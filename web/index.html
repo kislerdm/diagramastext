@@ -1,0 +1,26 @@
+<html lang="en">
+<header>
+    <script src="src/converter.min.js"></script>
+</header>
+
+<body>
+<div id="diag"></div>
+<script>
+    const s = `@startuml
+Bob -> Alice : hello
+@enduml`;
+
+    const url = `https://www.plantuml.com/plantuml/svg/${compress(s)}`;
+
+    fetch(url).then((response) => {
+        if (!response.ok) {
+            throw Error(`status ${response.status}`);
+        }
+        return response.text();
+    }).then((response) => {
+        document.getElementById("diag").innerHTML = response;
+    }).catch((err) => console.error(err));
+
+</script>
+</body>
+</html>
