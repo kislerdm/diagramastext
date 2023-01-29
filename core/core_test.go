@@ -31,8 +31,8 @@ func TestCode2Path(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if got, _ := Code2Path(tt.args.s); got != tt.want {
-					t.Errorf("Code2Path() = %v, want %v", got, tt.want)
+				if got, _ := code2Path(tt.args.s); got != tt.want {
+					t.Errorf("code2Path() = %v, want %v", got, tt.want)
 				}
 			},
 		)

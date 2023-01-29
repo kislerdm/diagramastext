@@ -2,13 +2,105 @@ package core
 
 import (
 	"bytes"
-	"log"
+	"errors"
+	"io"
+	"net/http"
+	"strconv"
+	"time"
 	"unsafe"
 
 	"github.com/kislerdm/chatgpt-c4/core/go-zopfli/zopfli"
 )
 
-// Code2Path converts the diagram as code to the 64Bytes encoded string to query plantuml
+// HttpClient http base client.
+type HttpClient interface {
+	Get(url string) (resp *http.Response, err error)
+}
+
+type options struct {
+	httpClient HttpClient
+}
+
+// PlantUMLClient client to communicate with the plantuml server.
+type PlantUMLClient interface {
+	// GenerateSVG generates the SVG diagram using the diagram as code input.
+	GenerateSVG(code string) ([]byte, error)
+
+	// GeneratePNG generates the PNG diagram using the diagram as code input.
+	GeneratePNG(code string) ([]byte, error)
+}
+
+type client struct {
+	options options
+
+	baseURL string
+}
+
+func (c *client) GenerateSVG(code string) ([]byte, error) {
+	p, err := code2Path(code)
+	if err != nil {
+		return nil, err
+	}
+	return c.requestHandler("svg/" + p)
+}
+
+func (c *client) GeneratePNG(code string) ([]byte, error) {
+	p, err := code2Path(code)
+	if err != nil {
+		return nil, err
+	}
+	return c.requestHandler("png/" + p)
+}
+
+func (c *client) requestHandler(p string) ([]byte, error) {
+	resp, err := c.options.httpClient.Get(c.baseURL + p)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode > 209 {
+		return nil, errors.New("error status code: " + strconv.Itoa(resp.StatusCode))
+	}
+
+	buf, err := io.ReadAll(resp.Body)
+	defer func() { _ = resp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+const (
+	baseURL        = "https://www.plantuml.com/plantuml/"
+	defaultTimeout = 1 * time.Minute
+)
+
+// NewPlantUMLClient initiates the client to communicate with the plantuml server.
+func NewPlantUMLClient(optFns ...func(*options)) PlantUMLClient {
+	o := options{
+		httpClient: nil,
+	}
+
+	for _, fn := range optFns {
+		fn(&o)
+	}
+
+	resolveHTTPClient(&o)
+
+	return &client{
+		options: o,
+		baseURL: baseURL,
+	}
+}
+
+func resolveHTTPClient(o *options) {
+	if o.httpClient == nil {
+		o.httpClient = &http.Client{Timeout: defaultTimeout}
+	}
+}
+
+// code2Path converts the diagram as code to the 64Bytes encoded string to query plantuml
 //
 // Example: the diagram's code
 // @startuml
@@ -22,7 +114,7 @@ import (
 // The resulting string to be used to generate C4 diagram
 // - as png: GET www.plantuml.com/plantuml/png/SoWkIImgAStDuL80WaG5NJk592w7rBmKe100
 // - as svg: GET www.plantuml.com/plantuml/svg/SoWkIImgAStDuL80WaG5NJk592w7rBmKe100
-func Code2Path(s string) (string, error) {
+func code2Path(s string) (string, error) {
 	zb, err := compress(*(*[]byte)(unsafe.Pointer(&s)))
 	if err != nil {
 		return "", err
@@ -31,7 +123,6 @@ func Code2Path(s string) (string, error) {
 }
 
 func compress(v []byte) ([]byte, error) {
-	log.Println(v)
 	var options = zopfli.DefaultOptions()
 	var w bytes.Buffer
 	if err := zopfli.Compress(&options, zopfli.FORMAT_DEFLATE, v, &w); err != nil {
