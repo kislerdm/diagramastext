@@ -7,10 +7,11 @@
 <div id="diag"></div>
 <script>
     const s = `@startuml
-Bob -> Alice : hello
+    a -> b
 @enduml`;
 
     const url = `https://www.plantuml.com/plantuml/svg/${compress(s)}`;
+    console.log(url);
 
     fetch(url).then((response) => {
         if (!response.ok) {
@@ -20,6 +21,15 @@ Bob -> Alice : hello
     }).then((response) => {
         document.getElementById("diag").innerHTML = response;
     }).catch((err) => console.error(err));
+
+    const comp = (s) => {
+        var arr = [];
+        for (var i = 0; i < s.length; i++)
+            arr.push(s.charCodeAt(i));
+        console.log(arr);
+        var compressor = new Zopfli.RawDeflate(arr);
+        return compressor.compress();
+    }
 
 </script>
 </body>

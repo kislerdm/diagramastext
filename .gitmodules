@@ -1,0 +1,3 @@
+[submodule "core/go-zopfli"]
+	path = core/go-zopfli
+	url = git@github.com:kislerdm/go-zopfli.git
