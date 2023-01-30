@@ -12,4 +12,4 @@ The tool generates C4 diagram using textual description.
 
 - [zopfi](https://github.com/google/zopfli): The library used to compress and encode the C4 Diagram definition as code
   as the string request content to generate diagram using [PlantUML](www.plantuml.com/plantuml/uml) server.
-- The encoding [logic](web/src/converter.js)
+- The encoding [logic](web/plantuml-mimic/src/converter.js)
