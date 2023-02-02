@@ -12,7 +12,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-20.04
-    permission: write
+    permissions:
+      contents: write
     if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master' )
     steps:
       - uses: actions/checkout@v3
