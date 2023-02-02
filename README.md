@@ -1,6 +1,17 @@
-# ChatGPT C4 Diagram Generator
+# Diagram As Text
 
-The tool generates C4 diagram using textual description.
+The tool to generate diagram based on textual description.
+
+_The motivation_: to streamline knowledge sharing by enabling effective generation of visual materials.
+
+_The objective_: to take a step beyond the "diagram as code" approach and remove the additional step between the idea of
+what shall be displayed and the illustration.
+
+**Note** that the focus of the project is on c4 container diagram as of January 2023 as a followup on
+the [LI post](https://www.linkedin.com/posts/dkisler_softwaredevelopment-infrastructure-engineers-activity-7023804923280510976-zH7U)
+.
+
+## Contribution is more than welcomed!
 
 ## Architecture
 
