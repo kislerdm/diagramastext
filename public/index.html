@@ -12,13 +12,29 @@
             border: 0 solid #e5e7eb
         }
 
-        :after, :before { --tw-content: ""; }
+        :after, :before {
+            --tw-content: "";
+        }
 
-        a { color: white; }
-        a:link { text-decoration: none; }
-        a:visited { text-decoration: none; }
-        a:hover { text-decoration: none; }
-        a:active { text-decoration: none; }
+        a {
+            color: white;
+        }
+
+        a:link {
+            text-decoration: none;
+        }
+
+        a:visited {
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: none;
+        }
+
+        a:active {
+            text-decoration: none;
+        }
 
         html {
             line-height: 1.5;
@@ -26,7 +42,7 @@
             -moz-tab-size: 4;
             -o-tab-size: 4;
             tab-size: 4;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif
         }
 
         body {
@@ -57,16 +73,6 @@
             margin-top: 30px;
         }
 
-        .patch {
-            padding: 1rem;
-            border-radius: 1.5rem;
-            margin-top: .5rem;
-            margin-bottom: .5rem;
-            background: rgba(25, 83, 161, 0.8);
-            text-align: justify-all;
-            color: white;
-        }
-
         .box {
             border-radius: 1.2rem;
             padding: 0.8rem;
@@ -94,6 +100,10 @@
 
         textarea {
             font-size: 20px;
+            color: white;
+            border-radius: 1rem;
+            background: #263950;
+            padding: 1rem;
         }
 
         #demo {
@@ -146,21 +156,18 @@
 </footer>
 
 <div id="punch">
-    Generate <span style="font-family: 'Arial Black', sans-serif;">diagrams</span>
+    Generate <span style="font-weight: bold;">diagrams</span>
     using <span style="font-style: italic; font-weight: bold;">plain English</span> in no time for free!
 </div>
 
 <div id="demo">
     <div class="box">
         <p class="box-text">Input:</p>
-        <textarea class="patch" style="color: white; resize: none;"
+        <textarea style="resize: none;"
                   placeholder="Type Your English Text here"
                   aria-label="Type your English text here"
-                  rows="5" cols="30"
-                  disabled>
-
-C4 diagram of a Go web server reading from external PostgreSQL database over TCP
-            </textarea>
+                  rows="3" cols="30"
+                  disabled>C4 diagram of a Go web server reading from external PostgreSQL database over TCP</textarea>
     </div>
     <i class="arrow"></i>
     <div id="output" class="box">
@@ -280,7 +287,7 @@ C4 diagram of a Go web server reading from external PostgreSQL database over TCP
 
 <i class="arrow"></i>
 
-<div class="bubble">
+<div class="bubble" style="margin-bottom: 50px;">
     <p>The tool is under development. Please get in touch for details and collaboration. Thanks!</p>
     <a href="https://www.linkedin.com/in/dkisler">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
