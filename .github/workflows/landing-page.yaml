@@ -9,7 +9,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-obs:
+jobs:
   deploy:
     runs-on: ubuntu-20.04
     if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master' )
