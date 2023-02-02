@@ -69,8 +69,8 @@
 
         #title {
             font-size: 50px;
-            color: #363434;
             margin-top: 30px;
+            color: #363434;
         }
 
         .box {
@@ -98,12 +98,14 @@
             margin-top: 8px;
         }
 
-        textarea {
+        .textarea {
             font-size: 20px;
             color: white;
+            text-align: left;
             border-radius: 1rem;
             background: #263950;
             padding: 1rem;
+            width: 450px;
         }
 
         #demo {
@@ -136,6 +138,10 @@
                 width: 100%;
             }
 
+            .textarea {
+                width: 100%;
+            }
+
             #title {
                 font-size: 40px;
             }
@@ -163,11 +169,7 @@
 <div id="demo">
     <div class="box">
         <p class="box-text">Input:</p>
-        <textarea style="resize: none;"
-                  placeholder="Type Your English Text here"
-                  aria-label="Type your English text here"
-                  rows="3" cols="30"
-                  disabled>C4 diagram of a Go web server reading from external PostgreSQL database over TCP</textarea>
+        <div class="textarea">C4 diagram of a Go web server reading from external PostgreSQL database over TCP</div>
     </div>
     <i class="arrow"></i>
     <div id="output" class="box">
