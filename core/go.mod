@@ -1,3 +1,3 @@
-module github.com/kislerdm/chatgpt-c4/core
+module github.com/kislerdm/diagramastext/core
 
 go 1.19
