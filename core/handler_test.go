@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -41,4 +42,44 @@ func TestNewC4Handler(t *testing.T) {
 			}
 		},
 	)
+}
+
+func Test_responseC4Diagram_ToJSON(t *testing.T) {
+	mustMarshal := func(v []byte) []byte {
+		o, _ := json.Marshal(
+			map[string][]byte{
+				"svg": v,
+			},
+		)
+		return o
+	}
+
+	type fields struct {
+		SVG []byte
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []byte
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				SVG: []byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"></svg>`),
+			},
+			want: mustMarshal([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"></svg>`)),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				r := responseC4Diagram{
+					SVG: tt.fields.SVG,
+				}
+				if got := r.ToJSON(); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("ToJSON() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
 }

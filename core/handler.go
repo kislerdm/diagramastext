@@ -58,6 +58,7 @@ type responseC4Diagram struct {
 }
 
 func (r responseC4Diagram) ToJSON() []byte {
+	// FIXME(?): add svg validation.
 	o, err := json.Marshal(r)
 	if err != nil {
 		panic(err)
