@@ -1,0 +1,73 @@
+run:
+  allow-parallel-runners: true
+  go: "1.19"
+  skip-files:
+    - compression/
+
+issues:
+  exclude-use-default: false
+  max-same-issues: 0
+  new-from-rev: HEAD
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - lll
+    - linters:
+      - lll
+      source: "Content: \\`"
+    - linters:
+      - lll
+      source: "\\// "
+    - linters:
+        - cyclop
+      path: cmd
+
+linters:
+  disable-all: true
+  enable:
+    - gosimple
+    - govet
+    - gofmt
+    - goimports
+    - staticcheck
+    - tenv
+    - gocyclo
+    - cyclop
+    - lll
+    - errcheck
+    - unused
+    - ineffassign
+    - asciicheck
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - makezero
+    - nilerr
+
+linters-settings:
+  gofmt:
+    simplify: true
+
+  exhaustive:
+    default-signifies-exhaustive: true
+
+  nolintlint:
+    allow-leading-space: true
+    allow-unused: false
+    require-explanation: true
+    require-specific: true
+
+  errorlint:
+    errorf: false
+
+  gocyclo:
+    min-complexity: 15
+
+  cyclop:
+    max-complexity: 15
+    package-average: 5
+    skip-tests: true
+
+  lll:
+    line-length: 120
+    tab-width: 1
