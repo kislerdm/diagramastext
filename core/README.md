@@ -1,5 +1,7 @@
 # diagramastext backend logic
 
+[![codecov](https://codecov.io/github/kislerdm/diagramastext/branch/master/graph/badge.svg)](https://codecov.io/github/kislerdm/diagramastext)
+
 The codebase orchestrates transformations of the user's inquiry.
 
 ## Design

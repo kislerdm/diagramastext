@@ -9,7 +9,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/kislerdm/diagramastext/core/zopfli"
+	"github.com/kislerdm/diagramastext/core/compression"
 )
 
 // HttpClient http base client.
@@ -123,9 +123,9 @@ func code2Path(s string) (string, error) {
 }
 
 func compress(v []byte) ([]byte, error) {
-	var options = zopfli.DefaultOptions()
+	var options = compression.DefaultOptions()
 	var w bytes.Buffer
-	if err := zopfli.Compress(&options, zopfli.FORMAT_DEFLATE, v, &w); err != nil {
+	if err := compression.Compress(&options, compression.FORMAT_DEFLATE, v, &w); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil

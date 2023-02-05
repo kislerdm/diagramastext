@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/kislerdm/chatgpt-c4/core"
+	"github.com/kislerdm/diagramastext/core"
 )
 
 func main() {
