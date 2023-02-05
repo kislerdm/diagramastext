@@ -21,10 +21,38 @@ type options struct {
 	httpClient HttpClient
 }
 
+// DiagramGraph defines the diagram graph.
+type DiagramGraph struct {
+	Title  string  `json:"title"`
+	Footer string  `json:"footer"`
+	Nodes  []*Node `json:"nodes"`
+	Links  []*Link `json:"links"`
+}
+
+// Node diagram's definition node.
+type Node struct {
+	ID         string `json:"id"`
+	Label      string `json:"label"`
+	Group      string `json:"group"`
+	Technology string `json:"technology"`
+	External   bool   `json:"external"`
+	IsQueue    bool   `json:"is_queue"`
+	IsDatabase bool   `json:"is_database"`
+}
+
+// Link diagram's definition link.
+type Link struct {
+	From       string `json:"from"`
+	To         string `json:"to"`
+	Direction  string `json:"direction"`
+	Label      string `json:"label"`
+	Technology string `json:"technology"`
+}
+
 // ClientPlantUML client to communicate with the plantuml server.
 type ClientPlantUML interface {
 	// GenerateDiagram generates the SVG diagram using the diagram as code input.
-	GenerateDiagram(code string) ([]byte, error)
+	GenerateDiagram(graph DiagramGraph) ([]byte, error)
 }
 
 type client struct {
@@ -33,8 +61,13 @@ type client struct {
 	baseURL string
 }
 
-func (c *client) GenerateDiagram(code string) ([]byte, error) {
-	p, err := code2Path(code)
+// diagramGraph2plantUMLCode function to "transpile" the diagram definition graph to plantUML code as string.
+func diagramGraph2plantUMLCode(graph DiagramGraph) string {
+	panic("todo")
+}
+
+func (c *client) GenerateDiagram(v DiagramGraph) ([]byte, error) {
+	p, err := code2Path(diagramGraph2plantUMLCode(v))
 	if err != nil {
 		return nil, err
 	}

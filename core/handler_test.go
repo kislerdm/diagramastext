@@ -14,7 +14,7 @@ func (m mockClientOpenAI) InferModel(s string) (DiagramGraph, error) {
 
 type mockClientPlantUML struct{}
 
-func (m mockClientPlantUML) GenerateDiagram(code string) ([]byte, error) {
+func (m mockClientPlantUML) GenerateDiagram(code DiagramGraph) ([]byte, error) {
 	return nil, nil
 }
 
