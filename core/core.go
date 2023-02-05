@@ -21,13 +21,10 @@ type options struct {
 	httpClient HttpClient
 }
 
-// PlantUMLClient client to communicate with the plantuml server.
-type PlantUMLClient interface {
-	// GenerateSVG generates the SVG diagram using the diagram as code input.
-	GenerateSVG(code string) ([]byte, error)
-
-	// GeneratePNG generates the PNG diagram using the diagram as code input.
-	GeneratePNG(code string) ([]byte, error)
+// ClientPlantUML client to communicate with the plantuml server.
+type ClientPlantUML interface {
+	// GenerateDiagram generates the SVG diagram using the diagram as code input.
+	GenerateDiagram(code string) ([]byte, error)
 }
 
 type client struct {
@@ -36,20 +33,12 @@ type client struct {
 	baseURL string
 }
 
-func (c *client) GenerateSVG(code string) ([]byte, error) {
+func (c *client) GenerateDiagram(code string) ([]byte, error) {
 	p, err := code2Path(code)
 	if err != nil {
 		return nil, err
 	}
 	return c.requestHandler("svg/" + p)
-}
-
-func (c *client) GeneratePNG(code string) ([]byte, error) {
-	p, err := code2Path(code)
-	if err != nil {
-		return nil, err
-	}
-	return c.requestHandler("png/" + p)
 }
 
 func (c *client) requestHandler(p string) ([]byte, error) {
@@ -77,7 +66,7 @@ const (
 )
 
 // NewPlantUMLClient initiates the client to communicate with the plantuml server.
-func NewPlantUMLClient(optFns ...func(*options)) PlantUMLClient {
+func NewPlantUMLClient(optFns ...func(*options)) ClientPlantUML {
 	o := options{
 		httpClient: nil,
 	}
