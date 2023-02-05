@@ -18,7 +18,7 @@ here for the rescue! All one needs is, a description in plain English to get des
 ## Outlook
 
 * [Contacts](#contacts)
-* [Bets/Panning/Commitment](#bets-panning-commitment)
+* [Bets/Panning/Commitment](#betspanningcommitment)
 * [Contribution](#contribution)
     + [Ways of work](#ways-of-work)
         - [Manifesto](#manifesto)
