@@ -48,7 +48,7 @@ here for the rescue! All one needs is, a description in plain English to get des
 - We are driven by the mission
 - We respect one another and the community
 - We deliver in lean iterations
-- We work async with pairing, or 
+- We work async with pairing programming sessions
 - We share the work openly, see the [license details](#license)
 
 #### Process
