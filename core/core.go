@@ -9,7 +9,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/kislerdm/chatgpt-c4/core/go-zopfli/zopfli"
+	"github.com/foobaz/go-zopfli/zopfli"
 )
 
 // HttpClient http base client.
