@@ -9,7 +9,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/kislerdm/diagramastext/core/zopfli"
+	"github.com/kislerdm/diagramastext/core/go-zopfli/zopfli"
 )
 
 // HttpClient http base client.
