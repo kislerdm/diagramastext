@@ -572,3 +572,45 @@ func Test_encode6bit(t *testing.T) {
 	// syntax signs
 
 }
+
+func Test_encode64(t *testing.T) {
+	type args struct {
+		e []byte
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "len(e)==2",
+			args: args{
+				e: []byte{0, 0},
+			},
+			want: "0000",
+		},
+		{
+			name: "len(e)==1",
+			args: args{
+				e: []byte{0},
+			},
+			want: "0000",
+		},
+		{
+			name: "len(e)==3",
+			args: args{
+				e: []byte{0, 0, 0},
+			},
+			want: "0000",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := encode64(tt.args.e); got != tt.want {
+					t.Errorf("encode64() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
