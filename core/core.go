@@ -60,7 +60,7 @@ type ClientInputToGraph interface {
 
 // ClientGraphToDiagram client to convert DiagramGraph to diagram artifact, e.g. svg image.
 type ClientGraphToDiagram interface {
-	Do(graph DiagramGraph) ([]byte, error)
+	Do(graph DiagramGraph) (ResponseDiagram, error)
 }
 
 // HttpClient http base client.

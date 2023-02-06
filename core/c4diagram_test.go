@@ -770,7 +770,7 @@ func Test_clientPlantUML_Do(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []byte
+		want    ResponseDiagram
 		wantErr bool
 	}{
 		{
@@ -795,7 +795,7 @@ func Test_clientPlantUML_Do(t *testing.T) {
 					},
 				},
 			},
-			want:    []byte(`<svg xmlns="http://www.w3.org/2000/svg" "></svg>`),
+			want:    ResponseC4Diagram{SVG: `<svg xmlns="http://www.w3.org/2000/svg" "></svg>`},
 			wantErr: false,
 		},
 		{

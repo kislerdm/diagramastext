@@ -24,7 +24,7 @@ type clientPlantUML struct {
 	baseURL string
 }
 
-func (c *clientPlantUML) Do(v DiagramGraph) ([]byte, error) {
+func (c *clientPlantUML) Do(v DiagramGraph) (ResponseDiagram, error) {
 	code, err := diagramGraph2plantUMLCode(v)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,13 @@ func (c *clientPlantUML) Do(v DiagramGraph) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return c.requestHandler("svg/" + p)
+
+	diagram, err := c.requestHandler("svg/" + p)
+	if err != nil {
+		return nil, err
+	}
+
+	return ResponseC4Diagram{SVG: *(*string)(unsafe.Pointer(&diagram))}, nil
 }
 
 func (c *clientPlantUML) requestHandler(p string) ([]byte, error) {
