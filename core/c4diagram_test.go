@@ -2,8 +2,10 @@ package core
 
 import (
 	"encoding/json"
+	"net/http"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func Test_diagramGraph2plantUMLCode(t *testing.T) {
@@ -609,6 +611,55 @@ func Test_encode64(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				if got := encode64(tt.args.e); got != tt.want {
 					t.Errorf("encode64() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func TestNewPlantUMLClient(t *testing.T) {
+	type args struct {
+		optFns []func(*optionsPlantUMLClient)
+	}
+	tests := []struct {
+		name string
+		args args
+		want ClientGraphToDiagram
+	}{
+		{
+			name: "default",
+			args: args{},
+			want: &clientPlantUML{
+				options: optionsPlantUMLClient{
+					httpClient: &http.Client{
+						Timeout: defaultTimeoutPlanUML,
+					},
+				},
+				baseURL: baseURLPlanUML,
+			},
+		},
+		{
+			name: "custom http client",
+			args: args{
+				optFns: []func(*optionsPlantUMLClient){
+					WithHTTPClientPlantUML(&http.Client{Timeout: 2 * time.Minute}),
+				},
+			},
+			want: &clientPlantUML{
+				options: optionsPlantUMLClient{
+					httpClient: &http.Client{
+						Timeout: 2 * time.Minute,
+					},
+				},
+				baseURL: baseURLPlanUML,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := NewPlantUMLClient(tt.args.optFns...); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("NewPlantUMLClient() = %v, want %v", got, tt.want)
 				}
 			},
 		)

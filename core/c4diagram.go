@@ -14,12 +14,12 @@ import (
 	"github.com/kislerdm/diagramastext/core/compression"
 )
 
-type options struct {
+type optionsPlantUMLClient struct {
 	httpClient HttpClient
 }
 
 type clientPlantUML struct {
-	options options
+	options optionsPlantUMLClient
 
 	baseURL string
 }
@@ -58,13 +58,13 @@ func (c *clientPlantUML) requestHandler(p string) ([]byte, error) {
 }
 
 const (
-	baseURL        = "https://www.plantuml.com/plantuml/"
-	defaultTimeout = 1 * time.Minute
+	baseURLPlanUML        = "https://www.plantuml.com/plantuml/"
+	defaultTimeoutPlanUML = 1 * time.Minute
 )
 
 // NewPlantUMLClient initiates the clientPlantUML to communicate with the plantuml server.
-func NewPlantUMLClient(optFns ...func(*options)) ClientGraphToDiagram {
-	o := options{
+func NewPlantUMLClient(optFns ...func(*optionsPlantUMLClient)) ClientGraphToDiagram {
+	o := optionsPlantUMLClient{
 		httpClient: nil,
 	}
 
@@ -76,13 +76,20 @@ func NewPlantUMLClient(optFns ...func(*options)) ClientGraphToDiagram {
 
 	return &clientPlantUML{
 		options: o,
-		baseURL: baseURL,
+		baseURL: baseURLPlanUML,
 	}
 }
 
-func resolveHTTPClient(o *options) {
+// WithHTTPClientPlantUML overwrite the PlantUML HTTP client.
+func WithHTTPClientPlantUML(c HttpClient) func(*optionsPlantUMLClient) {
+	return func(o *optionsPlantUMLClient) {
+		o.httpClient = c
+	}
+}
+
+func resolveHTTPClient(o *optionsPlantUMLClient) {
 	if o.httpClient == nil {
-		o.httpClient = &http.Client{Timeout: defaultTimeout}
+		o.httpClient = &http.Client{Timeout: defaultTimeoutPlanUML}
 	}
 }
 
