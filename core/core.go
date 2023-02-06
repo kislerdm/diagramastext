@@ -65,5 +65,5 @@ type ClientGraphToDiagram interface {
 
 // HttpClient http base client.
 type HttpClient interface {
-	Get(url string) (resp *http.Response, err error)
+	Do(req *http.Request) (resp *http.Response, err error)
 }

@@ -33,7 +33,9 @@ func (c *clientPlantUML) Do(v DiagramGraph) ([]byte, error) {
 }
 
 func (c *clientPlantUML) requestHandler(p string) ([]byte, error) {
-	resp, err := c.options.httpClient.Get(c.baseURL + p)
+	req, _ := http.NewRequest("GET", c.baseURL+p, nil)
+
+	resp, err := c.options.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
