@@ -210,9 +210,10 @@ func Test_diagramNode2UML(t *testing.T) {
 		n Node
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name    string
+		args    args
+		want    string
+		wantErr bool
 	}{
 		{
 			name: "ID only",
@@ -286,11 +287,22 @@ func Test_diagramNode2UML(t *testing.T) {
 			},
 			want: `Container(0, "Core Logic", "Go Application")`,
 		},
+		{
+			name:    "unhappy path",
+			args:    args{n: Node{}},
+			want:    "",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if got := diagramNode2UML(tt.args.n); got != tt.want {
+				got, err := diagramNode2UML(tt.args.n)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("diagramNode2UML() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if got != tt.want {
 					t.Errorf("diagramNode2UML() = %v, want %v", got, tt.want)
 				}
 			},

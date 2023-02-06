@@ -191,7 +191,11 @@ func diagramFooter2UML(graph DiagramGraph) string {
 	return `footer "` + stringCleaner(graph.Footer) + `"`
 }
 
-func diagramNode2UML(n Node) string {
+func diagramNode2UML(n Node) (string, error) {
+	if n.ID == "" {
+		return "", errors.New("node must be identified: 'id' attribute")
+	}
+
 	o := "Container"
 
 	switch n.IsQueue && n.IsDatabase {
@@ -224,15 +228,15 @@ func diagramNode2UML(n Node) string {
 
 	o += ")"
 
-	return o
+	return o, nil
 }
 
 func diagramLink2UML(l Link) (string, error) {
-	o := "Rel"
-
 	if l.From == "" || l.To == "" {
 		return "", errors.New("link must specify the end nodes: 'from' and 'to' attributes")
 	}
+
+	o := "Rel"
 
 	if d := linkDirection(l.Direction); d != "" {
 		o += "_" + d
