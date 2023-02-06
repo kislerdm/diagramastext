@@ -25,7 +25,11 @@ type clientPlantUML struct {
 }
 
 func (c *clientPlantUML) Do(v DiagramGraph) ([]byte, error) {
-	p, err := code2Path(diagramGraph2plantUMLCode(v))
+	code, err := diagramGraph2plantUMLCode(v)
+	if err != nil {
+		return nil, err
+	}
+	p, err := code2Path(code)
 	if err != nil {
 		return nil, err
 	}
@@ -223,8 +227,12 @@ func diagramNode2UML(n Node) string {
 	return o
 }
 
-func diagramLink2UML(l Link) string {
+func diagramLink2UML(l Link) (string, error) {
 	o := "Rel"
+
+	if l.From == "" || l.To == "" {
+		return "", errors.New("link must specify the end nodes: 'from' and 'to' attributes")
+	}
 
 	if d := linkDirection(l.Direction); d != "" {
 		o += "_" + d
@@ -233,16 +241,16 @@ func diagramLink2UML(l Link) string {
 	o += "(" + l.From + ", " + l.To
 
 	if l.Label != "" {
-		o += ", " + l.Label
+		o += `, "` + stringCleaner(l.Label) + `"`
 	}
 
 	if l.Technology != "" {
-		o += ", " + l.Technology
+		o += `, "` + stringCleaner(l.Technology) + `"`
 	}
 
 	o += ")"
 
-	return o
+	return o, nil
 }
 
 func linkDirection(s string) string {
@@ -268,7 +276,7 @@ func stringCleaner(s string) string {
 }
 
 // diagramGraph2plantUMLCode function to "transpile" the diagram definition graph to plantUML code as string.
-func diagramGraph2plantUMLCode(graph DiagramGraph) string {
+func diagramGraph2plantUMLCode(graph DiagramGraph) (string, error) {
 	o := `@startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml`
 
@@ -280,7 +288,7 @@ func diagramGraph2plantUMLCode(graph DiagramGraph) string {
 
 	o += "\n@enduml"
 
-	return o
+	return o, nil
 }
 
 func diagramTitle2UML(graph DiagramGraph) string {

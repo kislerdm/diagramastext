@@ -145,9 +145,10 @@ func Test_diagramGraph2plantUMLCode(t *testing.T) {
 		graph DiagramGraph
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name    string
+		args    args
+		want    string
+		wantErr bool
 	}{
 		{
 			name: "default graph",
@@ -191,7 +192,12 @@ title "foo"
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if got := diagramGraph2plantUMLCode(tt.args.graph); got != tt.want {
+				got, err := diagramGraph2plantUMLCode(tt.args.graph)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("diagramGraph2plantUMLCode() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if got != tt.want {
 					t.Errorf("diagramGraph2plantUMLCode() = %v, want %v", got, tt.want)
 				}
 			},
@@ -389,6 +395,103 @@ func Test_linkDirection(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				if got := linkDirection(tt.args.s); got != tt.want {
 					t.Errorf("linkDirection() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func Test_diagramLink2UML(t *testing.T) {
+	type args struct {
+		l Link
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "simple link",
+			args: args{
+				l: Link{
+					From: "foo",
+					To:   "bar",
+				},
+			},
+			want:    "Rel(foo, bar)",
+			wantErr: false,
+		},
+		{
+			name: "link w. label",
+			args: args{
+				l: Link{
+					From:  "foo",
+					To:    "bar",
+					Label: "baz",
+				},
+			},
+			want:    `Rel(foo, bar, "baz")`,
+			wantErr: false,
+		},
+		{
+			name: "link w. label and technology",
+			args: args{
+				l: Link{
+					From:       "foo",
+					To:         "bar",
+					Label:      "baz",
+					Technology: "HTTP/JSON",
+				},
+			},
+			want:    `Rel(foo, bar, "baz", "HTTP/JSON")`,
+			wantErr: false,
+		},
+		{
+			name: "link w. label and technology, direction: on the right",
+			args: args{
+				l: Link{
+					From:       "foo",
+					To:         "bar",
+					Label:      "baz",
+					Technology: "HTTP/JSON",
+					Direction:  "LR",
+				},
+			},
+			want:    `Rel_R(foo, bar, "baz", "HTTP/JSON")`,
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: no 'from'",
+			args: args{
+				l: Link{
+					To: "bar",
+				},
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: no 'to'",
+			args: args{
+				l: Link{
+					From: "foo",
+				},
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				got, err := diagramLink2UML(tt.args.l)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("diagramLink2UML() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if got != tt.want {
+					t.Errorf("diagramLink2UML() got = %v, want %v", got, tt.want)
 				}
 			},
 		)
