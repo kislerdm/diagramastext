@@ -331,3 +331,66 @@ func Test_responseC4Diagram_ToJSON(t *testing.T) {
 		)
 	}
 }
+
+func Test_linkDirection(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Rel_R",
+			args: args{
+				s: "LR",
+			},
+			want: "R",
+		},
+		{
+			name: "Rel_L",
+			args: args{
+				s: "RL",
+			},
+			want: "L",
+		},
+		{
+			name: "Rel_U",
+			args: args{
+				s: "TD",
+			},
+			want: "D",
+		},
+		{
+			name: "Rel_D",
+			args: args{
+				s: "DT",
+			},
+			want: "U",
+		},
+		{
+			name: "Rel:nothing provided",
+			args: args{
+				s: "",
+			},
+			want: "",
+		},
+		{
+			name: "Rel:unknown option provided",
+			args: args{
+				s: "foobar",
+			},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := linkDirection(tt.args.s); got != tt.want {
+					t.Errorf("linkDirection() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
