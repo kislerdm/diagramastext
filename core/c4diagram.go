@@ -198,7 +198,7 @@ func diagramFooter2UML(graph DiagramGraph) string {
 	return `footer "` + stringCleaner(graph.Footer) + `"`
 }
 
-func diagramNode2UML(n Node) (string, error) {
+func diagramNode2UML(n *Node) (string, error) {
 	if n.ID == "" {
 		return "", errors.New("node must be identified: 'id' attribute")
 	}
@@ -238,7 +238,7 @@ func diagramNode2UML(n Node) (string, error) {
 	return o, nil
 }
 
-func diagramLink2UML(l Link) (string, error) {
+func diagramLink2UML(l *Link) (string, error) {
 	if l.From == "" || l.To == "" {
 		return "", errors.New("link must specify the end nodes: 'from' and 'to' attributes")
 	}
@@ -303,7 +303,7 @@ func diagramGraph2plantUMLCode(graph DiagramGraph) (string, error) {
 
 	groups := map[string][]string{}
 	for _, n := range graph.Nodes {
-		containerStr, err := diagramNode2UML(*n)
+		containerStr, err := diagramNode2UML(n)
 		if err != nil {
 			return "", err
 		}
@@ -313,7 +313,15 @@ func diagramGraph2plantUMLCode(graph DiagramGraph) (string, error) {
 		}
 		groups[n.Group] = append(groups[n.Group], containerStr)
 	}
-	o += "\n" + diagramUMLSystemBoundary(groups)
+	o += diagramUMLSystemBoundary(groups)
+
+	for _, l := range graph.Links {
+		linkStr, err := diagramLink2UML(l)
+		if err != nil {
+			return "", err
+		}
+		o += "\n" + linkStr
+	}
 
 	o += "\n@enduml"
 
@@ -322,14 +330,15 @@ func diagramGraph2plantUMLCode(graph DiagramGraph) (string, error) {
 
 func diagramUMLSystemBoundary(v map[string][]string) string {
 	o := ""
+	if members, ok := v[""]; ok {
+		o += "\n" + strings.Join(members, "\n")
+		delete(v, "")
+	}
+
 	for groupName, members := range v {
-		if groupName == "" {
-			o += strings.Join(members, "\n")
-			continue
-		}
 		description := stringCleaner(groupName)
 		id := strings.ReplaceAll(description, "\n", "_")
-		o += "System_Boundary(" + id + `, "` + description + `") {
+		o += "\nSystem_Boundary(" + id + `, "` + description + `") {
 ` + strings.Join(members, "\n") + "\n}"
 	}
 	return o
