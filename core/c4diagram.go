@@ -288,6 +288,10 @@ func stringCleaner(s string) string {
 
 // diagramGraph2plantUMLCode function to "transpile" the diagram definition graph to plantUML code as string.
 func diagramGraph2plantUMLCode(graph DiagramGraph) (string, error) {
+	if len(graph.Nodes) == 0 {
+		return "", errors.New("graph must contain at least one node")
+	}
+
 	o := `@startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml`
 
