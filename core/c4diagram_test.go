@@ -249,12 +249,13 @@ func Test_diagramNode2UML(t *testing.T) {
 			name: "core logic example",
 			args: args{
 				n: Node{
-					ID:         "0",
-					Label:      "Core Logic",
-					Technology: "Go Application",
+					ID:    "0",
+					Label: "Core Logic",
+					Technology: `"Go Application"
+foobar"`,
 				},
 			},
-			want: `Container(0, "Core Logic", "Go Application")`,
+			want: `Container(0, "Core Logic", "Go Application"\nfoobar")`,
 		},
 		{
 			name:    "unhappy path",
