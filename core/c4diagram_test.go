@@ -494,6 +494,14 @@ bar`),
 			},
 			wantErr: false,
 		},
+		{
+			name: "unhappy path",
+			args: args{
+				v: []byte{0},
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
