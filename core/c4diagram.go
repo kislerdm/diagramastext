@@ -301,9 +301,38 @@ func diagramGraph2plantUMLCode(graph DiagramGraph) (string, error) {
 		o += "\n" + diagramTitle2UML(graph)
 	}
 
+	groups := map[string][]string{}
+	for _, n := range graph.Nodes {
+		containerStr, err := diagramNode2UML(*n)
+		if err != nil {
+			return "", err
+		}
+
+		if _, ok := groups[n.Group]; !ok {
+			groups[n.Group] = []string{}
+		}
+		groups[n.Group] = append(groups[n.Group], containerStr)
+	}
+	o += "\n" + diagramUMLSystemBoundary(groups)
+
 	o += "\n@enduml"
 
 	return o, nil
+}
+
+func diagramUMLSystemBoundary(v map[string][]string) string {
+	o := ""
+	for groupName, members := range v {
+		if groupName == "" {
+			o += strings.Join(members, "\n")
+			continue
+		}
+		description := stringCleaner(groupName)
+		id := strings.ReplaceAll(description, "\n", "_")
+		o += "System_Boundary(" + id + `, "` + description + `") {
+` + strings.Join(members, "\n") + "\n}"
+	}
+	return o
 }
 
 func diagramTitle2UML(graph DiagramGraph) string {
