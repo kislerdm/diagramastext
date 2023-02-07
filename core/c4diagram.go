@@ -59,6 +59,7 @@ func (c *clientPlantUML) Do(ctx context.Context, v DiagramGraph) (ResponseDiagra
 	return ResponseC4Diagram{SVG: *(*string)(unsafe.Pointer(&diagram))}, nil
 }
 
+// REFACTOR: take to a dedicated helper function.
 func (c *clientPlantUML) requestHandler(ctx context.Context, encodedDiagramString string) ([]byte, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+encodedDiagramString, nil)
 
