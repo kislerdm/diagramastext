@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -156,7 +157,7 @@ Rel_L(2, 1, "Consumes domain events", "TCP/Protobuf")
 	}
 }
 
-func Test_responseC4Diagram_ToJSON(t *testing.T) {
+func Test_responseC4Diagram_MustMarshal(t *testing.T) {
 	mustMarshal := func(v string) []byte {
 		o, _ := json.Marshal(
 			map[string]string{
@@ -188,7 +189,7 @@ func Test_responseC4Diagram_ToJSON(t *testing.T) {
 				r := ResponseC4Diagram{
 					SVG: tt.fields.SVG,
 				}
-				if got := r.ToJSON(); !reflect.DeepEqual(got, tt.want) {
+				if got := r.MustMarshal(); !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("ToJSON() = %v, want %v", got, tt.want)
 				}
 			},
@@ -764,7 +765,8 @@ func Test_clientPlantUML_Do(t *testing.T) {
 		baseURL string
 	}
 	type args struct {
-		v DiagramGraph
+		ctx context.Context
+		v   DiagramGraph
 	}
 	tests := []struct {
 		name    string
@@ -787,6 +789,7 @@ func Test_clientPlantUML_Do(t *testing.T) {
 				baseURL: baseURLPlanUML,
 			},
 			args: args{
+				ctx: context.TODO(),
 				v: DiagramGraph{
 					Nodes: []*Node{
 						{
@@ -802,7 +805,8 @@ func Test_clientPlantUML_Do(t *testing.T) {
 			name:   "unhappy path: faulty graph",
 			fields: fields{},
 			args: args{
-				v: DiagramGraph{},
+				ctx: context.TODO(),
+				v:   DiagramGraph{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -818,6 +822,7 @@ func Test_clientPlantUML_Do(t *testing.T) {
 				baseURL: baseURLPlanUML,
 			},
 			args: args{
+				ctx: context.TODO(),
 				v: DiagramGraph{
 					Nodes: []*Node{
 						{
@@ -861,7 +866,7 @@ func Test_clientPlantUML_Do(t *testing.T) {
 					options: tt.fields.options,
 					baseURL: tt.fields.baseURL,
 				}
-				got, err := c.Do(tt.args.v)
+				got, err := c.Do(tt.args.ctx, tt.args.v)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Do() error = %v, wantErr %v", err, tt.wantErr)
 					return

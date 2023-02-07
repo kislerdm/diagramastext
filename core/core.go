@@ -1,7 +1,7 @@
 package core
 
 import (
-	"encoding/json"
+	"context"
 	"net/http"
 )
 
@@ -35,32 +35,18 @@ type Link struct {
 
 // ResponseDiagram response object.
 type ResponseDiagram interface {
-	// ToJSON encodes the result as JSON.
-	ToJSON() []byte
-}
-
-// ResponseC4Diagram resulting C4 diagram.
-type ResponseC4Diagram struct {
-	SVG string `json:"svg"`
-}
-
-func (r ResponseC4Diagram) ToJSON() []byte {
-	// FIXME(?): add svg validation.
-	o, err := json.Marshal(r)
-	if err != nil {
-		panic(err)
-	}
-	return o
+	// MustMarshal serialises the result as JSON.
+	MustMarshal() []byte
 }
 
 // ClientInputToGraph client to convert user input inquiry to the DiagramGraph.
 type ClientInputToGraph interface {
-	Do(string) (DiagramGraph, error)
+	Do(context.Context, string) (DiagramGraph, error)
 }
 
 // ClientGraphToDiagram client to convert DiagramGraph to diagram artifact, e.g. svg image.
 type ClientGraphToDiagram interface {
-	Do(graph DiagramGraph) (ResponseDiagram, error)
+	Do(context.Context, DiagramGraph) (ResponseDiagram, error)
 }
 
 // HttpClient http base client.
