@@ -128,7 +128,7 @@ const (
 	baseURLOpenAI        = "https://api.openai.com/v1/"
 	defaultTimeoutOpenAI = 3 * time.Minute
 	defaultModelOpenAI   = "code-cushman-001"
-	defaultMaxTokens     = 1024
+	defaultMaxTokens     = 768
 	defaultTemperature   = 0
 	defaultTopP          = 1
 )
