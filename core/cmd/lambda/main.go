@@ -23,7 +23,7 @@ func main() {
 		core.ConfigOpenAI{
 			Token:       os.Getenv("OPENAI_API_KEY"),
 			MaxTokens:   mustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
-			Temperature: mustParseFloat32(os.Getenv("OPENAI_MAX_TOKENS")),
+			Temperature: mustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
 		},
 	)
 	if err != nil {
