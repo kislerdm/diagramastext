@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
+const mockToken = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
 func TestNewOpenAIClient(t *testing.T) {
 	type args struct {
 		cfg    ConfigOpenAI
 		optFns []func(client *clientOpenAI)
 	}
-
-	const mockToken = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 	tests := []struct {
 		name    string
@@ -157,6 +157,7 @@ func TestNewOpenAIClient(t *testing.T) {
 			wantErr: true,
 		},
 	}
+	t.Parallel()
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
@@ -171,4 +172,61 @@ func TestNewOpenAIClient(t *testing.T) {
 			},
 		)
 	}
+}
+
+func Test_clientOpenAI_setHeader(t *testing.T) {
+	t.Parallel()
+	t.Run(
+		"auth headers, no organization specified", func(t *testing.T) {
+			// GIVEN
+			c := clientOpenAI{
+				token: mockToken,
+			}
+			req := http.Request{
+				Header: make(map[string][]string),
+			}
+
+			// WHEN
+			c.setHeader(&req)
+
+			// THEN
+			if req.Header.Get("Authorization") != "Bearer "+mockToken {
+				t.Errorf("header Authorization must be set")
+				return
+			}
+			if req.Header.Get("Content-Type") != "application/json" {
+				t.Errorf("header Content-Type must be set as application/json")
+				return
+			}
+		},
+	)
+	t.Run(
+		"auth headers, organization specified", func(t *testing.T) {
+			// GIVEN
+			c := clientOpenAI{
+				token:        mockToken,
+				organization: "foobar",
+			}
+			req := http.Request{
+				Header: make(map[string][]string),
+			}
+
+			// WHEN
+			c.setHeader(&req)
+
+			// THEN
+			if req.Header.Get("Authorization") != "Bearer "+mockToken {
+				t.Errorf("header Authorization must be set")
+				return
+			}
+			if req.Header.Get("Content-Type") != "application/json" {
+				t.Errorf("header Content-Type must be set as application/json")
+				return
+			}
+			if req.Header.Get("Organization") != "foobar" {
+				t.Errorf("header Content-Type must be set as application/json")
+				return
+			}
+		},
+	)
 }
