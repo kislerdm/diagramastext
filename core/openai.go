@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -40,16 +39,14 @@ type ConfigOpenAI struct {
 }
 
 type openAIRequest struct {
-	Model       string  `json:"model"`
-	Prompt      string  `json:"prompt"`
-	Suffix      string  `json:"suffix,omitempty"`
-	Stop        string  `json:"stop,omitempty"`
-	MaxTokens   int     `json:"max_tokens,omitempty"`
-	Temperature float32 `json:"temperature,omitempty"`
-	Echo        bool    `json:"echo,omitempty"`
-	N           int     `json:"n,omitempty"`
-	Stream      bool    `json:"stream,omitempty"`
-	BestOf      int     `json:"best_of,omitempty"`
+	Model            string   `json:"model"`
+	Prompt           string   `json:"prompt"`
+	Stop             []string `json:"stop,omitempty"`
+	MaxTokens        int      `json:"max_tokens,omitempty"`
+	Temperature      float32  `json:"temperature,omitempty"`
+	TopP             float32  `json:"top_p"`
+	FrequencyPenalty float32  `json:"frequency_penalty"`
+	PresencePenalty  float32  `json:"presence_penalty"`
 }
 
 type clientOpenAI struct {
@@ -67,16 +64,14 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 		token:        cfg.Token,
 		organization: cfg.Organization,
 		payload: openAIRequest{
-			Model:       cfg.Model,
-			Prompt:      "",
-			Suffix:      "",
-			Stop:        "",
-			MaxTokens:   cfg.MaxTokens,
-			Temperature: cfg.Temperature,
-			Echo:        false,
-			N:           1,
-			Stream:      false,
-			BestOf:      1,
+			Model:            cfg.Model,
+			Prompt:           "",
+			Stop:             []string{"\n"},
+			MaxTokens:        cfg.MaxTokens,
+			TopP:             1,
+			Temperature:      cfg.Temperature,
+			FrequencyPenalty: 0,
+			PresencePenalty:  0,
 		},
 		baseURL: baseURLOpenAI,
 	}
@@ -110,7 +105,7 @@ func resolveConfigurations(c *clientOpenAI) error {
 	}
 
 	if c.payload.Temperature <= 0 {
-		c.payload.Temperature = 0.1
+		c.payload.Temperature = 0
 	}
 
 	return nil
@@ -146,8 +141,63 @@ type openAIResponse struct {
 }
 
 func (c *clientOpenAI) Do(ctx context.Context, prompt string) (DiagramGraph, error) {
+	// FIXME/REFACTOR: huge payload.
+	const promptInputComment = `Given prompts and corresponding graphs as json define new graph based on new prompt. ` +
+		`Every node has id,label,group,technology as strings,external,is_queue and is_database as bool. ` +
+		`Every link connects nodes using their id:from,to. It also has label,technology and direction as strings. ` +
+		`Every json has title and footer as string.` + "\\n" +
+		`Draw c4 container diagram with four containers,thee of which are external and belong to the system X.
+{"nodes":[{"id":"0"},{"id":"1","group":"X","external":true},{"id":"2","group":"X","external":true},` +
+		`{"id":"3","group":"X","external":true}]}` + "\\n" +
+		`three connected boxes
+{"nodes":[{"id":"0"},{"id":"1"},{"id":"2"}],` +
+		`"links":[{"from":"0","to":"1"},{"from":"1","to":"2"},{"from":"2","to":"0"}]}` + "\\n" +
+		`c4 containers:golang web server authenticating users read from external mysql database
+{"nodes":[{"id":"0","label":"Web Server","technology":"Go","description":"Authenticates users"},` + "\\n" +
+		`{"id":"1","label":"Database","technology":"MySQL","external":true,"is_database":true}]` + "\\n" +
+		`"links":[{"from":"0","to":"1","direction":"LR"}]}` + "\\n" +
+		`Five containers in three groups. First container is a Flink Application which performs feature engineering ` +
+		`using JSON encoded user behavioural clickstream consumed from AWS Kinesis Stream over HTTP. ` +
+		`It publishes AVRO encoded results to the kafka topic over TCP and infers the machine learning model by ` +
+		`sending JSON data over rest API. The Flink application is deployed to AWS KDA of the Business Domain account. ` +
+		`Kafka topic is part of the Streaming Platform,which sinks the data to the Datalake,AWS S3 bucket. ` +
+		`The model is deployed to the MLPlatform. MLPlatform,clickstream and datalake belong to the Data Platform. ` +
+		`All but Flink application are external.` + "\\n" +
+		`{"nodes":[{"id":"0","label":"Flink Application","technology":"AWS KDA",` +
+		`"description":"Performs feature engineering","group":"Business Domain account"},` +
+		`{"id":"1","label":"User behavioural clickstream","technology":"AWS Kinesis Stream",` +
+		`"external":true,"is_queue":true,"group":"Data Platform"},{"id":"2","label":"Kafka topic","technology":"Kafka",` +
+		`"external":true,"is_queue":true,"group":"Streaming Platform"},{"id":"3","label":"Machine learning model",` +
+		`"technology":"MLPlatform","external":true,"group":"Data Platform"},{"id":"4","label":"Datalake",` +
+		`"technology":"AWS S3","external":true,"group":"Data Platform"}],` +
+		`"links":[{"from":"0","to":"1","direction":"TD","label":"consumes clickstream","technology":"HTTP/JSON"},` +
+		`{"from":"0","to":"2","direction":"LR","label":"publishes results","technology":"TCP/AVRO"},` +
+		`{"from":"0","to":"3","direction":"TD","label":"infers the machine learning model","technology":"HTTP/JSON"},` +
+		`{"from":"2","to":"4","direction":"TD","label":"sinks the data","technology":"HTTP/JSON"}]}` + "\\n" +
+		`draw c4 diagram with Go producer publishing to Kafka over TCP and Java application consuming from Kafka over TCP.` +
+		`Data encoded in Protobuf.` + "\\n" +
+		`{"nodes":[{"id":"0","label":"Go producer","technology":"Go","description":"Publishes to Kafka"},` +
+		`{"id":"1","label":"Kafka","technology":"Kafka","is_queue":true},` +
+		`{"id":"2","label":"Java consumer","technology":"Java","description":"Consumes from Kafka"}],` +
+		`"links":[{"from":"0","to":"1","label":"publishes to Kafka","technology":"TCP/Protobuf"},` +
+		`{"from":"2","to":"1","label":"consumes from Kafka","technology":"TCP/Protobuf"}]}` + "\\n" +
+		`draw c4 diagram with python backend reading from postgres over tcp` + "\\n" +
+		`{"nodes":[{"id":"0","label":"Postgres","technology":"Postgres","is_database":true},` +
+		`{"id":"1","label":"Backend","technology":"Python"}],` +
+		`"links":[{"from":"1","to":"0","label":"reads from postgres","technology":"TCP"}]}` + "\n" +
+		`draw c4 diagram with java backend reading from dynamoDB over tcp` + "\\n" +
+		`{"nodes":[{"id":"0","label":"DynamoDB","technology":"DynamoDB","is_database":true},` +
+		`{"id":"1","label":"Backend","technology":"Java"}],` +
+		`"links":[{"from":"1","to":"0","label":"reads from dynamoDB","technology":"TCP"}]}` + "\\n" +
+		`c4 diagram with kotlin backend reading from mysql and publishing to kafka avro encoded events` + "\\n" +
+		`{"nodes":[{"id":"0","label":"Backend","technology":"Kotlin"},` +
+		`{"id":"1","label":"Kafka","technology":"Kafka","is_queue":true},` +
+		`{"id":"2","label":"Database","technology":"MySQL","is_database":true}],` +
+		`"links":[{"from":"0","to":"2","label":"reads from database","technology":"TCP"},` +
+		`{"from":"0","to":"2","label":"publishes to kafka","technology":"TCP/AVRO"}]` + "\\n"
+
 	payload := c.payload
-	payload.Prompt = prompt
+	payload.Prompt = promptInputComment + strings.ReplaceAll(prompt, "\n", "") + "\\n"
 
 	respBytes, err := c.requestHandler(ctx, payload)
 	if err != nil {
@@ -188,7 +238,7 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 		return nil, err
 	}
 
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, path.Join(c.baseURL, "completions"), &w)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"completions", &w)
 
 	c.setHeader(req)
 
