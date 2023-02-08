@@ -82,7 +82,12 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 	}
 
 	if err := resolveConfigurations(&c); err != nil {
-		return nil, err
+		return nil, Error{
+			Service:                   ServiceOpenAI,
+			Stage:                     StageInit,
+			ServiceResponseStatusCode: 0,
+			Message:                   err.Error(),
+		}
 	}
 
 	resolveHTTPClientOpenAI(&c)
@@ -161,22 +166,42 @@ func (c *clientOpenAI) Do(ctx context.Context, prompt string) (DiagramGraph, err
 
 	respBytes, err := c.requestHandler(ctx, payload)
 	if err != nil {
-		return DiagramGraph{}, err
+		return DiagramGraph{}, Error{
+			Service:                   ServiceOpenAI,
+			Stage:                     StageRequest,
+			Message:                   err.Error(),
+			ServiceResponseStatusCode: 0,
+		}
 	}
 
 	var resp openAIResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return DiagramGraph{}, err
+		return DiagramGraph{}, Error{
+			Service:                   ServiceOpenAI,
+			Stage:                     StageDeserialization,
+			Message:                   err.Error(),
+			ServiceResponseStatusCode: 0,
+		}
 	}
 
 	if len(resp.Choices) == 0 {
-		return DiagramGraph{}, errors.New("openAI could not convert the input prompt")
+		return DiagramGraph{}, Error{
+			Service:                   ServiceOpenAI,
+			Stage:                     StageDeserialization,
+			Message:                   "openAI could not convert the input prompt",
+			ServiceResponseStatusCode: 0,
+		}
 	}
 
 	s := strings.TrimSpace(resp.Choices[0].Text)
 	var o DiagramGraph
 	if err := json.Unmarshal(*(*[]byte)(unsafe.Pointer(&s)), &o); err != nil {
-		return DiagramGraph{}, err
+		return DiagramGraph{}, Error{
+			Service:                   ServiceOpenAI,
+			Stage:                     StageDeserialization,
+			Message:                   err.Error(),
+			ServiceResponseStatusCode: 0,
+		}
 	}
 
 	return o, nil
@@ -195,7 +220,12 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	var w bytes.Buffer
 	err := json.NewEncoder(&w).Encode(payload)
 	if err != nil {
-		return nil, err
+		return nil, Error{
+			Service:                   ServiceOpenAI,
+			Stage:                     StageSerialization,
+			Message:                   err.Error(),
+			ServiceResponseStatusCode: 0,
+		}
 	}
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"completions", &w)
@@ -204,17 +234,32 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, Error{
+			Service:                   ServiceOpenAI,
+			Stage:                     StageRequest,
+			Message:                   err.Error(),
+			ServiceResponseStatusCode: 0,
+		}
 	}
 
 	if resp.StatusCode > 209 {
-		return nil, errors.New("error status code: " + strconv.Itoa(resp.StatusCode))
+		return nil, Error{
+			Service:                   ServiceOpenAI,
+			Stage:                     StageRequest,
+			Message:                   "error status code: " + strconv.Itoa(resp.StatusCode),
+			ServiceResponseStatusCode: resp.StatusCode,
+		}
 	}
 
 	buf, err := io.ReadAll(resp.Body)
 	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
-		return nil, err
+		return nil, Error{
+			Service:                   ServiceOpenAI,
+			Stage:                     StageDeserialization,
+			Message:                   err.Error(),
+			ServiceResponseStatusCode: 0,
+		}
 	}
 
 	return buf, nil
