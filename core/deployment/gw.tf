@@ -180,6 +180,9 @@ resource "aws_api_gateway_method" "this" {
 
   api_key_required = true
 
+  request_models = {
+    "application/json" = aws_api_gateway_model.schema_request.name
+  }
   request_validator_id = aws_api_gateway_request_validator.this.id
 
   request_parameters = local.request_parameters
@@ -219,4 +222,7 @@ resource "aws_api_gateway_integration_response" "this" {
   http_method         = aws_api_gateway_method.this[each.key].http_method
   status_code         = "200"
   response_parameters = local.cors_headers
+  response_templates = {
+    "application/json" = aws_api_gateway_model.schema_response.name
+  }
 }
