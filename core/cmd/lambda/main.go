@@ -43,7 +43,7 @@ func main() {
 				}, err
 			}
 
-			svg, err := clientPlantUML.Do(context.Background(), graph)
+			svg, err := clientPlantUML.Do(ctx, graph)
 			if err != nil {
 				return events.APIGatewayProxyResponse{
 					StatusCode: http.StatusInternalServerError,
