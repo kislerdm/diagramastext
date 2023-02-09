@@ -158,18 +158,21 @@ type openAIResponse struct {
 
 func (c *clientOpenAI) Do(ctx context.Context, prompt string) (DiagramGraph, error) {
 	// FIXME: revert back for test
+	// FIXME: replace with embed after understanding encoding diff:
+	// FIXME: we tried to replace with embedded files already, but openAI was returning 400
+	// FIXME: it's likely to do with data encoding -> TBD
 	const promptInputComment = `Given prompts and corresponding graphs as json define new graph based on new prompt. ` +
 		`Every node has id,label,group,technology as strings,external,is_queue and is_database as bool. ` +
 		`Every link connects nodes using their id:from,to. It also has label,technology and direction as strings. ` +
 		`Every json has title and footer as string.` + "\n" +
 		`Draw c4 container diagram with four containers,thee of which are external and belong to the system X.
-{"nodes":[{"id":"0"},{"id":"1","group":"X","external":true},{"id":"2","group":"X","external":true},` +
+	{"nodes":[{"id":"0"},{"id":"1","group":"X","external":true},{"id":"2","group":"X","external":true},` +
 		`{"id":"3","group":"X","external":true}]}` + "\n" +
 		`three connected boxes
-{"nodes":[{"id":"0"},{"id":"1"},{"id":"2"}],` +
+	{"nodes":[{"id":"0"},{"id":"1"},{"id":"2"}],` +
 		`"links":[{"from":"0","to":"1"},{"from":"1","to":"2"},{"from":"2","to":"0"}]}` + "\n" +
 		`c4 containers:golang web server authenticating users read from external mysql database
-{"nodes":[{"id":"0","label":"Web Server","technology":"Go","description":"Authenticates users"},` + "\n" +
+	{"nodes":[{"id":"0","label":"Web Server","technology":"Go","description":"Authenticates users"},` + "\n" +
 		`{"id":"1","label":"Database","technology":"MySQL","external":true,"is_database":true}]` + "\n" +
 		`"links":[{"from":"0","to":"1","direction":"LR"}]}` + "\n" +
 		`Five containers in three groups. First container is a Flink Application which performs feature engineering ` +
