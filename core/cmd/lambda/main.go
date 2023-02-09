@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"unsafe"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -35,7 +34,7 @@ func main() {
 	lambda.Start(
 		func(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 			var r Request
-			if err := json.Unmarshal(*(*[]byte)(unsafe.Pointer(&req.Body)), &r); err != nil {
+			if err := json.Unmarshal([]byte(req.Body), &r); err != nil {
 				return events.APIGatewayProxyResponse{
 					StatusCode: http.StatusBadRequest,
 				}, err

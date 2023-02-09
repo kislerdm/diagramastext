@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unsafe"
 
 	"github.com/kislerdm/diagramastext/core/compression"
 )
@@ -56,7 +55,7 @@ func (c *clientPlantUML) Do(ctx context.Context, v DiagramGraph) (ResponseDiagra
 		return nil, err
 	}
 
-	return ResponseC4Diagram{SVG: *(*string)(unsafe.Pointer(&diagram))}, nil
+	return ResponseC4Diagram{SVG: string(diagram)}, nil
 }
 
 // REFACTOR: take to a dedicated helper function.
@@ -132,7 +131,7 @@ func resolveHTTPClient(o *optionsPlantUMLClient) {
 // - as png: GET www.plantuml.com/plantuml/png/SoWkIImgAStDuL80WaG5NJk592w7rBmKe100
 // - as svg: GET www.plantuml.com/plantuml/svg/SoWkIImgAStDuL80WaG5NJk592w7rBmKe100
 func code2Path(s string) (string, error) {
-	zb, err := compress(*(*[]byte)(unsafe.Pointer(&s)))
+	zb, err := compress([]byte(s))
 	if err != nil {
 		return "", err
 	}

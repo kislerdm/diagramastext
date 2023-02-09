@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unsafe"
 )
 
 /*
@@ -198,7 +197,7 @@ func (c *clientOpenAI) Do(ctx context.Context, prompt string) (DiagramGraph, err
 		`{"id":"1","label":"Kafka","technology":"Kafka","is_queue":true},` +
 		`{"id":"2","label":"Database","technology":"MySQL","is_database":true}],` +
 		`"links":[{"from":"0","to":"2","label":"reads from database","technology":"TCP"},` +
-		`{"from":"0","to":"2","label":"publishes to kafka","technology":"TCP/AVRO"}]` + "\n"
+		`{"from":"0","to":"2","label":"publishes to kafka","technology":"TCP/AVRO"}]`
 	payload := c.payload
 	payload.Prompt = promptInputComment + "\n" + strings.ReplaceAll(prompt, "\n", "") + "\n"
 
@@ -233,7 +232,7 @@ func (c *clientOpenAI) Do(ctx context.Context, prompt string) (DiagramGraph, err
 
 	s := strings.TrimSpace(resp.Choices[0].Text)
 	var o DiagramGraph
-	if err := json.Unmarshal(*(*[]byte)(unsafe.Pointer(&s)), &o); err != nil {
+	if err := json.Unmarshal([]byte(s), &o); err != nil {
 		return DiagramGraph{}, Error{
 			Service:                   ServiceOpenAI,
 			Stage:                     StageDeserialization,
