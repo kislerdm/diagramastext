@@ -1,14 +1,51 @@
-resource "aws_api_gateway_rest_api" "this" {
-  name = "main"
-  endpoint_configuration {
-    types = ["REGIONAL"]
-  }
+resource "aws_api_gateway_account" "this" {
+  cloudwatch_role_arn = aws_iam_role.cloudwatch.arn
 }
 
-resource "aws_api_gateway_api_key" "this" {
-  name        = "main"
-  description = "Main API key to authN/Z webclient"
-  enabled     = true
+resource "aws_iam_role" "cloudwatch" {
+  name = "api_gateway_cloudwatch_global"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "apigateway.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy" "cloudwatch" {
+  name = "GWCloudwatch"
+  role = aws_iam_role.cloudwatch.id
+
+  policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams",
+                "logs:PutLogEvents",
+                "logs:GetLogEvents",
+                "logs:FilterLogEvents"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+EOF
 }
 
 resource "aws_api_gateway_request_validator" "this" {
@@ -16,6 +53,15 @@ resource "aws_api_gateway_request_validator" "this" {
   rest_api_id                 = aws_api_gateway_rest_api.this.id
   validate_request_body       = true
   validate_request_parameters = true
+}
+
+resource "aws_api_gateway_rest_api" "this" {
+  name           = "main"
+  api_key_source = "HEADER"
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
 }
 
 resource "aws_api_gateway_model" "schema_request" {
@@ -91,6 +137,13 @@ locals {
     # "method.request.header.UserID" = true
     # "method.request.header.Authorization" = true
     }
+  )
+
+  deployment_trigger = merge(
+    local.endpoints,
+    local.allowed_headers_response,
+    local.cors_headers,
+    local.request_parameters,
   )
 
   lambda_trigger = {
@@ -225,4 +278,58 @@ resource "aws_api_gateway_integration_response" "this" {
   response_templates = {
     "application/json" = aws_api_gateway_model.schema_response.name
   }
+}
+
+# stage and deployment
+
+locals {
+  stages = ["production"]
+}
+
+resource "aws_cloudwatch_log_group" "gw" {
+  for_each          = toset(local.stages)
+  name              = "API-Gateway-Execution-Logs_${aws_api_gateway_rest_api.this.id}/${each.value}"
+  retention_in_days = 7
+}
+
+resource "aws_api_gateway_deployment" "this" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+
+  triggers = {
+    redeployment = sha1(jsonencode(local.deployment_trigger))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "this" {
+  for_each      = toset(local.stages)
+  deployment_id = aws_api_gateway_deployment.this.id
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  stage_name    = each.value
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.gw[each.value].arn
+    format = jsonencode({
+      "requestId"         = "$context.requestId"
+      "extendedRequestId" = "$context.extendedRequestId"
+      "ip"                = "$context.identity.sourceIp"
+      "caller"            = "$context.identity.caller"
+      "user"              = "$context.identity.user"
+      "requestTime"       = "$context.requestTime"
+      "httpMethod"        = "$context.httpMethod"
+      "resourcePath"      = "$context.resourcePath"
+      "status"            = "$context.status"
+    })
+  }
+
+  depends_on = [aws_cloudwatch_log_group.gw]
+}
+
+# authN
+resource "aws_api_gateway_api_key" "this" {
+  name        = "main"
+  description = "Main API key to authN/Z webclient"
+  enabled     = true
 }
