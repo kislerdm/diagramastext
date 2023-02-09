@@ -102,10 +102,11 @@ resource "aws_api_gateway_model" "schema_response" {
 EOF
 }
 
-resource "aws_api_gateway_gateway_response" "response-401" {
+resource "aws_api_gateway_gateway_response" "response-4xx" {
+  for_each      = toset(["401", "403"])
   rest_api_id   = aws_api_gateway_rest_api.this.id
-  status_code   = "401"
-  response_type = "UNAUTHORIZED"
+  status_code   = each.value
+  response_type = "DEFAULT_4XX"
 
   response_templates = {
     "application/json" = "{\"error\":$context.error.messageString}"
@@ -125,7 +126,7 @@ locals {
 
   cors_headers = {
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
   }
 
@@ -327,9 +328,36 @@ resource "aws_api_gateway_stage" "this" {
   depends_on = [aws_cloudwatch_log_group.gw]
 }
 
+# plan
+
+resource "aws_api_gateway_usage_plan" "test" {
+  name        = "test"
+  description = "Test usage plan"
+
+  api_stages {
+    api_id = aws_api_gateway_rest_api.this.id
+    stage  = aws_api_gateway_stage.this["production"].stage_name
+    throttle {
+      path        = "/c4/POST"
+      burst_limit = 10
+      rate_limit  = 2
+    }
+  }
+
+  throttle_settings {
+    burst_limit = 100
+    rate_limit  = 10
+  }
+}
 # authN
-resource "aws_api_gateway_api_key" "this" {
+resource "aws_api_gateway_api_key" "main" {
   name        = "main"
   description = "Main API key to authN/Z webclient"
   enabled     = true
+}
+
+resource "aws_api_gateway_usage_plan_key" "main" {
+  key_id        = aws_api_gateway_api_key.main.id
+  key_type      = "API_KEY"
+  usage_plan_id = aws_api_gateway_usage_plan.test.id
 }
