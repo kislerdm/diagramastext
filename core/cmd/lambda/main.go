@@ -13,10 +13,6 @@ import (
 	"github.com/kislerdm/diagramastext/core"
 )
 
-type Request struct {
-	Prompt string `json:"prompt"`
-}
-
 func main() {
 	clientOpenAI, err := core.NewOpenAIClient(
 		core.ConfigOpenAI{
@@ -33,14 +29,13 @@ func main() {
 
 	lambda.Start(
 		func(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-			var r Request
-			if err := json.Unmarshal([]byte(req.Body), &r); err != nil {
+			prompt, err := readPrompt(req)
+			if err != nil {
 				return events.APIGatewayProxyResponse{
 					StatusCode: http.StatusBadRequest,
 				}, err
 			}
-
-			graph, err := clientOpenAI.Do(ctx, r.Prompt)
+			graph, err := clientOpenAI.Do(ctx, prompt)
 			if err != nil {
 				return events.APIGatewayProxyResponse{
 					StatusCode: http.StatusInternalServerError,
@@ -62,6 +57,18 @@ func main() {
 			}, err
 		},
 	)
+}
+
+type request struct {
+	Prompt string `json:"prompt"`
+}
+
+func readPrompt(req events.APIGatewayProxyRequest) (string, error) {
+	var r request
+	if err := json.Unmarshal([]byte(req.Body), &r); err != nil {
+		return "", err
+	}
+	return r.Prompt, nil
 }
 
 func mustParseInt(s string) int {
