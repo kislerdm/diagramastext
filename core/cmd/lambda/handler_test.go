@@ -2,10 +2,13 @@ package main
 
 import (
 	"math/rand"
+	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/kislerdm/diagramastext/core"
 )
 
 func Test_readPrompt(t *testing.T) {
@@ -126,4 +129,73 @@ func randomString(length int) string {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+func Test_parseClientError(t *testing.T) {
+	type args struct {
+		err error
+	}
+	tests := []struct {
+		name string
+		args args
+		want events.APIGatewayProxyResponse
+	}{
+		{
+			name: "too many requests",
+			args: args{
+				err: core.Error{
+					ServiceResponseStatusCode: http.StatusTooManyRequests,
+				},
+			},
+			want: events.APIGatewayProxyResponse{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       "service experiences high load, please try later",
+			},
+		},
+		{
+			name: "opanAI failed to predict",
+			args: args{
+				err: core.Error{
+					Service:                   core.ServiceOpenAI,
+					ServiceResponseStatusCode: http.StatusInternalServerError,
+				},
+			},
+			want: events.APIGatewayProxyResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       "could not recognise diagram description",
+			},
+		},
+		{
+			name: "plantUML failed to predict",
+			args: args{
+				err: core.Error{
+					Service:                   core.ServiePlantUML,
+					ServiceResponseStatusCode: http.StatusInternalServerError,
+				},
+			},
+			want: events.APIGatewayProxyResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       "could not generate diagram using provided description",
+			},
+		},
+		{
+			name: "unknown",
+			args: args{
+				err: core.Error{},
+			},
+			want: events.APIGatewayProxyResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       "unknown",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := parseClientError(tt.args.err); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("parseClientError() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
 }

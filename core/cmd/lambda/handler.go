@@ -21,12 +21,14 @@ func handler(clientModel core.ClientInputToGraph, clientDiagram core.ClientGraph
 		if err != nil {
 			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusUnprocessableEntity,
+				Body:       "could not recognise the prompt format",
 			}, err
 		}
 
 		if err := validatePrompt(prompt); err != nil {
 			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusBadRequest,
+				Body:       err.Error(),
 			}, err
 		}
 
