@@ -283,12 +283,21 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	}
 
 	if resp.StatusCode > 209 {
-		return nil, Error{
+		o := Error{
 			Service:                   ServiceOpenAI,
-			Stage:                     StageRequest,
+			Stage:                     StageResponse,
 			Message:                   "error status code: " + strconv.Itoa(resp.StatusCode),
 			ServiceResponseStatusCode: resp.StatusCode,
 		}
+
+		var e openAIErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&e); err == nil {
+			if v := e.Error; v != nil {
+				o.Message = v.Message
+			}
+		}
+
+		return nil, o
 	}
 
 	buf, err := io.ReadAll(resp.Body)
@@ -303,4 +312,13 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	}
 
 	return buf, nil
+}
+
+type openAIErrorResponse struct {
+	Error *struct {
+		Code    *int    `json:"code,omitempty"`
+		Message string  `json:"message"`
+		Param   *string `json:"param,omitempty"`
+		Type    string  `json:"type"`
+	} `json:"error,omitempty"`
 }

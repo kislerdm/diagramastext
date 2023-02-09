@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/kislerdm/diagramastext/core"
@@ -18,23 +20,24 @@ func handler(clientModel core.ClientInputToGraph, clientDiagram core.ClientGraph
 		prompt, err := readPrompt(req)
 		if err != nil {
 			return events.APIGatewayProxyResponse{
+				StatusCode: http.StatusUnprocessableEntity,
+			}, err
+		}
+
+		if err := validatePrompt(prompt); err != nil {
+			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusBadRequest,
 			}, err
 		}
+
 		graph, err := clientModel.Do(ctx, prompt)
 		if err != nil {
-			return events.APIGatewayProxyResponse{
-				StatusCode: http.StatusInternalServerError,
-				Body:       "could not recognise diagram description",
-			}, err
+			return parseClientError(err), err
 		}
 
 		svg, err := clientDiagram.Do(ctx, graph)
 		if err != nil {
-			return events.APIGatewayProxyResponse{
-				StatusCode: http.StatusInternalServerError,
-				Body:       "could not generate diagram using provided description",
-			}, err
+			return parseClientError(err), err
 		}
 
 		return events.APIGatewayProxyResponse{
@@ -42,6 +45,43 @@ func handler(clientModel core.ClientInputToGraph, clientDiagram core.ClientGraph
 			Body:       string(svg.MustMarshal()),
 		}, err
 	}
+}
+
+func parseClientError(err error) events.APIGatewayProxyResponse {
+	msg := "unknown"
+	if e, ok := err.(core.Error); ok {
+		if e.ServiceResponseStatusCode == http.StatusTooManyRequests {
+			return events.APIGatewayProxyResponse{
+				StatusCode: e.ServiceResponseStatusCode,
+				Body:       "service experiences high load, please try later",
+			}
+		}
+		switch e.Service {
+		case core.ServiceOpenAI:
+			msg = "could not recognise diagram description"
+		case core.ServiePlantUML:
+			msg = "could not generate diagram using provided description"
+		}
+	}
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusInternalServerError,
+		Body:       msg,
+	}
+}
+
+const (
+	promptLengthMin = 3
+	promptLengthMax = 1000
+)
+
+func validatePrompt(prompt string) error {
+	if len(prompt) < promptLengthMin || len(prompt) > promptLengthMax {
+		return errors.New(
+			"prompt length must be between " + strconv.Itoa(promptLengthMin) + " and " +
+				strconv.Itoa(promptLengthMax) + " characters",
+		)
+	}
+	return nil
 }
 
 type request struct {
