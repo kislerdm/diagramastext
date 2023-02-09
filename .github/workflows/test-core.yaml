@@ -4,8 +4,8 @@ on:
   push:
     paths:
       - "core/**/*.go"
-      - "core/go.mod"
-      - "core/go.sum"
+      - "core/**/go.mod"
+      - "core/**/go.sum"
   pull_request:
     branches:
       - master
@@ -31,3 +31,18 @@ jobs:
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
+        with:
+          flags: module
+          files: coverage.txt
+
+      - name: Unittests-lambda
+        run: |
+          cd core/cmd/lambda
+          go mod tidy
+          go test -race -coverprofile=coverage-lambda.txt -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          flags: lambda
+          files: coverage-lambda.txt
