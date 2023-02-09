@@ -88,8 +88,8 @@ locals {
   }
 
   request_parameters = merge({
-    "method.request.header.UserID" = true
-    #    "method.request.header.Authorization" = true
+    # "method.request.header.UserID" = true
+    # "method.request.header.Authorization" = true
     }
   )
 
@@ -137,8 +137,8 @@ resource "aws_api_gateway_method" "options" {
 
 resource "aws_api_gateway_integration" "options" {
   for_each    = local.endpoints
-  rest_api_id = aws_api_gateway_rest_api.this.id
-  resource_id = aws_api_gateway_resource.route_top[each.key].id
+  rest_api_id = aws_api_gateway_method.options[each.key].rest_api_id
+  resource_id = aws_api_gateway_method.options[each.key].resource_id
   http_method = "OPTIONS"
   type        = "MOCK"
   request_templates = {
@@ -148,8 +148,8 @@ resource "aws_api_gateway_integration" "options" {
 
 resource "aws_api_gateway_method_response" "options" {
   for_each    = local.endpoints
-  rest_api_id = aws_api_gateway_rest_api.this.id
-  resource_id = aws_api_gateway_resource.route_top[each.key].id
+  rest_api_id = aws_api_gateway_method.options[each.key].rest_api_id
+  resource_id = aws_api_gateway_method.options[each.key].resource_id
   http_method = "OPTIONS"
   status_code = "200"
   response_models = {
@@ -160,8 +160,8 @@ resource "aws_api_gateway_method_response" "options" {
 
 resource "aws_api_gateway_integration_response" "options" {
   for_each    = local.endpoints
-  rest_api_id = aws_api_gateway_rest_api.this.id
-  resource_id = aws_api_gateway_resource.route_top[each.key].id
+  rest_api_id = aws_api_gateway_method.options[each.key].rest_api_id
+  resource_id = aws_api_gateway_method.options[each.key].resource_id
   http_method = "OPTIONS"
   status_code = "200"
 
@@ -187,8 +187,8 @@ resource "aws_api_gateway_method" "this" {
 
 resource "aws_api_gateway_integration" "this" {
   for_each                = local.lambda_trigger
-  rest_api_id             = aws_api_gateway_rest_api.this.id
-  resource_id             = aws_api_gateway_resource.route_top[each.value.path].id
+  rest_api_id             = aws_api_gateway_method.this[each.key].rest_api_id
+  resource_id             = aws_api_gateway_method.this[each.key].resource_id
   http_method             = aws_api_gateway_method.this[each.key].http_method
   integration_http_method = aws_api_gateway_method.this[each.key].http_method
   type                    = "AWS_PROXY"
@@ -202,8 +202,8 @@ resource "aws_api_gateway_integration" "this" {
 
 resource "aws_api_gateway_method_response" "this" {
   for_each    = local.lambda_trigger
-  rest_api_id = aws_api_gateway_rest_api.this.id
-  resource_id = aws_api_gateway_resource.route_top[each.value.path].id
+  rest_api_id = aws_api_gateway_method.this[each.key].rest_api_id
+  resource_id = aws_api_gateway_method.this[each.key].resource_id
   http_method = aws_api_gateway_method.this[each.key].http_method
   status_code = "200"
   response_models = {
@@ -214,8 +214,8 @@ resource "aws_api_gateway_method_response" "this" {
 
 resource "aws_api_gateway_integration_response" "this" {
   for_each            = local.lambda_trigger
-  rest_api_id         = aws_api_gateway_rest_api.this.id
-  resource_id         = aws_api_gateway_resource.route_top[each.value.path].id
+  rest_api_id         = aws_api_gateway_method.this[each.key].rest_api_id
+  resource_id         = aws_api_gateway_method.this[each.key].resource_id
   http_method         = aws_api_gateway_method.this[each.key].http_method
   status_code         = "200"
   response_parameters = local.cors_headers
