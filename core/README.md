@@ -41,11 +41,11 @@ output "gw_domain_name" {
   description = "API GW domain name required to configure custom DNS, e.g. Cloudflaire"
 }
 ```
-6. Use output `gw_domain_name` to configure CNAME record in Cloudflaire:
+6. Use output `gw_domain_name` to configure CNAME record in Cloudflaire. See the illustration below.
+
 ![dns](fig/dns.png)
 
-Use the [article](https://carocci-eugenio.medium.com/connect-cloudflare-to-aws-api-gateway-18e961a6e24f) as a reference
-to setup with AWS API Gateway.
+**Note** that the proxy status shall be set to "DNS only".
 
 ## Acknowledgements
 
