@@ -91,14 +91,17 @@
             width: 450px;
         }
 
-        #input
-        {margin-top: 20px;
+        #input {
+            margin-top: 20px;
         }
 
         #output {
             margin-top: 20px;
-            margin-bottom: 30px;
             padding: 20px;
+        }
+
+        #disclaimer {
+            margin-top: 50px;
         }
 
         #punch {
@@ -133,13 +136,19 @@
         button {
             margin-top: 15px;
             border-radius: 1.8rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
             background: #919ea8;
             border: #ccc9c9 solid 1px;
             font-size: 20px;
             color: white;
             box-shadow: 0 0 3px 3px #ccc9c9;
         }
-        button:hover { box-shadow: 0 0 10px 10px #ccc9c9; }
+
+        button:hover {
+            box-shadow: 0 0 10px 10px #ccc9c9;
+        }
+
         button:active {
             box-shadow: none;
             background: #ccc9c9;
@@ -188,7 +197,7 @@
     <div class="box shadow-black">
         <p class="box-text">Input:</p>
         <div class="textarea">C4 diagram of a Go web server reading from external Postgres database over TCP</div>
-<!--        <button>Generate Diagram</button>-->
+        <button id="trigger">Try the tool!</button>
     </div>
 </div>
 
@@ -296,24 +305,19 @@
     </svg>
 </div>
 
-<div class="box bubble">
+<div class="box bubble" id="disclaimer">
     <p>"A picture is worth a thousand words": diagram is a powerful conventional instrument to explain the
         meaning of complex systems, or processes. Unfortunately, substantial effort is required to develop and maintain
         a diagram. It impacts effectiveness of knowledge sharing, especially in software development. Luckily, <a
                 href="https://openai.com/blog/best-practices-for-deploying-language-models/" target="_blank"
                 rel="noopener noreffer">LLM</a> development reached such level when special skills are no longer needed
         to prepare standardised diagram in seconds!</p>
-</div>
 
-<i class="arrow"></i>
-
-<div class="box bubble" style="margin-bottom: 50px;">
-    <p>The tool is under development. Please get in touch for details and collaboration. Thanks!</p>
+    <p>Please get in touch for feedback and details about collaboration. Thanks!</p>
     <a href="mailto:hi@diagramastext.dev">
         <svg xmlns="http://www.w3.org/2000/svg" version="1.1"
              width="24" height="24" viewBox="0 0 256 256"
              xml:space="preserve">
-
 <defs>
 </defs>
             <g style="stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: none; fill-rule: nonzero; opacity: 1;"
