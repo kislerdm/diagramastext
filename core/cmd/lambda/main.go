@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"strconv"
@@ -23,7 +24,12 @@ func main() {
 
 	clientPlantUML := core.NewPlantUMLClient()
 
-	lambda.Start(handler(clientOpenAI, clientPlantUML))
+	var corsHeaders corsHeaders
+	if v := os.Getenv("CORS_HEADERS"); v != "" {
+		_ = json.Unmarshal([]byte(v), &corsHeaders)
+	}
+
+	lambda.Start(handler(clientOpenAI, clientPlantUML, corsHeaders))
 }
 
 func mustParseInt(s string) int {

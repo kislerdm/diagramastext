@@ -228,11 +228,19 @@ func Test_handler(t *testing.T) {
 	type fields struct {
 		clientModel   core.ClientInputToGraph
 		clientDiagram core.ClientGraphToDiagram
+		corsHeaders   corsHeaders
 	}
 	type args struct {
 		ctx context.Context
 		req events.APIGatewayProxyRequest
 	}
+
+	expectedHandler := map[string]string{
+		"Access-Control-Allow-Origin":  "*",
+		"Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token'",
+		"Access-Control-Allow-Methods": "'POST,OPTIONS'",
+	}
+
 	tests := []struct {
 		name    string
 		fields  fields
@@ -253,6 +261,7 @@ func Test_handler(t *testing.T) {
 					Resp: core.ResponseC4Diagram{SVG: "<svg></svg>"},
 					Err:  nil,
 				},
+				corsHeaders: expectedHandler,
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -261,6 +270,7 @@ func Test_handler(t *testing.T) {
 				},
 			},
 			want: events.APIGatewayProxyResponse{
+				Headers:    expectedHandler,
 				StatusCode: http.StatusOK,
 				Body:       string(core.ResponseC4Diagram{SVG: "<svg></svg>"}.MustMarshal()),
 			},
@@ -268,6 +278,9 @@ func Test_handler(t *testing.T) {
 		},
 		{
 			name: "unhappy path: faulty prompt",
+			fields: fields{
+				corsHeaders: expectedHandler,
+			},
 			args: args{
 				ctx: context.TODO(),
 				req: events.APIGatewayProxyRequest{
@@ -275,6 +288,7 @@ func Test_handler(t *testing.T) {
 				},
 			},
 			want: events.APIGatewayProxyResponse{
+				Headers:    expectedHandler,
 				StatusCode: http.StatusUnprocessableEntity,
 				Body:       "could not recognise the prompt format",
 			},
@@ -282,6 +296,9 @@ func Test_handler(t *testing.T) {
 		},
 		{
 			name: "unhappy path: invalid prompt",
+			fields: fields{
+				corsHeaders: expectedHandler,
+			},
 			args: args{
 				ctx: context.TODO(),
 				req: events.APIGatewayProxyRequest{
@@ -289,6 +306,7 @@ func Test_handler(t *testing.T) {
 				},
 			},
 			want: events.APIGatewayProxyResponse{
+				Headers:    expectedHandler,
 				StatusCode: http.StatusBadRequest,
 				Body: "prompt length must be between " + strconv.Itoa(promptLengthMin) + " and " +
 					strconv.Itoa(promptLengthMax) + " characters",
@@ -306,6 +324,7 @@ func Test_handler(t *testing.T) {
 						ServiceResponseStatusCode: http.StatusTooManyRequests,
 					},
 				},
+				corsHeaders: expectedHandler,
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -314,6 +333,7 @@ func Test_handler(t *testing.T) {
 				},
 			},
 			want: events.APIGatewayProxyResponse{
+				Headers:    expectedHandler,
 				StatusCode: http.StatusTooManyRequests,
 				Body:       "service experiences high load, please try later",
 			},
@@ -336,6 +356,7 @@ func Test_handler(t *testing.T) {
 						ServiceResponseStatusCode: http.StatusTooManyRequests,
 					},
 				},
+				corsHeaders: expectedHandler,
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -344,6 +365,7 @@ func Test_handler(t *testing.T) {
 				},
 			},
 			want: events.APIGatewayProxyResponse{
+				Headers:    expectedHandler,
 				StatusCode: http.StatusTooManyRequests,
 				Body:       "service experiences high load, please try later",
 			},
@@ -356,13 +378,61 @@ func Test_handler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, gotErr := handler(tt.fields.clientModel, tt.fields.clientDiagram)(tt.args.ctx, tt.args.req)
+				got, gotErr := handler(
+					tt.fields.clientModel, tt.fields.clientDiagram, tt.fields.corsHeaders,
+				)(tt.args.ctx, tt.args.req)
 				if (gotErr != nil) != tt.wantErr {
 					t.Errorf("handler execution error = %v, wantErr %v", gotErr, tt.wantErr)
 					return
 				}
 				if !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("handler execution got: %v, want: %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func Test_corsHeaders_setHeaders(t *testing.T) {
+	type args struct {
+		resp events.APIGatewayProxyResponse
+	}
+	tests := []struct {
+		name string
+		h    corsHeaders
+		args args
+		want events.APIGatewayProxyResponse
+	}{
+		{
+			name: "no cors handlers",
+			h:    nil,
+			args: args{
+				resp: events.APIGatewayProxyResponse{},
+			},
+			want: events.APIGatewayProxyResponse{},
+		},
+		{
+			name: "cors: wildcard origin and methods",
+			h: corsHeaders{
+				"Access-Control-Allow-Origin":  "'*'",
+				"Access-Control-Allow-Methods": "'POST,OPTIONS'",
+			},
+			args: args{
+				resp: events.APIGatewayProxyResponse{},
+			},
+			want: events.APIGatewayProxyResponse{
+				Headers: map[string]string{
+					"Access-Control-Allow-Origin":  "*",
+					"Access-Control-Allow-Methods": "'POST,OPTIONS'",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := tt.h.setHeaders(tt.args.resp); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("setHeaders() = %v, want %v", got, tt.want)
 				}
 			},
 		)

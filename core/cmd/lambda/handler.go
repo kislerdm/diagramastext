@@ -11,7 +11,31 @@ import (
 	"github.com/kislerdm/diagramastext/core"
 )
 
-func handler(clientModel core.ClientInputToGraph, clientDiagram core.ClientGraphToDiagram) func(
+type corsHeaders map[string]string
+
+func (h corsHeaders) setHeaders(resp events.APIGatewayProxyResponse) events.APIGatewayProxyResponse {
+	if h == nil {
+		return resp
+	}
+
+	if resp.Headers == nil {
+		resp.Headers = map[string]string{}
+	}
+
+	for k, v := range h {
+		resp.Headers[k] = v
+
+		if k == "Access-Control-Allow-Origin" && (v == "" || v == "'*'") {
+			resp.Headers[k] = "*"
+		}
+	}
+
+	return resp
+}
+
+func handler(
+	clientModel core.ClientInputToGraph, clientDiagram core.ClientGraphToDiagram, corsHeaders corsHeaders,
+) func(
 	ctx context.Context, req events.APIGatewayProxyRequest,
 ) (events.APIGatewayProxyResponse, error) {
 	return func(
@@ -19,33 +43,39 @@ func handler(clientModel core.ClientInputToGraph, clientDiagram core.ClientGraph
 	) (events.APIGatewayProxyResponse, error) {
 		prompt, err := readPrompt(req)
 		if err != nil {
-			return events.APIGatewayProxyResponse{
-				StatusCode: http.StatusUnprocessableEntity,
-				Body:       "could not recognise the prompt format",
-			}, err
+			return corsHeaders.setHeaders(
+				events.APIGatewayProxyResponse{
+					StatusCode: http.StatusUnprocessableEntity,
+					Body:       "could not recognise the prompt format",
+				},
+			), err
 		}
 
 		if err := validatePrompt(prompt); err != nil {
-			return events.APIGatewayProxyResponse{
-				StatusCode: http.StatusBadRequest,
-				Body:       err.Error(),
-			}, err
+			return corsHeaders.setHeaders(
+				events.APIGatewayProxyResponse{
+					StatusCode: http.StatusBadRequest,
+					Body:       err.Error(),
+				},
+			), err
 		}
 
 		graph, err := clientModel.Do(ctx, prompt)
 		if err != nil {
-			return parseClientError(err), err
+			return corsHeaders.setHeaders(parseClientError(err)), err
 		}
 
 		svg, err := clientDiagram.Do(ctx, graph)
 		if err != nil {
-			return parseClientError(err), err
+			return corsHeaders.setHeaders(parseClientError(err)), err
 		}
 
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusOK,
-			Body:       string(svg.MustMarshal()),
-		}, err
+		return corsHeaders.setHeaders(
+			events.APIGatewayProxyResponse{
+				StatusCode: http.StatusOK,
+				Body:       string(svg.MustMarshal()),
+			},
+		), err
 	}
 }
 
