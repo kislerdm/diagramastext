@@ -73,7 +73,7 @@ func parseClientError(err error) events.APIGatewayProxyResponse {
 
 const (
 	promptLengthMin = 3
-	promptLengthMax = 1000
+	promptLengthMax = 768
 )
 
 func validatePrompt(prompt string) error {

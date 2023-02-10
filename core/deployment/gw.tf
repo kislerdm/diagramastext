@@ -361,3 +361,20 @@ resource "aws_api_gateway_usage_plan_key" "main" {
   key_type      = "API_KEY"
   usage_plan_id = aws_api_gateway_usage_plan.test.id
 }
+
+# custom domain
+resource "aws_api_gateway_domain_name" "this" {
+  domain_name     = "api.diagramastext.dev"
+  certificate_arn = "arn:aws:acm:us-east-1:027889758114:certificate/74feb1e2-797b-4ebb-8399-e1eee4ace87d"
+}
+
+resource "aws_api_gateway_base_path_mapping" "this" {
+  api_id      = aws_api_gateway_rest_api.this.id
+  stage_name  = aws_api_gateway_stage.this["production"].stage_name
+  domain_name = aws_api_gateway_domain_name.this.domain_name
+}
+
+output "gw_domain_name" {
+  value       = aws_api_gateway_domain_name.this.cloudfront_domain_name
+  description = "API GW domain name required to configure custom DNS, e.g. Cloudflaire"
+}
