@@ -125,10 +125,12 @@ locals {
   }
 
   cors_headers = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "Access-Control-Allow-Origin"  = "'*'"
+    "Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "Access-Control-Allow-Methods" = "'POST,OPTIONS'"
   }
+
+  cors_headers_gw = { for k, v in local.cors_headers : "method.response.header.${k}" => v }
 
   endpoints = {
     "c4" : ["POST"],
@@ -143,7 +145,7 @@ locals {
   deployment_trigger = merge(
     local.endpoints,
     local.allowed_headers_response,
-    local.cors_headers,
+    local.cors_headers_gw,
     local.request_parameters,
   )
 
@@ -222,7 +224,7 @@ resource "aws_api_gateway_integration_response" "options" {
   response_templates = {
     "application/json" = "{ \"statusCode\": 200 }"
   }
-  response_parameters = local.cors_headers
+  response_parameters = local.cors_headers_gw
 }
 
 resource "aws_api_gateway_method" "this" {
@@ -275,7 +277,7 @@ resource "aws_api_gateway_integration_response" "this" {
   resource_id         = aws_api_gateway_method.this[each.key].resource_id
   http_method         = aws_api_gateway_method.this[each.key].http_method
   status_code         = "200"
-  response_parameters = local.cors_headers
+  response_parameters = local.cors_headers_gw
   response_templates = {
     "application/json" = aws_api_gateway_model.schema_response.name
   }

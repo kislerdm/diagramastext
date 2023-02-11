@@ -70,21 +70,6 @@
             color: #363434;
         }
 
-        .box {
-            border-radius: 1.2rem;
-            padding: 0.8rem;
-            background: #86919b;
-        }
-
-        .box-text {
-            text-align: center;
-            padding: 0;
-            margin: 0;
-            font-weight: bold;
-            color: white;
-            margin-bottom: 5px;
-        }
-
         .arrow {
             border: solid black;
             border-width: 0 5px 5px 0;
@@ -95,23 +80,28 @@
             margin-top: 8px;
         }
 
-        .textarea {
+        textarea {
             font-size: 20px;
             color: white;
             text-align: left;
             border-radius: 1rem;
             background: #263950;
+            box-shadow: 0 0 3px 3px #2b425e;
             padding: 1rem;
             width: 450px;
         }
 
-        #demo {
+        #input {
             margin-top: 20px;
         }
 
         #output {
             margin-top: 20px;
             padding: 20px;
+        }
+
+        #disclaimer {
+            margin-top: 50px;
         }
 
         #punch {
@@ -121,7 +111,6 @@
         }
 
         .bubble {
-            background: #7a818c;
             padding: 1rem;
             border-radius: 2rem;
             color: white;
@@ -135,13 +124,140 @@
                 width: 100%;
             }
 
-            .textarea {
+            textarea {
                 width: 100%;
             }
 
             #title {
                 font-size: 40px;
             }
+        }
+
+        button {
+            margin-top: 15px;
+            border-radius: 1.8rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            background: #919ea8;
+            border: #ccc9c9 solid 1px;
+            font-size: 20px;
+            color: white;
+            box-shadow: 0 0 3px 3px #ccc9c9;
+        }
+
+        button:hover {
+            box-shadow: 0 0 10px 10px #ccc9c9;
+        }
+
+        button:active {
+            box-shadow: none;
+            background: #ccc9c9;
+        }
+
+        .box {
+            border-radius: 1.2rem;
+            padding: 0.8rem;
+            background: #86919b;
+            border: #ccc9c9 solid 5px;
+            box-shadow: 0 0 5px 5px #ccc9c9;
+        }
+
+        .box-text {
+            text-align: center;
+            padding: 0;
+            margin: 0;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        #diagram {
+            border: solid #2d4765 2px;
+            background: white;
+            box-shadow: 0 0 3px 3px #2b425e;
+        }
+
+        /* Error message popup */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            padding-top: 100px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0, 0, 0);
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            border-radius: 1rem;
+            background-color: #fefefe;
+            box-shadow: 0 0 3px 3px #e00d0d;;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 40%;
+        }
+
+        .close {
+            color: #aaaaaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Error message popup: end */
+
+        .loader {
+            border: 16px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 16px solid #3498db;
+            width: 120px;
+            height: 120px;
+            -webkit-animation: spin 2s linear infinite; /* Safari */
+            animation: spin 2s linear infinite;
+        }
+
+        #modal-loader {
+            width: 150px;
+            margin-top: 200px;
+            border: none;
+            box-shadow: none;
+            background: none;
+        }
+
+        /* Safari */
+        @-webkit-keyframes spin {
+            0% {
+                -webkit-transform: rotate(0deg);
+            }
+            100% {
+                -webkit-transform: rotate(360deg);
+            }
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #feedback-link {
+            color: #3498db;
+            font-weight: bold;
         }
 
     </style>
@@ -153,24 +269,45 @@
         <span> as </span>
         <span style="font-weight: bold; font-style: italic;">Text</span>
     </div>
+    <div id="punch">
+        Generate <span style="font-weight: bold;">diagrams</span>
+        using <span style="font-style: italic; font-weight: bold;">plain English</span> in no time!
+    </div>
 </header>
 
-<div id="punch">
-    Generate <span style="font-weight: bold;">diagrams</span>
-    using <span style="font-style: italic; font-weight: bold;">plain English</span> in no time!
+<div id="input">
+    <div class="box shadow-black">
+        <p class="box-text">Input:</p>
+        <textarea id="prompt" minlength="3"
+                  maxlength="500"
+                  rows="3"
+                  placeholder="Type in the diagram description">C4 diagram of a Go web server reading from external Postgres database over TCP
+        </textarea>
+        <div>
+            <button id="trigger" onclick=trigger()>Generate Diagram</button>
+        </div>
+    </div>
+    <div id="error-msg" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="error-msg-content"></div>
+        </div>
+    </div>
+    <div id="loader" class="modal">
+        <div id="modal-loader" class="modal-content">
+            <div class="loader"></div>
+        </div>
+    </div>
 </div>
 
-<div id="demo">
-    <div class="box">
-        <p class="box-text">Input:</p>
-        <div class="textarea">C4 diagram of a Go web server reading from external Postgres database over TCP</div>
-    </div>
-    <i class="arrow"></i>
-    <div id="output" class="box">
-        <p class="box-text">Output:</p>
+<i class="arrow"></i>
+
+<div id="output" class="box">
+    <p class="box-text">Output:</p>
+    <div id="diagram">
         <svg xmlns="http://www.w3.org/2000/svg" contentStyleType="text/css" height="179px"
              preserveAspectRatio="none"
-             style="border: solid black 2px; background:#FFFFFF;" version="1.1" viewBox="0 0 375 179"
+             version="1.1" viewBox="0 0 375 179"
              width="375px"
              zoomAndPan="magnify">
             <defs/>
@@ -269,26 +406,19 @@
     </div>
 </div>
 
-<i class="arrow"></i>
-
-<div class="bubble">
+<div id="disclaimer" class="box bubble">
     <p>"A picture is worth a thousand words": diagram is a powerful conventional instrument to explain the
         meaning of complex systems, or processes. Unfortunately, substantial effort is required to develop and maintain
         a diagram. It impacts effectiveness of knowledge sharing, especially in software development. Luckily, <a
                 href="https://openai.com/blog/best-practices-for-deploying-language-models/" target="_blank"
                 rel="noopener noreffer">LLM</a> development reached such level when special skills are no longer needed
         to prepare standardised diagram in seconds!</p>
-</div>
 
-<i class="arrow"></i>
-
-<div class="bubble" style="margin-bottom: 50px;">
-    <p>The tool is under development. Please get in touch for details and collaboration. Thanks!</p>
+    <p>Please get in touch for feedback and details about collaboration. Thanks!</p>
     <a href="mailto:hi@diagramastext.dev">
         <svg xmlns="http://www.w3.org/2000/svg" version="1.1"
              width="24" height="24" viewBox="0 0 256 256"
              xml:space="preserve">
-
 <defs>
 </defs>
             <g style="stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: none; fill-rule: nonzero; opacity: 1;"
@@ -335,4 +465,109 @@
 </footer>
 
 </body>
+
+<script>
+    function showErrorPopup(msg) {
+        const modal = document.getElementById("error-msg");
+        const span = document.getElementsByClassName("close")[0];
+
+        msg += `<br>Please retry, and`+
+            `<br>Leave the `+
+            `<a id="feedback-link" href="https://github.com/kislerdm/diagramastext/issues/new" target="_blank" rel="noopener">feedback</a>`
+
+        document.getElementById("error-msg-content").innerHTML =
+            `<p style="font-size: medium;font-weight: bold;"><span style="color: red;">Error! </span>${msg}</p>`;
+
+        modal.style.display = "block";
+
+        span.onclick = function () {
+            modal.style.display = "none";
+        }
+
+        window.onclick = function (event) {
+            if (event.target === modal) {
+                modal.style.display = "none";
+            }
+        }
+    }
+
+    function loaderShow() {
+        document.getElementById("loader").style.display = "block";
+    }
+
+    function loaderHide() {
+        document.getElementById("loader").style.display = "none";
+    }
+
+    function trigger() {
+        const placeholder = "C4 diagram of a Go web server reading from external Postgres database over TCP";
+        const prompt = document.getElementById("prompt").value.trim();
+
+        const urlAPI = "https://api.diagramastext.dev/c4";
+        const apiKey = "{{ .Env.TOKEN }}";
+
+        if (placeholder !== prompt) {
+            loaderShow();
+
+            try {
+                validatePrompt(prompt);
+
+                fetch(urlAPI, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-api-key": apiKey,
+                    },
+                    body: JSON.stringify({
+                        "prompt": prompt,
+                    }),
+                }).then((resp) => {
+                    loaderHide();
+                    if (!resp.ok) {
+                        throw Error("critical error");
+                    }
+
+                    switch (resp.status) {
+                        case 200:
+                            resp.json()
+                                .then((data) => {
+                                    if (data.svg === null) {
+                                        throw Error("empty response");
+                                    } else {
+                                        document.getElementById("diagram").innerHTML = data.svg;
+                                    }
+                                })
+                            break;
+                        case 429:
+                            throw Error("the server is experiencing high load, please try later");
+                        default:
+                            resp.text().then((msg) => {
+                                throw Error(msg);
+                            })
+                    }
+
+                }).catch((e) => {
+                    loaderHide();
+                    showErrorPopup(e.message);
+                });
+
+            } catch (e) {
+                loaderHide();
+                showErrorPopup(e.message);
+            }
+
+        }
+
+    }
+
+    function validatePrompt(prompt) {
+        const minLength = 3,
+            maxLength = 500;
+        if (prompt.length < minLength || prompt.length > maxLength) {
+            throw RangeError(`The prompt must be between ${minLength} and ${maxLength} characters long`)
+        }
+    }
+
+</script>
+
 </html>
