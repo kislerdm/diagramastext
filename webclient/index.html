@@ -474,15 +474,14 @@
 <script>
     const version = "{{.Env.VERSION}}";
 
-    function generateFeedbackLink(apiGwRequestID, prompt) {
+    function generateFeedbackLink(prompt) {
         let url = "https://github.com/kislerdm/diagramastext/issues/new";
         const params = {
             assignee: "kislerdm",
             labels: ["feedback", "defect"],
-            title: `User report - Webclient. RequestID: ${apiGwRequestID}`,
+            title: `Webclient issue`,
             body: `## Environment
 - App version: ${version}
-- x-amzn-requestid: ${apiGwRequestID}
 
 ## Prompt
 
@@ -510,8 +509,8 @@ Please describe what should have happened following the actions you described.
         showErrorPopup(msg)
     }
 
-    function showErrorPopupRequest(msg, apiGwRequestID, prompt) {
-        const feedbackLink = generateFeedbackLink(apiGwRequestID, prompt);
+    function showErrorPopupRequest(msg, prompt) {
+        const feedbackLink = generateFeedbackLink(prompt);
 
         msg += `<br>Please retry, and` +
             `<br>Leave the ` +
@@ -557,7 +556,7 @@ Please describe what should have happened following the actions you described.
 
         if (placeholder !== prompt) {
             loaderShow();
-            let requestID = "";
+
             try {
                 validatePrompt(prompt);
             } catch (e) {
@@ -577,12 +576,6 @@ Please describe what should have happened following the actions you described.
                 }),
             }).then((resp) => {
                 loaderHide();
-
-                console.log(resp.headers);
-
-                if (resp.headers !== null) {
-                    requestID = resp.headers.get("x-amzn-requestid");
-                }
 
                 if (!resp.ok) {
                     throw new Error("critical error");
@@ -608,8 +601,7 @@ Please describe what should have happened following the actions you described.
                 }
             }).catch((e) => {
                 loaderHide();
-                console.log(e);
-                showErrorPopupRequest(e.message, requestID, prompt);
+                showErrorPopupRequest(e.message, prompt);
             });
         }
     }
