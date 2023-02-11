@@ -218,6 +218,48 @@
 
         /* Error message popup: end */
 
+        .loader {
+            border: 16px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 16px solid #3498db;
+            width: 120px;
+            height: 120px;
+            -webkit-animation: spin 2s linear infinite; /* Safari */
+            animation: spin 2s linear infinite;
+        }
+
+        #modal-loader {
+            width: 150px;
+            margin-top: 200px;
+            border: none;
+            box-shadow: none;
+            background: none;
+        }
+
+        /* Safari */
+        @-webkit-keyframes spin {
+            0% {
+                -webkit-transform: rotate(0deg);
+            }
+            100% {
+                -webkit-transform: rotate(360deg);
+            }
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #feedback-link {
+            color: #3498db;
+            font-weight: bold;
+        }
+
     </style>
 </head>
 <body>
@@ -250,7 +292,11 @@
             <span class="close">&times;</span>
             <div id="error-msg-content"></div>
         </div>
-
+    </div>
+    <div id="loader" class="modal">
+        <div id="modal-loader" class="modal-content">
+            <div class="loader"></div>
+        </div>
     </div>
 </div>
 
@@ -425,6 +471,10 @@
         const modal = document.getElementById("error-msg");
         const span = document.getElementsByClassName("close")[0];
 
+        msg += `<br>Please retry, and`+
+            `<br>Leave the `+
+            `<a id="feedback-link" href="https://github.com/kislerdm/diagramastext/issues/new" target="_blank" rel="noopener">feedback</a>`
+
         document.getElementById("error-msg-content").innerHTML =
             `<p style="font-size: medium;font-weight: bold;"><span style="color: red;">Error! </span>${msg}</p>`;
 
@@ -441,6 +491,14 @@
         }
     }
 
+    function loaderShow() {
+        document.getElementById("loader").style.display = "block";
+    }
+
+    function loaderHide() {
+        document.getElementById("loader").style.display = "none";
+    }
+
     function trigger() {
         const placeholder = "C4 diagram of a Go web server reading from external Postgres database over TCP";
         const prompt = document.getElementById("prompt").value.trim();
@@ -448,12 +506,13 @@
         const urlAPI = "https://api.diagramastext.dev/c4";
         const apiKey = "{{ .Env.TOKEN }}";
 
-        try {
-            validatePrompt(prompt);
+        if (placeholder !== prompt) {
+            loaderShow();
 
-            if (placeholder !== prompt) {
+            try {
+                validatePrompt(prompt);
 
-                return fetch(urlAPI, {
+                fetch(urlAPI, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -463,6 +522,7 @@
                         "prompt": prompt,
                     }),
                 }).then((resp) => {
+                    loaderHide();
                     if (!resp.ok) {
                         throw Error("critical error");
                     }
@@ -485,12 +545,17 @@
                                 throw Error(msg);
                             })
                     }
-                })
-                    .catch((e) => showErrorPopup(e.message));
+
+                }).catch((e) => {
+                    loaderHide();
+                    showErrorPopup(e.message);
+                });
+
+            } catch (e) {
+                loaderHide();
+                showErrorPopup(e.message);
             }
 
-        } catch (e) {
-            showErrorPopup(e.message);
         }
 
     }
