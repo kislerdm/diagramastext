@@ -578,6 +578,8 @@ Please describe what should have happened following the actions you described.
             }).then((resp) => {
                 loaderHide();
 
+                console.log(resp.headers);
+
                 if (resp.headers !== null) {
                     requestID = resp.headers.get("x-amzn-requestid");
                 }
@@ -606,9 +608,9 @@ Please describe what should have happened following the actions you described.
                 }
             }).catch((e) => {
                 loaderHide();
+                console.log(e);
                 showErrorPopupRequest(e.message, requestID, prompt);
             });
-
         }
     }
 
