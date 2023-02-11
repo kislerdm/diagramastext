@@ -551,7 +551,7 @@ Please describe what should have happened following the actions you described.
         const placeholder = "C4 diagram of a Go web server reading from external Postgres database over TCP";
         const prompt = document.getElementById("prompt").value.trim();
 
-        const urlAPI = "https://api.diagramastext.dev/c4";
+        const urlAPI = "{{ .Env.API_URL }}";
         const apiKey = "{{ .Env.TOKEN }}";
 
         if (placeholder !== prompt) {

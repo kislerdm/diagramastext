@@ -23,7 +23,8 @@ jobs:
       - name: Generate webclient
         env:
           TOKEN: ${{ secrets.GW_API_TOKEN }}
-        run: docker run -e TOKEN=$TOKEN -e VERSION=$GITHUB_SHA -v ${PWD}:/app -t hairyhenderson/gomplate:stable -f /app/webclient/index.html -o /app/public/index.html
+          API_URL: "https://api.diagramastext.dev/c4"
+        run: docker run -e TOKEN=$TOKEN -e VERSION=$GITHUB_SHA -e API_URL=$API_URL -v ${PWD}:/app -t hairyhenderson/gomplate:stable -f /app/webclient/index.html -o /app/public/index.html
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
