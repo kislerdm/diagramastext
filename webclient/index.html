@@ -80,7 +80,7 @@
             margin-top: 8px;
         }
 
-        .textarea {
+        textarea {
             font-size: 20px;
             color: white;
             text-align: left;
@@ -124,7 +124,7 @@
                 width: 100%;
             }
 
-            .textarea {
+            textarea {
                 width: 100%;
             }
 
@@ -177,6 +177,47 @@
             box-shadow: 0 0 3px 3px #2b425e;
         }
 
+        /* Error message popup */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            padding-top: 100px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0, 0, 0);
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            border-radius: 1rem;
+            background-color: #fefefe;
+            box-shadow: 0 0 3px 3px #e00d0d;;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 40%;
+        }
+
+        .close {
+            color: #aaaaaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Error message popup: end */
+
     </style>
 </head>
 <body>
@@ -195,8 +236,21 @@
 <div id="input">
     <div class="box shadow-black">
         <p class="box-text">Input:</p>
-        <div class="textarea">C4 diagram of a Go web server reading from external Postgres database over TCP</div>
-        <button id="trigger">Try the tool!</button>
+        <textarea id="prompt" minlength="3"
+                  maxlength="500"
+                  rows="3"
+                  placeholder="Type in the diagram description">C4 diagram of a Go web server reading from external Postgres database over TCP
+        </textarea>
+        <div>
+            <button id="trigger" onclick=trigger()>Generate Diagram</button>
+        </div>
+    </div>
+    <div id="error-msg" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="error-msg-content"></div>
+        </div>
+
     </div>
 </div>
 
@@ -365,4 +419,90 @@
 </footer>
 
 </body>
+
+<script>
+    function showErrorPopup(msg) {
+        const modal = document.getElementById("error-msg");
+        const span = document.getElementsByClassName("close")[0];
+
+        document.getElementById("error-msg-content").innerHTML =
+            `<p style="font-size: medium;font-weight: bold;"><span style="color: red;">Error! </span>${msg}</p>`;
+
+        modal.style.display = "block";
+
+        span.onclick = function () {
+            modal.style.display = "none";
+        }
+
+        window.onclick = function (event) {
+            if (event.target === modal) {
+                modal.style.display = "none";
+            }
+        }
+    }
+
+    function trigger() {
+        const placeholder = "C4 diagram of a Go web server reading from external Postgres database over TCP";
+        const prompt = document.getElementById("prompt").value.trim();
+
+        const urlAPI = "https://api.diagramastext.dev/c4";
+        const apiKey = "{{ .Env.TOKEN }}";
+
+        try {
+            validatePrompt(prompt);
+
+            if (placeholder !== prompt) {
+
+                return fetch(urlAPI, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-api-key": apiKey,
+                    },
+                    body: JSON.stringify({
+                        "prompt": prompt,
+                    }),
+                }).then((resp) => {
+                    if (!resp.ok) {
+                        throw Error("critical error");
+                    }
+
+                    switch (resp.status) {
+                        case 200:
+                            resp.json()
+                                .then((data) => {
+                                    if (data.svg === null) {
+                                        throw Error("empty response");
+                                    } else {
+                                        document.getElementById("diagram").innerHTML = data.svg;
+                                    }
+                                })
+                            break;
+                        case 429:
+                            throw Error("the server is experiencing high load, please try later");
+                        default:
+                            resp.text().then((msg) => {
+                                throw Error(msg);
+                            })
+                    }
+                })
+                    .catch((e) => showErrorPopup(e.message));
+            }
+
+        } catch (e) {
+            showErrorPopup(e.message);
+        }
+
+    }
+
+    function validatePrompt(prompt) {
+        const minLength = 3,
+            maxLength = 500;
+        if (prompt.length < minLength || prompt.length > maxLength) {
+            throw RangeError(`The prompt must be between ${minLength} and ${maxLength} characters long`)
+        }
+    }
+
+</script>
+
 </html>
