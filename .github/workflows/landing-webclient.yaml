@@ -23,7 +23,7 @@ jobs:
       - name: Generate webclient
         env:
           TOKEN: ${{ secrets.GW_API_TOKEN }}
-        run: docker run -e TOKEN=$TOKEN -v ${PWD}:/app -t hairyhenderson/gomplate:stable -f /app/webclient/index.html -o /app/public/index.html
+        run: docker run -e TOKEN=$TOKEN -e VERSION=$GITHUB_SHA -v ${PWD}:/app -t hairyhenderson/gomplate:stable -f /app/webclient/index.html -o /app/public/index.html
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
