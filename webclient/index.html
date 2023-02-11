@@ -497,7 +497,7 @@ ${prompt}
 
 ## Expected behaviour
 
-Please describe what should have happened following the actions your described.
+Please describe what should have happened following the actions you described.
 `,
         };
 
@@ -506,15 +506,23 @@ Please describe what should have happened following the actions your described.
         return `${url}?${query}`;
     }
 
-    function showErrorPopup(msg, apiGwRequestID, prompt) {
-        const modal = document.getElementById("error-msg");
-        const span = document.getElementsByClassName("close")[0];
+    function showErrorPopupValidation(msg) {
+        showErrorPopup(msg)
+    }
 
+    function showErrorPopupRequest(msg, apiGwRequestID, prompt) {
         const feedbackLink = generateFeedbackLink(apiGwRequestID, prompt);
 
         msg += `<br>Please retry, and` +
             `<br>Leave the ` +
             `<a id="feedback-link" href=${feedbackLink} target="_blank" rel="noopener">feedback</a>`
+
+        showErrorPopup(msg)
+    }
+
+    function showErrorPopup(msg) {
+        const modal = document.getElementById("error-msg");
+        const span = document.getElementsByClassName("close")[0];
 
         document.getElementById("error-msg-content").innerHTML =
             `<p style="font-size: medium;font-weight: bold;"><span style="color: red;">Error! </span>${msg}</p>`;
@@ -552,58 +560,56 @@ Please describe what should have happened following the actions your described.
             let requestID = "";
             try {
                 validatePrompt(prompt);
-
-                fetch(urlAPI, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "x-api-key": apiKey,
-                    },
-                    body: JSON.stringify({
-                        "prompt": prompt,
-                    }),
-                }).then((resp) => {
-                    loaderHide();
-
-                    if (resp.headers !== null) {
-                        requestID = resp.headers.get("x-amzn-requestid");
-                    }
-
-                    if (!resp.ok) {
-                        throw Error("critical error");
-                    }
-
-                    switch (resp.status) {
-                        case 200:
-                            resp.json()
-                                .then((data) => {
-                                    if (data.svg === null) {
-                                        throw Error("empty response");
-                                    } else {
-                                        document.getElementById("diagram").innerHTML = data.svg;
-                                    }
-                                })
-                            break;
-                        case 429:
-                            throw Error("the server is experiencing high load, please try later");
-                        default:
-                            resp.text().then((msg) => {
-                                throw Error(msg);
-                            })
-                    }
-
-                }).catch((e) => {
-                    loaderHide();
-                    showErrorPopup(e.message, requestID, prompt);
-                });
-
             } catch (e) {
                 loaderHide();
-                showErrorPopup(e.message, requestID, prompt);
+                showErrorPopupValidation(e.message);
+                return;
             }
 
-        }
+            fetch(urlAPI, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": apiKey,
+                },
+                body: JSON.stringify({
+                    "prompt": prompt,
+                }),
+            }).then((resp) => {
+                loaderHide();
 
+                if (resp.headers !== null) {
+                    requestID = resp.headers.get("x-amzn-requestid");
+                }
+
+                if (!resp.ok) {
+                    throw Error("critical error");
+                }
+
+                switch (resp.status) {
+                    case 200:
+                        resp.json()
+                            .then((data) => {
+                                if (data.svg === null) {
+                                    throw Error("empty response");
+                                } else {
+                                    document.getElementById("diagram").innerHTML = data.svg;
+                                }
+                            })
+                        break;
+                    case 429:
+                        throw Error("the server is experiencing high load, please try later");
+                    default:
+                        resp.text().then((msg) => {
+                            throw Error(msg);
+                        })
+                }
+            }).catch((e) => {
+                loaderHide();
+                showErrorPopupRequest(e.message, requestID, prompt);
+            });
+
+        }
     }
 
     function validatePrompt(prompt) {
