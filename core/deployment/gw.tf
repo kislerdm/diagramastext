@@ -125,12 +125,12 @@ locals {
   }
 
   cors_headers = {
-    "Access-Control-Allow-Origin"  = "'*'"
-    "Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "Access-Control-Allow-Origin"  = "https://diagramastext.dev"
+    "Access-Control-Allow-Headers" = "Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token"
+    "Access-Control-Allow-Methods" = "POST,OPTIONS"
   }
 
-  cors_headers_gw = { for k, v in local.cors_headers : "method.response.header.${k}" => v }
+  cors_headers_gw = { for k, v in local.cors_headers : "method.response.header.${k}" => "'${v}'" }
 
   endpoints = {
     "c4" : ["POST"],
