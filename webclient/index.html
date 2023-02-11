@@ -585,7 +585,7 @@ Please describe what should have happened following the actions you described.
                 }
 
                 if (!resp.ok) {
-                    throw Error("critical error");
+                    throw new Error("critical error");
                 }
 
                 switch (resp.status) {
@@ -593,7 +593,7 @@ Please describe what should have happened following the actions you described.
                         resp.json()
                             .then((data) => {
                                 if (data.svg === null) {
-                                    throw Error("empty response");
+                                    throw new Error("empty response");
                                 } else {
                                     document.getElementById("diagram").innerHTML = data.svg;
                                 }
@@ -603,7 +603,7 @@ Please describe what should have happened following the actions you described.
                         throw Error("the server is experiencing high load, please try later");
                     default:
                         resp.text().then((msg) => {
-                            throw Error(msg);
+                            throw new Error(msg);
                         })
                 }
             }).catch((e) => {
@@ -618,7 +618,7 @@ Please describe what should have happened following the actions you described.
         const minLength = 3,
             maxLength = 500;
         if (prompt.length < minLength || prompt.length > maxLength) {
-            throw RangeError(`The prompt must be between ${minLength} and ${maxLength} characters long`)
+            throw new RangeError(`The prompt must be between ${minLength} and ${maxLength} characters long`)
         }
     }
 
