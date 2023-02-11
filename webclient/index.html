@@ -154,6 +154,11 @@
             background: #ccc9c9;
         }
 
+        button:disabled {
+            box-shadow: none;
+            background: #ccc9c9;
+        }
+
         .box {
             border-radius: 1.2rem;
             padding: 0.8rem;
@@ -408,6 +413,9 @@
             </g>
         </svg>
     </div>
+    <div>
+        <button id="download" onclick=download() disabled>Download</button>
+    </div>
 </div>
 
 <div id="disclaimer" class="box bubble">
@@ -547,6 +555,12 @@ Please describe what should have happened following the actions you described.
         document.getElementById("loader").style.display = "none";
     }
 
+    function activateDownloadButton() {
+        document.getElementById("download").disabled = false;
+    }
+
+    let svg = ""
+
     function trigger() {
         const placeholder = "C4 diagram of a Go web server reading from external Postgres database over TCP";
         const prompt = document.getElementById("prompt").value.trim();
@@ -588,6 +602,8 @@ Please describe what should have happened following the actions you described.
                                 if (data.svg === null) {
                                     throw new Error("empty response");
                                 } else {
+                                    activateDownloadButton();
+                                    svg = data.svg;
                                     document.getElementById("diagram").innerHTML = data.svg;
                                 }
                             })
@@ -612,6 +628,13 @@ Please describe what should have happened following the actions you described.
         if (prompt.length < minLength || prompt.length > maxLength) {
             throw new RangeError(`The prompt must be between ${minLength} and ${maxLength} characters long`)
         }
+    }
+
+    function download() {
+        const link = document.createElement("a");
+        link.setAttribute("download", "diagram.svg");
+        link.setAttribute("href", `data:image/svg+xml,${svg}`);
+        link.click();
     }
 
 </script>
