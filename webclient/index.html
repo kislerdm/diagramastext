@@ -472,13 +472,49 @@
 </body>
 
 <script>
-    function showErrorPopup(msg) {
+    const version = "{{.Env.VERSION}}";
+
+    function generateFeedbackLink(apiGwRequestID, prompt) {
+        let url = "https://github.com/kislerdm/diagramastext/issues/new";
+        const params = {
+            assignee: "kislerdm",
+            labels: ["feedback", "defect"],
+            title: `User report - Webclient. RequestID: ${apiGwRequestID}`,
+            body: `## Environment
+- App version: ${version}
+- x-amzn-requestid: ${apiGwRequestID}
+
+## Prompt
+
+\`\`\`
+${prompt}
+\`\`\`
+
+## Details
+
+- Please describe your chain of actions, i.e. what preceded the state you report?
+- Please attach screenshots whether possible
+
+## Expected behaviour
+
+Please describe what should have happened following the actions your described.
+`,
+        };
+
+        const query = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
+
+        return `${url}?${query}`;
+    }
+
+    function showErrorPopup(msg, apiGwRequestID, prompt) {
         const modal = document.getElementById("error-msg");
         const span = document.getElementsByClassName("close")[0];
 
-        msg += `<br>Please retry, and`+
-            `<br>Leave the `+
-            `<a id="feedback-link" href="https://github.com/kislerdm/diagramastext/issues/new" target="_blank" rel="noopener">feedback</a>`
+        const feedbackLink = generateFeedbackLink(apiGwRequestID, prompt);
+
+        msg += `<br>Please retry, and` +
+            `<br>Leave the ` +
+            `<a id="feedback-link" href=${feedbackLink} target="_blank" rel="noopener">feedback</a>`
 
         document.getElementById("error-msg-content").innerHTML =
             `<p style="font-size: medium;font-weight: bold;"><span style="color: red;">Error! </span>${msg}</p>`;
@@ -513,7 +549,7 @@
 
         if (placeholder !== prompt) {
             loaderShow();
-
+            let requestID = "";
             try {
                 validatePrompt(prompt);
 
@@ -528,6 +564,11 @@
                     }),
                 }).then((resp) => {
                     loaderHide();
+
+                    if (resp.headers !== null) {
+                        requestID = resp.headers.get("x-amzn-requestid");
+                    }
+
                     if (!resp.ok) {
                         throw Error("critical error");
                     }
@@ -553,12 +594,12 @@
 
                 }).catch((e) => {
                     loaderHide();
-                    showErrorPopup(e.message);
+                    showErrorPopup(e.message, requestID, prompt);
                 });
 
             } catch (e) {
                 loaderHide();
-                showErrorPopup(e.message);
+                showErrorPopup(e.message, requestID, prompt);
             }
 
         }
