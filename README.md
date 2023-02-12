@@ -24,14 +24,17 @@ here for the rescue! All one needs is, a description in plain English to get des
         - [Manifesto](#manifesto)
         - [Process](#process)
         - [Tech stack](#tech-stack)
+        - [Documentation](#documentation)
 * [License](#license)
     + [Codebase](#codebase)
     + [Images and diagrams](#images-and-diagrams)
 
 ## Contacts
 
-- <a href="mailto:hi@diagramastext.com">hi@diagramastext.com</a>
-- [LinkedIn](https://www.linkedin.com/in/dkisler/)
+- Submit your [request](https://github.com/kislerdm/diagramastext/issues/new?assignee=kislerdm&labels=feedback&title=PLEASE%20DEFINE%20YOUR%20REQUEST&body=%23%23%20What%0APlease%20describe%20your%20proposal.%0A%0A%23%23%20Why%0APlease%20clarify%20the%20context.%0A%0A%23%23%20How%0A%0A(optional)%20Please%20sketch%20execution%20paths.)
+- Join us on [Slack](https://join.slack.com/t/diagramastextdev/shared_invite/zt-1onedpbsz-ECNIfwjIj02xzBjWNGOllg)
+- Write us: <a href="mailto:hi@diagramastext.com">hi@diagramastext.com</a>
+- Get in touch on [LinkedIn](https://www.linkedin.com/in/dkisler/)
 
 ## Bets/Panning/Commitment
 
@@ -57,45 +60,48 @@ here for the rescue! All one needs is, a description in plain English to get des
 - We follow [RDD](https://tom.preston-werner.com/2010/08/23/readme-driven-development.html)
 - We maintain flat modules structure whether possible
 - We aim for simplicity with the least external dependencies
-- We follow the release [guideline](https://keepachangelog.com/en/1.0.0/) and [semantic versioning](https://semver.org/)
-- We follow conventional _commits_ [guideline](https://www.conventionalcommits.org/en/v1.0.0/):
-  - `feat`: for features
-  - `fix`: for defect fix
-  - `chore`: for infra, ci, or docs adjustments; or refactoring
 - We follow conventional _comments_ [guideline](https://conventionalcomments.org/) for code reviews
+- We follow conventional _commits_ [guideline](https://www.conventionalcommits.org/en/v1.0.0/):
+    - `feat`: for features
+    - `fix`: for defect fix
+    - `chore`: for infra, ci, or docs adjustments; or refactoring
 - We follow the [monorepo](https://monorepo.tools/) approach
+- We follow [trunk-based development](https://trunkbaseddevelopment.com/) model
+- We follow the release [guideline](https://keepachangelog.com/en/1.0.0/) and [semantic versioning](https://semver.org/)
 
 #### Tech stack
 
 - Languages:
-  - Go 1.19
-  - Vanilla javascript
-  - Python 3.9
+    - Go 1.19
+    - JavaScript ES2021
+    - Python 3.9
 - Markup:
-  - Markdown
-  - HTML5
-  - CSS3
+    - Markdown
+    - HTML5
+    - CSS3
 - CI:
-  - GitHub Actions
+    - GitHub Actions
 - Infra:
-  - AWS:
-    - IAM
-    - Lambda
-    - API Gateway
-  - GitHub Pages
-  - [Neon](https://neon.tech/)
-  - _Temp_: bare server hosted on [netcup](https://www.netcup.de/)
-  - Cloudflare
-  - namecheap
-  - godaddy
+    - AWS:
+        - IAM
+        - Lambda
+        - API Gateway
+    - GitHub Pages
+    - [Neon](https://neon.tech/)
+    - Cloudflare
+    - namecheap
+    - godaddy
 - Tools:
-  - gnuMake
-  - Docker
-  - terraform
-  - slack
+    - gnuMake
+    - Docker
+    - terraform
 - Logic:
-  - PlantUML
-  - OpenAI
+    - PlantUML
+    - OpenAI
+
+#### Documentation
+
+Please find further documentation [here](./docs).
 
 ## License
 
