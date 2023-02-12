@@ -6,20 +6,21 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
+
+	coreHandler "github.com/kislerdm/diagramastext/core/handler"
+	"github.com/kislerdm/diagramastext/core/utils"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/kislerdm/diagramastext/core"
-	coreHandler "github.com/kislerdm/diagramastext/core/handler"
 )
 
 func main() {
 	clientOpenAI, err := core.NewOpenAIClient(
 		core.ConfigOpenAI{
 			Token:       os.Getenv("OPENAI_API_KEY"),
-			MaxTokens:   mustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
-			Temperature: mustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
+			MaxTokens:   utils.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
+			Temperature: utils.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
 		},
 	)
 	if err != nil {
@@ -34,16 +35,6 @@ func main() {
 	}
 
 	lambda.Start(handler(clientOpenAI, clientPlantUML, corsHeaders))
-}
-
-func mustParseInt(s string) int {
-	o, _ := strconv.Atoi(s)
-	return o
-}
-
-func mustParseFloat32(s string) float32 {
-	o, _ := strconv.ParseFloat(s, 10)
-	return float32(o)
 }
 
 type corsHeaders map[string]string
@@ -110,7 +101,7 @@ func handler(
 				StatusCode: http.StatusOK,
 				Body:       string(svg.MustMarshal()),
 			},
-		), err
+		), nil
 	}
 }
 

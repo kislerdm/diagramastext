@@ -1,4 +1,4 @@
-package main
+package utils
 
 import "testing"
 
@@ -25,8 +25,8 @@ func Test_mustParseInt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if got := mustParseInt(tt.args.s); got != tt.want {
-					t.Errorf("mustParseInt() = %v, want %v", got, tt.want)
+				if got := MustParseInt(tt.args.s); got != tt.want {
+					t.Errorf("MustParseInt() = %v, want %v", got, tt.want)
 				}
 			},
 		)
@@ -56,8 +56,8 @@ func Test_mustParseFloat32(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if got := mustParseFloat32(tt.args.s); got != tt.want {
-					t.Errorf("mustParseFloat32() = %v, want %v", got, tt.want)
+				if got := MustParseFloat32(tt.args.s); got != tt.want {
+					t.Errorf("MustParseFloat32() = %v, want %v", got, tt.want)
 				}
 			},
 		)
