@@ -5,12 +5,13 @@ help: ## Prints help message.
 
 test: ## Run tests of the core module.
 	@ go mod tidy && \
-  		go test -timeout 3m --tags=unittest -v -coverprofile=.coverage.out . -coverpkg=. && \
+  		go test -timeout 3m ./... --tags=unittest -v -coverprofile=.coverage.out . -coverpkg=.  && \
 		go tool cover -func .coverage.out && rm .coverage.out
 
 test-lambda: ## Run tests for the lambda function.
 	@ cd cmd/lambda && \
- 		go test -timeout 3m --tags=unittest -v -coverprofile=.coverage.out . -coverpkg=. && \
+ 		go mod tidy && \
+ 		go test -timeout 3m -v -coverprofile=.coverage.out . -coverpkg=. && \
 		go tool cover -func .coverage.out && rm .coverage.out
 
 compile:
@@ -24,3 +25,9 @@ build: compile ## Builds the lambda binary and archives it.
 
 deploy-lambda: ## Deploys the core logic as AWS lambda.
 	@ cd deployment && terraform plan && terraform apply -auto-approve
+
+compile-httpserver: ## Compiles httpserver
+	@ test -d bin || mkdir -p bin && \
+		cd cmd/httpserver && \
+		go mod tidy && \
+			CGO_ENABLED=0 go build -o ../../bin/httpserver -ldflags="-s -w" .
