@@ -1,6 +1,7 @@
 # Diagram As Text
 
-The tool to generate diagram based on textual description.
+The tool to generate diagram based on textual description. Although it takes quite some effort to make a diagram, LLM is
+here for the rescue! 🤖🦾
 
 🚀🚀🚀 _Mission_: to enable anyone to explain complex system, or process in a simple way.
 
@@ -8,17 +9,30 @@ The tool to generate diagram based on textual description.
 
 🚀 _MVP_: plain english to [C4 container](http://c4model.com/) diagrams.
 
-The work is driven by the motivation to streamline knowledge sharing by enabling effective generation of visual
-materials. We aim to take a step beyond the "diagram as code" approach and remove the additional step between the idea
-of what shall be displayed and the illustration.
+🔔 **Wanted**: founding contributors 🔔
 
-We all know that “a picture is worth a thousand words”. Although it takes quite some effort to make a diagram, LLM is
-here for the rescue! All one needs is, a description in plain English to get desired result in no time! 🤖🦾
+The project is purely community driven - we need your support:
 
-## Outlook
+- Please give the project a _star_.
+- Join us as _contributor_: we need software engineers, data scientists, analysts, designers.
 
-* [Contacts](#contacts)
-* [Contribution](#contribution)
+If you are excited about the project, feel comfortable with our [ways of work](#ways-of-work), and want to contribute,
+please [get in touch](#contacts) for further details.
+
+Thank you! 🙏
+
+## Contacts
+
+- Submit
+  your [request](https://github.com/kislerdm/diagramastext/issues/new?assignee=kislerdm&labels=feedback&title=PLEASE%20DEFINE%20YOUR%20REQUEST&body=%23%23%20What%0APlease%20describe%20your%20proposal.%0A%0A%23%23%20Why%0APlease%20clarify%20the%20context.%0A%0A%23%23%20How%0A%0A(optional)%20Please%20sketch%20execution%20paths.)
+- Join us on [Slack](https://join.slack.com/t/diagramastextdev/shared_invite/zt-1onedpbsz-ECNIfwjIj02xzBjWNGOllg)
+- Write us: <a href="mailto:hi@diagramastext.com">hi@diagramastext.com</a>
+- Get in touch on [LinkedIn](https://www.linkedin.com/in/dkisler/)
+
+<details>
+<summary><strong>Outlook</strong></summary>
+
+* [Ways of work](#ways-of-work)
     + [Manifesto](#manifesto)
     + [Process](#process)
     + [Bets/Panning/Commitment](#betspanningcommitment)
@@ -29,27 +43,9 @@ here for the rescue! All one needs is, a description in plain English to get des
     + [Codebase](#codebase)
     + [Images and diagrams](#images-and-diagrams)
 
-## Contacts
+</details>
 
-- Submit
-  your [request](https://github.com/kislerdm/diagramastext/issues/new?assignee=kislerdm&labels=feedback&title=PLEASE%20DEFINE%20YOUR%20REQUEST&body=%23%23%20What%0APlease%20describe%20your%20proposal.%0A%0A%23%23%20Why%0APlease%20clarify%20the%20context.%0A%0A%23%23%20How%0A%0A(optional)%20Please%20sketch%20execution%20paths.)
-- Join us on [Slack](https://join.slack.com/t/diagramastextdev/shared_invite/zt-1onedpbsz-ECNIfwjIj02xzBjWNGOllg)
-- Write us: <a href="mailto:hi@diagramastext.com">hi@diagramastext.com</a>
-- Get in touch on [LinkedIn](https://www.linkedin.com/in/dkisler/)
-
-## Contribution
-
-🔔 **Wanted**: founding contributors 🔔
-
-The project is purely community driven - we need your support:
-
-- Please give the project a star, if you find its mission valuable for the software community.
-- Join us as contributor: we need software engineers, data scientists, analysts, designers.
-
-If you are excited about the project, feel comfortable with our [manifesto](#manifesto), and want to help, please do
-not hesitate to [get in touch](#contacts) for further details.
-
-Thank you! 🙏
+## Ways of work
 
 ### Manifesto
 
@@ -80,39 +76,41 @@ Thank you! 🙏
 
 ## Tech details
 
+<details>
+<summary><strong>Tech stack</strong></summary>
+
+- Languages:
+  - Go 1.19
+  - JavaScript ES2021
+  - Python 3.9
+- Markup:
+  - Markdown
+  - HTML5
+  - CSS3
+- CI:
+  - GitHub Actions
+- Infra:
+  - AWS:
+    - IAM
+    - Lambda
+    - API Gateway
+  - GitHub Pages
+  - [Neon](https://neon.tech/)
+  - Cloudflare
+  - namecheap
+  - godaddy
+- Tools:
+  - gnuMake
+  - Docker
+  - terraform
+- Logic:
+  - PlantUML
+  - OpenAI
+</details>
+
 ### Architecture
 
 ![architecture](https://www.plantuml.com/plantuml/svg/RP3DRk8m58NtUGfFf151cf3DhAggeeK8gFY9-56NaHDV4akE7TatBRnzxM1eKPjDh7FEPvzxnmQfnguHmHykIz4n83LYQnwIHDEFKSMnxehEW2wLH90uAbMJj89AnyG6cU15ClaVPquwh9P9Gms2jb8-SSG9HwsxFK2E0aZ8EAqqTI5dCNWdvIL6l1C6mL4f14t2HuIo7lyWdaXC_ZAA40tEzejNgvYnmT226MYZP9wUC7AL_v7mO7_XC0XsPuitKSUzHXOIGHzf2TRrPW7Md2Zz9VKtgHOaTTp67fuNz-Pr4zQ-Ri0zjmMHRts7_iqfc98NO0ZMS9sKS4bIMGbkwj16zdOyothKGdsVJAkMLXGzschLjEZYy_q-IrvtcxLd3dt_Mzc5F8A-C8rY87v3fZtoROGPID0KxslUo1SkgJxtsvnltl9bEalNqsWOZ44ooty2)
-
-### Tech stack
-
-- Languages:
-    - Go 1.19
-    - JavaScript ES2021
-    - Python 3.9
-- Markup:
-    - Markdown
-    - HTML5
-    - CSS3
-- CI:
-    - GitHub Actions
-- Infra:
-    - AWS:
-        - IAM
-        - Lambda
-        - API Gateway
-    - GitHub Pages
-    - [Neon](https://neon.tech/)
-    - Cloudflare
-    - namecheap
-    - godaddy
-- Tools:
-    - gnuMake
-    - Docker
-    - terraform
-- Logic:
-    - PlantUML
-    - OpenAI
 
 ## License
 
