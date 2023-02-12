@@ -44,8 +44,8 @@ here for the rescue! All one needs is, a description in plain English to get des
 The project is purely community driven - we need your support:
 
 - Please give the project a star, if you find its mission valuable for the software community.
-- Join us as a contributor: we need software engineers, data scientists, analysts, designers. If you feel excited about
-  the project, you feel comfortable with our [manifesto](#manifesto), and you want to help pushing it forward, please do
+- Join us as a contributor: we need software engineers, data scientists, analysts, designers. If you are excited about
+  the project, feel comfortable with our [manifesto](#manifesto), and want to help, please do
   not hesitate to [get in touch](#contacts) for further details.
 
 Thank you! 🙏
