@@ -19,12 +19,12 @@ here for the rescue! All one needs is, a description in plain English to get des
 
 * [Contacts](#contacts)
 * [Contribution](#contribution)
-  + [Manifesto](#manifesto)
-  + [Process](#process)
-  + [Bets/Panning/Commitment](#betspanningcommitment)
+    + [Manifesto](#manifesto)
+    + [Process](#process)
+    + [Bets/Panning/Commitment](#betspanningcommitment)
 * [Tech details](#tech-details)
-  + [Architecture](#architecture)
-  + [Tech stack](#tech-stack)
+    + [Architecture](#architecture)
+    + [Tech stack](#tech-stack)
 * [License](#license)
     + [Codebase](#codebase)
     + [Images and diagrams](#images-and-diagrams)
@@ -44,9 +44,10 @@ here for the rescue! All one needs is, a description in plain English to get des
 The project is purely community driven - we need your support:
 
 - Please give the project a star, if you find its mission valuable for the software community.
-- Join us as a contributor: we need software engineers, data scientists, analysts, designers. If you are excited about
-  the project, feel comfortable with our [manifesto](#manifesto), and want to help, please do
-  not hesitate to [get in touch](#contacts) for further details.
+- Join us as contributor: we need software engineers, data scientists, analysts, designers.
+
+If you are excited about the project, feel comfortable with our [manifesto](#manifesto), and want to help, please do
+not hesitate to [get in touch](#contacts) for further details.
 
 Thank you! 🙏
 
