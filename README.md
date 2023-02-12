@@ -38,7 +38,7 @@ Thank you! 🙏
     + [Bets/Panning/Commitment](#betspanningcommitment)
 * [Tech details](#tech-details)
     + [Architecture](#architecture)
-    + [Tech stack](#tech-stack)
+    + [Local setup](#local-setup)
 * [License](#license)
     + [Codebase](#codebase)
     + [Images and diagrams](#images-and-diagrams)
@@ -111,6 +111,28 @@ Thank you! 🙏
 ### Architecture
 
 ![architecture](https://www.plantuml.com/plantuml/svg/RP3DRk8m58NtUGfFf151cf3DhAggeeK8gFY9-56NaHDV4akE7TatBRnzxM1eKPjDh7FEPvzxnmQfnguHmHykIz4n83LYQnwIHDEFKSMnxehEW2wLH90uAbMJj89AnyG6cU15ClaVPquwh9P9Gms2jb8-SSG9HwsxFK2E0aZ8EAqqTI5dCNWdvIL6l1C6mL4f14t2HuIo7lyWdaXC_ZAA40tEzejNgvYnmT226MYZP9wUC7AL_v7mO7_XC0XsPuitKSUzHXOIGHzf2TRrPW7Md2Zz9VKtgHOaTTp67fuNz-Pr4zQ-Ri0zjmMHRts7_iqfc98NO0ZMS9sKS4bIMGbkwj16zdOyothKGdsVJAkMLXGzschLjEZYy_q-IrvtcxLd3dt_Mzc5F8A-C8rY87v3fZtoROGPID0KxslUo1SkgJxtsvnltl9bEalNqsWOZ44ooty2)
+
+### Local setup
+
+#### Requirements
+
+- git
+- gnuMake
+- docker
+
+#### Steps
+
+Follow the steps to provision local development environment.
+
+1. Clone the repo
+```commandline
+git clone git@github.com:kislerdm/diagramastext.git
+```
+
+2. Run to command:
+```commandline
+make localenv
+```
 
 ## License
 
