@@ -138,7 +138,7 @@ git clone git@github.com:kislerdm/diagramastext.git
 export OPENAI_API_KEY=##TOKEN##
 ```
 
-3. Run to command to provision the local environemnt:
+3. Run to provision the local environment:
 
 ```commandline
 make localenv
