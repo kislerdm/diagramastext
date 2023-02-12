@@ -80,32 +80,33 @@ Thank you! 🙏
 <summary><strong>Tech stack</strong></summary>
 
 - Languages:
-  - Go 1.19
-  - JavaScript ES2021
-  - Python 3.9
+    - Go 1.19
+    - JavaScript ES2021
+    - Python 3.9
 - Markup:
-  - Markdown
-  - HTML5
-  - CSS3
+    - Markdown
+    - HTML5
+    - CSS3
 - CI:
-  - GitHub Actions
+    - GitHub Actions
 - Infra:
-  - AWS:
-    - IAM
-    - Lambda
-    - API Gateway
-  - GitHub Pages
-  - [Neon](https://neon.tech/)
-  - Cloudflare
-  - namecheap
-  - godaddy
+    - AWS:
+        - IAM
+        - Lambda
+        - API Gateway
+    - GitHub Pages
+    - [Neon](https://neon.tech/)
+    - Cloudflare
+    - namecheap
+    - godaddy
 - Tools:
-  - gnuMake
-  - Docker
-  - terraform
+    - gnuMake
+    - Docker
+    - terraform
 - Logic:
-  - PlantUML
-  - OpenAI
+    - PlantUML
+    - OpenAI
+
 </details>
 
 ### Architecture
@@ -118,18 +119,27 @@ Thank you! 🙏
 
 - git
 - gnuMake
-- docker
+- docker ~> 20.10
 
 #### Steps
 
 Follow the steps to provision local development environment.
 
 1. Clone the repo
+
 ```commandline
 git clone git@github.com:kislerdm/diagramastext.git
 ```
 
-2. Run to command:
+2. Export OpenAI access [token](https://platform.openai.com/docs/api-reference/authentication) as the environment
+   variable `OPENAI_API_KEY`:
+
+```commandline
+export OPENAI_API_KEY=##TOKEN##
+```
+
+3. Run to command to provision the local environemnt:
+
 ```commandline
 make localenv
 ```

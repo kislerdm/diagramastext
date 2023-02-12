@@ -32,6 +32,11 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, status int, er
 }
 
 func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		h.response(w, nil, http.StatusOK, nil)
+		return
+	}
+
 	defer func() { _ = r.Body.Close() }()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -82,6 +87,7 @@ func main() {
 	handler := httpHandler{
 		clientModel:   clientOpenAI,
 		clientDiagram: core.NewPlantUMLClient(),
+		reportErrorFn: func(err error) { log.Println(err) },
 	}
 
 	if v := os.Getenv("CORS_HEADERS"); v != "" {
