@@ -671,7 +671,7 @@ Please describe what should have happened following the actions you described.
     function download() {
         const link = document.createElement("a");
         link.setAttribute("download", "diagram.svg");
-        link.setAttribute("href", `data:image/svg+xml,${svg}`);
+        link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
         link.click();
     }
 
