@@ -3,6 +3,8 @@
 The tool to generate diagram based on textual description. Although it takes quite some effort to make a diagram, LLM is
 here for the rescue! 🤖🦾
 
+<video src="https://user-images.githubusercontent.com/13434797/218483498-57d671ad-6ad0-40af-b107-7d4cb87cc673.mp4" controls="controls" style="max-width: 720px;"></video>
+
 🚀🚀🚀 _Mission_: to enable anyone to explain complex system, or process in a simple way.
 
 🚀🚀 _Objective_: to streamline knowledge sharing through diagrams.
