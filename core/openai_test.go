@@ -38,6 +38,7 @@ func TestNewOpenAIClient(t *testing.T) {
 					MaxTokens:   defaultMaxTokens,
 					Temperature: defaultTemperature,
 					TopP:        defaultTopP,
+					BestOf:      defaultBestOf,
 				},
 				token:   mockToken,
 				baseURL: baseURLOpenAI,
@@ -68,6 +69,7 @@ func TestNewOpenAIClient(t *testing.T) {
 					MaxTokens:   defaultMaxTokens,
 					Temperature: defaultTemperature,
 					TopP:        defaultTopP,
+					BestOf:      defaultBestOf,
 				},
 				token:   mockToken,
 				baseURL: baseURLOpenAI,
@@ -94,6 +96,7 @@ func TestNewOpenAIClient(t *testing.T) {
 					MaxTokens:   100,
 					Temperature: 0.5,
 					TopP:        defaultTopP,
+					BestOf:      defaultBestOf,
 				},
 				token:   mockToken,
 				baseURL: baseURLOpenAI,
@@ -118,6 +121,7 @@ func TestNewOpenAIClient(t *testing.T) {
 					MaxTokens:   defaultMaxTokens,
 					Temperature: defaultTemperature,
 					TopP:        defaultTopP,
+					BestOf:      defaultBestOf,
 				},
 				token:   mockToken,
 				baseURL: baseURLOpenAI,
@@ -142,6 +146,7 @@ func TestNewOpenAIClient(t *testing.T) {
 					MaxTokens:   defaultMaxTokens,
 					Temperature: defaultTemperature,
 					TopP:        defaultTopP,
+					BestOf:      defaultBestOf,
 				},
 				token:   mockToken,
 				baseURL: baseURLOpenAI,
@@ -229,4 +234,32 @@ func Test_clientOpenAI_setHeader(t *testing.T) {
 			}
 		},
 	)
+}
+
+func Test_cleanRawResponse(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "faulty json end",
+			args: args{
+				s: `{"nodes":[{"id":"0","label":"Go Web Server","technology":"Go","description":"Authenticates users"},{"id":"1","label":"Kafka","technology":"Kafka","is_database":true},{"id":"2"},{"id":"3","label":"Database","technology":"MySQL","is_database":true}],`,
+			},
+			want: `{"nodes":[{"id":"0","label":"Go Web Server","technology":"Go","description":"Authenticates users"},{"id":"1","label":"Kafka","technology":"Kafka","is_database":true},{"id":"2"},{"id":"3","label":"Database","technology":"MySQL","is_database":true}]}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := cleanRawResponse(tt.args.s); got != tt.want {
+					t.Errorf("cleanRawResponse() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
 }

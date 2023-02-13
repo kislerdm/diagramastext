@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -47,6 +48,7 @@ type openAIRequest struct {
 	TopP             float32  `json:"top_p"`
 	FrequencyPenalty float32  `json:"frequency_penalty"`
 	PresencePenalty  float32  `json:"presence_penalty"`
+	BestOf           int8     `json:"best_of"`
 }
 
 type clientOpenAI struct {
@@ -72,6 +74,7 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 			Temperature:      cfg.Temperature,
 			FrequencyPenalty: 0,
 			PresencePenalty:  0,
+			BestOf:           defaultBestOf,
 		},
 		baseURL: baseURLOpenAI,
 	}
@@ -134,8 +137,9 @@ const (
 	defaultTimeoutOpenAI = 3 * time.Minute
 	defaultModelOpenAI   = "code-cushman-001"
 	defaultMaxTokens     = 768
-	defaultTemperature   = 0
+	defaultTemperature   = 0.2
 	defaultTopP          = 1
+	defaultBestOf        = 3
 )
 
 type openAIResponse struct {
@@ -214,6 +218,18 @@ func (c *clientOpenAI) Do(ctx context.Context, prompt string) (DiagramGraph, err
 		}
 	}
 
+	return c.decodeResponse(ctx, respBytes)
+}
+
+func (c *clientOpenAI) setHeader(req *http.Request) {
+	req.Header.Add("Authorization", "Bearer "+c.token)
+	req.Header.Add("Content-Type", "application/json")
+	if c.organization != "" {
+		req.Header.Add("Organization", c.organization)
+	}
+}
+
+func (c *clientOpenAI) decodeResponse(ctx context.Context, respBytes []byte) (DiagramGraph, error) {
 	var resp openAIResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return DiagramGraph{}, Error{
@@ -233,7 +249,8 @@ func (c *clientOpenAI) Do(ctx context.Context, prompt string) (DiagramGraph, err
 		}
 	}
 
-	s := strings.TrimSpace(resp.Choices[0].Text)
+	s := cleanRawResponse(resp.Choices[0].Text)
+	log.Println(s)
 	var o DiagramGraph
 	if err := json.Unmarshal([]byte(s), &o); err != nil {
 		return DiagramGraph{}, Error{
@@ -247,12 +264,16 @@ func (c *clientOpenAI) Do(ctx context.Context, prompt string) (DiagramGraph, err
 	return o, nil
 }
 
-func (c *clientOpenAI) setHeader(req *http.Request) {
-	req.Header.Add("Authorization", "Bearer "+c.token)
-	req.Header.Add("Content-Type", "application/json")
-	if c.organization != "" {
-		req.Header.Add("Organization", c.organization)
+func cleanRawResponse(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, ",")
+	if s[:1] != "{" {
+		s = "{" + s
 	}
+	if s[len(s)-1:len(s)] != "}" {
+		s += "}"
+	}
+	return s
 }
 
 // REFACTOR: take to a dedicated helper function.
