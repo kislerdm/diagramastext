@@ -27,7 +27,7 @@ func main() {
 	flag.StringVar(&pathServe, "path", "/public", "path to index.html file")
 	flag.Parse()
 
-	templates, err := template.ParseFS(os.DirFS(pathServe), "*.html")
+	_, err := template.ParseFS(os.DirFS(pathServe), "*.html")
 	if err != nil {
 		log.Println(err)
 		flag.Usage()
@@ -36,6 +36,13 @@ func main() {
 
 	http.HandleFunc(
 		"/", func(w http.ResponseWriter, r *http.Request) {
+			templates, err := template.ParseFS(os.DirFS(pathServe), "*.html")
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte("<html><h1>Error</h1><p>" + err.Error() + "</p></html>"))
+				return
+			}
 			if err := templates.ExecuteTemplate(
 				w, "index.html", impute{
 					Env: env{
