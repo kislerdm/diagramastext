@@ -22,6 +22,12 @@ func main() {
 			MaxTokens:   utils.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
 			Temperature: utils.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
 		},
+		core.WithSinkFn(
+			// FIXME: add proper sink to preserve user's requests for model fine-tuning
+			func(s string) {
+				log.Println(s)
+			},
+		),
 	)
 	if err != nil {
 		log.Fatalln(err)
@@ -67,6 +73,9 @@ func handler(
 	return func(
 		ctx context.Context, req events.APIGatewayProxyRequest,
 	) (events.APIGatewayProxyResponse, error) {
+		// FIXME: add proper sink to preserve user's requests for model fine-tuning
+		log.Println(req.Body)
+
 		prompt, err := coreHandler.ReadPrompt([]byte(req.Body))
 		if err != nil {
 			return corsHeaders.setHeaders(

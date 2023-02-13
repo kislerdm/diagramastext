@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -54,6 +53,7 @@ type openAIRequest struct {
 type clientOpenAI struct {
 	httpClient   HttpClient
 	payload      openAIRequest
+	sink         func(s string)
 	token        string
 	organization string
 	baseURL      string
@@ -77,6 +77,7 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 			BestOf:           defaultBestOf,
 		},
 		baseURL: baseURLOpenAI,
+		sink:    nil,
 	}
 
 	for _, fn := range optFns {
@@ -101,6 +102,13 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 func WithHTTPClientOpenAI(c HttpClient) func(o *clientOpenAI) {
 	return func(o *clientOpenAI) {
 		o.httpClient = c
+	}
+}
+
+// WithSinkFn sets sink function to record model's input and output.
+func WithSinkFn(sinkFn func(string)) func(o *clientOpenAI) {
+	return func(o *clientOpenAI) {
+		o.sink = sinkFn
 	}
 }
 
@@ -230,6 +238,11 @@ func (c *clientOpenAI) setHeader(req *http.Request) {
 }
 
 func (c *clientOpenAI) decodeResponse(ctx context.Context, respBytes []byte) (DiagramGraph, error) {
+	// FIXME: add proper sink to preserve user's requests for model fine-tuning
+	if c.sink != nil {
+		c.sink(`{"raw":"` + string(respBytes) + `"}`)
+	}
+
 	var resp openAIResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return DiagramGraph{}, Error{
@@ -250,7 +263,12 @@ func (c *clientOpenAI) decodeResponse(ctx context.Context, respBytes []byte) (Di
 	}
 
 	s := cleanRawResponse(resp.Choices[0].Text)
-	log.Println(s)
+
+	// FIXME: add proper sink to preserve user's requests for model fine-tuning
+	if c.sink != nil {
+		c.sink(`{"cleaned":"` + s + `"}`)
+	}
+
 	var o DiagramGraph
 	if err := json.Unmarshal([]byte(s), &o); err != nil {
 		return DiagramGraph{}, Error{
