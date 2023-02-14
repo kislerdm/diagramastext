@@ -33,7 +33,7 @@ jobs:
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.2
       - name: Terraform init
-        id: validate
+        id: init
         run: terraform init
       - name: Terraform validate
         id: validate
