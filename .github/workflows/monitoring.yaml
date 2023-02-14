@@ -40,7 +40,7 @@ jobs:
         run: terraform validate
       - name: Terraform plan
         id: plan
-        run: terraform plan -lock-timeout=120s
+        run: terraform plan -lock-timeout=120s -no-color -out /tmp/terraform.tfplan
         continue-on-error: true
       - uses: actions/github-script@v6
         if: github.event_name == 'pull_request'
@@ -50,20 +50,29 @@ jobs:
             // Prepare format of the comment
             const resultValidate = `${{ steps.validate.outputs.exitcode }}` === '0' ? `${{ steps.validate.outputs.stdout }}` : `${{ steps.validate.outputs.stderr }}`;
             const resultPlan = `${{ steps.plan.outputs.exitcode }}` === '0' ? `${{ steps.plan.outputs.stdout }}` : `${{ steps.plan.outputs.stderr }}`;
+            
             const output = `#### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
             #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
             <details><summary>Validation Output</summary>
+            
             \`\`\`\n
             ${resultValidate}
             \`\`\`
+            
             </details>
+            
             #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+            
             <details><summary>Show Plan</summary>
+            
             \`\`\`\n
             ${resultPlan}
             \`\`\`
+            
             </details>
+            
             *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
+            
             // Publish comment
             github.rest.issues.createComment({
                 issue_number: context.issue.number,
