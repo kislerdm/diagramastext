@@ -11,6 +11,12 @@ resource "aws_cloudwatch_metric_alarm" "request_error_rate" {
   threshold           = "10"
   alarm_description   = "Request error rate has exceeded 10%"
   treat_missing_data  = "ignore"
+  alarm_actions = [
+    aws_sns_topic.this.arn,
+  ]
+  ok_actions = [
+    aws_sns_topic.this.arn,
+  ]
 
   metric_query {
     id          = "error_rate"
