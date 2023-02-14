@@ -33,6 +33,7 @@ jobs:
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.2
       - name: Terraform init
+        id: validate
         run: terraform init
       - name: Terraform validate
         id: validate
@@ -49,7 +50,7 @@ jobs:
             // Prepare format of the comment
             const resultValidate = `${{ steps.validate.outputs.exitcode }}` === '0' ? `${{ steps.validate.outputs.stdout }}` : `${{ steps.validate.outputs.stderr }}`;
             const resultPlan = `${{ steps.plan.outputs.exitcode }}` === '0' ? `${{ steps.plan.outputs.stdout }}` : `${{ steps.plan.outputs.stderr }}`;
-            const output = `#### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            const output = `#### Terraform Initialization ⚙️`${{ steps.init.outcome }}`
             #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
             <details><summary>Validation Output</summary>
             \`\`\`\n
