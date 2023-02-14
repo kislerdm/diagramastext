@@ -31,8 +31,7 @@ jobs:
         with:
           aws-region: us-east-2
           role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
-          role-duration-seconds: 600
-          role-session-name: ${GITHUB_SHA}-plan
+          role-duration-seconds: 900
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.2
       - name: Terraform init
@@ -92,8 +91,7 @@ jobs:
         with:
           aws-region: us-east-2
           role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
-          role-duration-seconds: 600
-          role-session-name: ${GITHUB_SHA}-apply
+          role-duration-seconds: 900
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.2
       - name: Provision
