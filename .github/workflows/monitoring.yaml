@@ -20,10 +20,9 @@ permissions:
   pull-requests: write
 
 jobs:
-  tf-test:
+  test:
     runs-on: ubuntu-latest
-    environment:
-      name: "production:monitoring"
+    environment: "production:monitoring"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -34,7 +33,7 @@ jobs:
           aws-region: us-east-2
           role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
           role-duration-seconds: 600
-          role-session-name: ${GITHUB_SHA}
+          role-session-name: ${GITHUB_SHA}-plan
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.2
       - name: Terraform init
@@ -44,7 +43,7 @@ jobs:
         run: terraform validate
       - name: Terraform plan
         id: plan
-        run: terraform plan -lock-timeout=120s -out=/tmp/${GITHUB_SHA}.tfstate
+        run: terraform plan -lock-timeout=120s
         continue-on-error: true
       - uses: actions/github-script@v6
         if: github.event_name == 'pull_request'
@@ -79,6 +78,27 @@ jobs:
         run: |
           if [[ ! ${{ steps.validate.outputs.exitcode }} -eq 0 ]]; then echo "failed validation"; exit 1; fi
           if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
-      - name: Terraform Apply
-        if: (github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch')
-        run: terraform apply -state=/tmp/${GITHUB_SHA}.tfstate -auto-approve
+
+  apply:
+    runs-on: ubuntu-latest
+    environment: "production:monitoring"
+    if: (github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch')
+    needs: test
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Configure AWS Credentials Action For GitHub Actions
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
+          role-duration-seconds: 600
+          role-session-name: ${GITHUB_SHA}-apply
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v2.0.2
+      - name: Provision
+        run: |
+          terraform init
+          terraform plan
+          terraform apply -auto-approve
