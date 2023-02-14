@@ -22,7 +22,6 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    environment: "production:monitoring"
     steps:
       - uses: actions/checkout@v3
         with:
