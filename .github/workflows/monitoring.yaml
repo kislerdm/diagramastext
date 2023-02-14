@@ -22,6 +22,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ github.event.inputs.tfpath }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -80,6 +83,9 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     environment: "production:monitoring"
+    defaults:
+      run:
+        working-directory: ${{ github.event.inputs.tfpath }}
     if: (github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch')
     needs: test
     steps:
