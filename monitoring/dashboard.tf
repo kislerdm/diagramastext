@@ -1,6 +1,6 @@
 locals {
   gw = {
-    name = "main"
+    name  = "main"
     stage = "production"
   }
   lambda_name = "core-c4"
