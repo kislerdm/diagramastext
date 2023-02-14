@@ -8,11 +8,6 @@ on:
     branches:
       - master
   workflow_dispatch:
-    inputs:
-      tfpath:
-        description: 'TF File Path'
-        required: false
-        default: "monitoring"
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -24,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ${{ github.event.inputs.tfpath }}
+        working-directory: "monitoring"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -85,7 +80,7 @@ jobs:
     environment: "production:monitoring"
     defaults:
       run:
-        working-directory: ${{ github.event.inputs.tfpath }}
+        working-directory: "monitoring"
     if: (github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch')
     needs: test
     steps:
