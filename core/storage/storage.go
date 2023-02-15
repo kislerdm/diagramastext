@@ -21,8 +21,14 @@ type ModelOutput struct {
 	Timestamp time.Time
 }
 
-// Client defines the client to store the prompt and prediction.
+// Client defines the client to communicate to the storage to persist core logic transactions.
 type Client interface {
+	// WritePrompt writes user's input prompt.
 	WritePrompt(ctx context.Context, v UserInput) error
+
+	// WriteModelPrediction writes model's prediction result used to generate diagram.
 	WriteModelPrediction(ctx context.Context, v ModelOutput) error
+
+	// Close closes the connection.
+	Close(ctx context.Context) error
 }
