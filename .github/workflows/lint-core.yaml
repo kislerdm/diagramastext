@@ -2,11 +2,13 @@ name: "Lint:Core"
 
 on:
   push:
-  pull_request:
     paths:
       - "core/**/*.go"
+  pull_request:
     branches:
       - master
+    paths:
+      - "core/**/*.go"
 
 jobs:
   link:
