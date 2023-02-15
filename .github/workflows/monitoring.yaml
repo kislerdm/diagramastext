@@ -5,6 +5,8 @@ on:
     paths:
       - "monitoring"
   pull_request:
+    paths:
+      - "monitoring"
     branches:
       - master
   workflow_dispatch:
