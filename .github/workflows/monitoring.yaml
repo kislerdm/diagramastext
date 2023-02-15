@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   test:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -43,7 +44,6 @@ jobs:
         run: terraform plan -lock-timeout=120s -no-color -out /tmp/terraform.tfplan
         continue-on-error: true
       - uses: actions/github-script@v6
-        if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -86,12 +86,12 @@ jobs:
           if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
 
   apply:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     environment: "production:monitoring"
     defaults:
       run:
         working-directory: "monitoring"
-    if: (github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch')
     needs: test
     steps:
       - uses: actions/checkout@v3

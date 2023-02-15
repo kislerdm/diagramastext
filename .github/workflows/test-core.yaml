@@ -2,11 +2,11 @@ name: "Tests:Core"
 
 on:
   push:
+  pull_request:
     paths:
       - "core/**/*.go"
       - "core/**/go.mod"
       - "core/**/go.sum"
-  pull_request:
     branches:
       - master
 
