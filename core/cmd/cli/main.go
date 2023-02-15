@@ -1,3 +1,6 @@
+//go:build !unittest
+// +build !unittest
+
 package main
 
 import (
