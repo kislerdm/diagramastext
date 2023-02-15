@@ -94,7 +94,6 @@ jobs:
     defaults:
       run:
         working-directory: "monitoring"
-    needs: test
     steps:
       - uses: actions/checkout@v3
         with:
