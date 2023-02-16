@@ -51,8 +51,10 @@ resource "null_resource" "core_c4" {
   triggers = {
     md5 = join(",", [
       for file in concat(
-        [for f in fileset("${path.module}/../", "{*.go,go.mod,go.sum,*.prompt}") : "${path.module}/../${f}"],
+        [for f in fileset("${path.module}/../", "{*.go,go.mod,go.sum}") : "${path.module}/../${f}"],
         [for f in fileset("${path.module}/../compression", "*.go") : "${path.module}/../compression/${f}"],
+        [for f in fileset("${path.module}/../handler", "*.go") : "${path.module}/../handler/${f}"],
+        [for f in fileset("${path.module}/../storage", "{*.go,go.mod,go.sum}") : "${path.module}/../storage/${f}"],
         [for f in fileset("${path.module}/../cmd/lambda", "{*.go,go.mod,go.sum}") : "${path.module}/../cmd/lambda/${f}"],
       ) : filemd5(file)
     ])
