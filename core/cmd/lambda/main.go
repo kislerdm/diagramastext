@@ -6,12 +6,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
+
+	"github.com/kislerdm/diagramastext/core/storage"
 
 	coreHandler "github.com/kislerdm/diagramastext/core/handler"
 	"github.com/kislerdm/diagramastext/core/utils"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/kislerdm/diagramastext/core"
 )
 
@@ -22,12 +26,17 @@ func main() {
 			MaxTokens:   utils.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
 			Temperature: utils.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
 		},
-		core.WithSinkFn(
-			// FIXME: add proper sink to preserve user's requests for model fine-tuning
-			func(s string) {
-				log.Println(s)
-			},
-		),
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	clientStorage, err := storage.NewClient(
+		context.Background(),
+		os.Getenv("NEON_HOST"),
+		os.Getenv("NEON_DBNAME"),
+		os.Getenv("NEON_USER"),
+		os.Getenv("NEON_PASSWORD"),
 	)
 	if err != nil {
 		log.Fatalln(err)
@@ -40,7 +49,7 @@ func main() {
 		_ = json.Unmarshal([]byte(v), &corsHeaders)
 	}
 
-	lambda.Start(handler(clientOpenAI, clientPlantUML, corsHeaders))
+	lambda.Start(handler(clientOpenAI, clientPlantUML, corsHeaders, clientStorage))
 }
 
 type corsHeaders map[string]string
@@ -67,14 +76,14 @@ func (h corsHeaders) setHeaders(resp events.APIGatewayProxyResponse) events.APIG
 
 func handler(
 	clientModel core.ClientInputToGraph, clientDiagram core.ClientGraphToDiagram, corsHeaders corsHeaders,
+	clientStorage core.ClientStorage,
 ) func(
 	ctx context.Context, req events.APIGatewayProxyRequest,
 ) (events.APIGatewayProxyResponse, error) {
 	return func(
 		ctx context.Context, req events.APIGatewayProxyRequest,
 	) (events.APIGatewayProxyResponse, error) {
-		// FIXME: add proper sink to preserve user's requests for model fine-tuning
-		log.Println(req.Body)
+		defer func() { _ = clientStorage.Close(ctx) }()
 
 		prompt, err := coreHandler.ReadPrompt([]byte(req.Body))
 		if err != nil {
@@ -95,9 +104,38 @@ func handler(
 			), err
 		}
 
+		userID := readUserID(req.Headers)
+		requestID := readRequestID(ctx)
+
+		userInput := core.UserInput{
+			CallID: core.CallID{
+				RequestID: requestID,
+				UserID:    userID,
+			},
+			Prompt:    prompt,
+			Timestamp: time.Now().UTC(),
+		}
+
+		if err := clientStorage.WritePrompt(ctx, userInput); err != nil {
+			log.Print("WritePrompt() error " + err.Error())
+		}
+
 		graph, err := clientModel.Do(ctx, prompt)
 		if err != nil {
 			return corsHeaders.setHeaders(parseClientError(err)), err
+		}
+
+		prediction, _ := json.Marshal(graph)
+		predictionOutput := core.ModelOutput{
+			CallID: core.CallID{
+				RequestID: requestID,
+				UserID:    userID,
+			},
+			Response:  string(prediction),
+			Timestamp: time.Now().UTC(),
+		}
+		if err := clientStorage.WriteModelPrediction(ctx, predictionOutput); err != nil {
+			log.Print("WriteModelPrediction() error " + err.Error())
 		}
 
 		svg, err := clientDiagram.Do(ctx, graph)
@@ -112,6 +150,16 @@ func handler(
 			},
 		), nil
 	}
+}
+
+func readRequestID(ctx context.Context) string {
+	c, _ := lambdacontext.FromContext(ctx)
+	return c.AwsRequestID
+}
+
+func readUserID(h map[string]string) string {
+	// FIXME: extract UserID from the headers when authN is implemented
+	return "00000000-0000-0000-0000-000000000000"
 }
 
 func parseClientError(err error) events.APIGatewayProxyResponse {

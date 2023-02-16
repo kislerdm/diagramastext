@@ -16,6 +16,9 @@ on:
 
 jobs:
   test:
+    defaults:
+      run:
+        working-directory: "core"
     runs-on: ubuntu-latest
     name: Tests
     steps:
@@ -29,7 +32,6 @@ jobs:
 
       - name: Unittests
         run: |
-          cd core
           go mod tidy
           go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
@@ -41,7 +43,7 @@ jobs:
 
       - name: Unittests-lambda
         run: |
-          cd core/cmd/lambda
+          cd cmd/lambda
           go mod tidy
           go test -race -coverprofile=coverage-lambda.txt -covermode=atomic
 
@@ -50,3 +52,15 @@ jobs:
         with:
           flags: lambda
           files: coverage-lambda.txt
+
+      - name: Unittests-storage/postgres
+        run: |
+          cd storage
+          go mod tidy
+          go test -race -coverprofile=coverage-postgres.txt -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          flags: postgres
+          files: coverage-postgres.txt

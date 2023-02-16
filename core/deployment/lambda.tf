@@ -51,8 +51,10 @@ resource "null_resource" "core_c4" {
   triggers = {
     md5 = join(",", [
       for file in concat(
-        [for f in fileset("${path.module}/../", "{*.go,go.mod,go.sum,*.prompt}") : "${path.module}/../${f}"],
+        [for f in fileset("${path.module}/../", "{*.go,go.mod,go.sum}") : "${path.module}/../${f}"],
         [for f in fileset("${path.module}/../compression", "*.go") : "${path.module}/../compression/${f}"],
+        [for f in fileset("${path.module}/../handler", "*.go") : "${path.module}/../handler/${f}"],
+        [for f in fileset("${path.module}/../storage", "{*.go,go.mod,go.sum}") : "${path.module}/../storage/${f}"],
         [for f in fileset("${path.module}/../cmd/lambda", "{*.go,go.mod,go.sum}") : "${path.module}/../cmd/lambda/${f}"],
       ) : filemd5(file)
     ])
@@ -85,6 +87,10 @@ resource "aws_lambda_function" "core_c4" {
       OPENAI_MAX_TOKENS  = var.openai_max_tokens
       OPENAI_TEMPERATURE = var.openai_temperature
       CORS_HEADERS       = jsonencode(local.cors_headers)
+      NEON_HOST          = local.neon_endpoint
+      NEON_DBNAME        = neon_database.this.name
+      NEON_USER          = neon_role.lambda.name
+      NEON_PASSWORD      = neon_role.lambda.password
     }
   }
 

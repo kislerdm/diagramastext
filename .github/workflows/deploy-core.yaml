@@ -1,0 +1,154 @@
+name: "Deploy:Core"
+
+on:
+  push:
+    paths:
+      - "core/**/*.go"
+      - "core/**/go.mod"
+      - "core/**/go.sum"
+    pull_request:
+      branches:
+        - master
+      paths:
+        - "core/**/*.go"
+        - "core/**/go.mod"
+        - "core/**/go.sum"
+
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read  # This is required for actions/checkout
+  pull-requests: write
+
+jobs:
+  unittest:
+    defaults:
+      run:
+        working-directory: "core"
+      runs-on: ubuntu-latest
+      name: "Unittest"
+      steps:
+        - uses: actions/checkout@v3
+          with:
+            fetch-depth: 0
+        - name: Set up Go
+          uses: actions/setup-go@v3
+          with:
+            go-version: 1.19
+
+        - name: Unittests
+          run: |
+            go mod tidy
+            go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+        - name: Upload coverage to Codecov
+          uses: codecov/codecov-action@v3
+          with:
+            flags: module
+            files: coverage.txt
+
+        - name: Unittests-lambda
+          run: |
+            cd cmd/lambda
+            go mod tidy
+            go test -race -coverprofile=coverage-lambda.txt -covermode=atomic
+
+        - name: Upload coverage to Codecov
+          uses: codecov/codecov-action@v3
+          with:
+            flags: lambda
+            files: coverage-lambda.txt
+
+        - name: Unittests-storage/postgres
+          run: |
+            cd storage
+            go mod tidy
+            go test -race -coverprofile=coverage-postgres.txt -covermode=atomic
+
+        - name: Upload coverage to Codecov
+          uses: codecov/codecov-action@v3
+          with:
+            flags: postgres
+            files: coverage-postgres.txt
+
+  lint:
+    runs-on: ubuntu-latest
+    name: "Lint"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          working-directory: "core"
+
+  test-deployment:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: "core/deployment"
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Configure AWS Credentials Action For GitHub Actions
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
+          role-duration-seconds: 900
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v2.0.2
+      - name: Terraform init
+        id: init
+        run: terraform init
+      - name: Terraform validate
+        id: validate
+        run: terraform validate
+      - name: Terraform plan
+        id: plan
+        run: terraform plan -lock-timeout=120s -no-color -out /tmp/terraform.tfplan
+        continue-on-error: true
+      - uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Prepare format of the comment
+            const resultValidate = `${{ steps.validate.outputs.exitcode }}` === '0' ? `${{ steps.validate.outputs.stdout }}` : `${{ steps.validate.outputs.stderr }}`;
+            const resultPlan = `${{ steps.plan.outputs.exitcode }}` === '0' ? `${{ steps.plan.outputs.stdout }}` : `${{ steps.plan.outputs.stderr }}`;
+            
+            const output = `#### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            <details><summary>Validation Output</summary>
+            
+            \`\`\`\n
+            ${resultValidate}
+            \`\`\`
+            
+            </details>
+            
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+            
+            <details><summary>Show Plan</summary>
+            
+            \`\`\`\n
+            ${resultPlan}
+            \`\`\`
+            
+            </details>
+            
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
+            
+            // Publish comment
+            github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+            })
+      - name: Status check
+        run: |
+          if [[ ! ${{ steps.validate.outputs.exitcode }} -eq 0 ]]; then echo "failed validation"; exit 1; fi
+          if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
