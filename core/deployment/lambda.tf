@@ -85,6 +85,10 @@ resource "aws_lambda_function" "core_c4" {
       OPENAI_MAX_TOKENS  = var.openai_max_tokens
       OPENAI_TEMPERATURE = var.openai_temperature
       CORS_HEADERS       = jsonencode(local.cors_headers)
+      NEON_HOST          = neon_branch.this.host
+      NEON_DBNAME        = neon_database.this.name
+      NEON_USER          = neon_role.lambda.name
+      NEON_PASSWORD      = neon_role.lambda.password
     }
   }
 
