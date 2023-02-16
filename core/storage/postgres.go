@@ -18,7 +18,7 @@ func (c client) Close(ctx context.Context) error {
 	return c.c.Close()
 }
 
-const tableWritePrompt = "public.user_prompt"
+const tableWritePrompt = "user_prompt"
 
 func (c client) WritePrompt(ctx context.Context, v core.UserInput) error {
 	if v.UserID == "" {
@@ -35,8 +35,8 @@ func (c client) WritePrompt(ctx context.Context, v core.UserInput) error {
 	}
 
 	_, err := c.c.ExecContext(
-		ctx, `INSERT INTO "`+tableWritePrompt+
-			`" ("request_id", "user_id", "prompt", "timestamp") VALUES ($1, $2, $3, $4);`,
+		ctx, `INSERT INTO `+tableWritePrompt+
+			` (request_id, user_id, prompt, timestamp) VALUES ($1, $2, $3, $4)`,
 		v.RequestID,
 		v.UserID,
 		v.Prompt,
@@ -45,7 +45,7 @@ func (c client) WritePrompt(ctx context.Context, v core.UserInput) error {
 	return err
 }
 
-const tableWriteModelPrediction = "public.openai_response"
+const tableWriteModelPrediction = "openai_response"
 
 func (c client) WriteModelPrediction(ctx context.Context, v core.ModelOutput) error {
 	if v.UserID == "" {
@@ -61,8 +61,8 @@ func (c client) WriteModelPrediction(ctx context.Context, v core.ModelOutput) er
 		v.Timestamp = time.Now().UTC()
 	}
 	_, err := c.c.ExecContext(
-		ctx, `INSERT INTO "`+tableWriteModelPrediction+
-			`" ("request_id", "user_id", "response", "timestamp") VALUES ($1, $2, $3, $4);`,
+		ctx, `INSERT INTO `+tableWriteModelPrediction+
+			` (request_id, user_id, response, timestamp) VALUES ($1, $2, $3, $4)`,
 		v.RequestID,
 		v.UserID,
 		v.Response,
