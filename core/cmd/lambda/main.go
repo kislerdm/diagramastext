@@ -106,16 +106,17 @@ func handler(
 
 		userID := readUserID(req.Headers)
 		requestID := readRequestID(ctx)
-		if err := clientStorage.WritePrompt(
-			ctx, core.UserInput{
-				CallID: core.CallID{
-					RequestID: requestID,
-					UserID:    userID,
-				},
-				Prompt:    prompt,
-				Timestamp: time.Now().UTC(),
+
+		userInput := core.UserInput{
+			CallID: core.CallID{
+				RequestID: requestID,
+				UserID:    userID,
 			},
-		); err != nil {
+			Prompt:    prompt,
+			Timestamp: time.Now().UTC(),
+		}
+
+		if err := clientStorage.WritePrompt(ctx, userInput); err != nil {
 			log.Print("WritePrompt() error " + err.Error())
 		}
 
@@ -125,16 +126,15 @@ func handler(
 		}
 
 		prediction, _ := json.Marshal(graph)
-		if err := clientStorage.WriteModelPrediction(
-			ctx, core.ModelOutput{
-				CallID: core.CallID{
-					RequestID: requestID,
-					UserID:    userID,
-				},
-				Response:  string(prediction),
-				Timestamp: time.Now().UTC(),
+		predictionOutput := core.ModelOutput{
+			CallID: core.CallID{
+				RequestID: requestID,
+				UserID:    userID,
 			},
-		); err != nil {
+			Response:  string(prediction),
+			Timestamp: time.Now().UTC(),
+		}
+		if err := clientStorage.WriteModelPrediction(ctx, predictionOutput); err != nil {
 			log.Print("WriteModelPrediction() error " + err.Error())
 		}
 
