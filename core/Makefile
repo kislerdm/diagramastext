@@ -4,7 +4,7 @@ help: ## Prints help message.
 	@ grep -h -E '^[a-zA-Z0-9_-].+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[1m%-30s\033[0m %s\n", $$1, $$2}'
 
 test-postgres:
-	@ cd storage/postgres && \
+	@ cd storage && \
  		go mod tidy && \
  		go test -timeout 1m -coverprofile=.coverage.out -coverpkg=. && \
  		go tool cover -func .coverage.out && rm -r .coverage.out

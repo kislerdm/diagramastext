@@ -238,11 +238,6 @@ func (c *clientOpenAI) setHeader(req *http.Request) {
 }
 
 func (c *clientOpenAI) decodeResponse(ctx context.Context, respBytes []byte) (DiagramGraph, error) {
-	// FIXME: add proper sink to preserve user's requests for model fine-tuning
-	if c.sink != nil {
-		c.sink(`{"raw":"` + string(respBytes) + `"}`)
-	}
-
 	var resp openAIResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return DiagramGraph{}, Error{
@@ -263,11 +258,6 @@ func (c *clientOpenAI) decodeResponse(ctx context.Context, respBytes []byte) (Di
 	}
 
 	s := cleanRawResponse(resp.Choices[0].Text)
-
-	// FIXME: add proper sink to preserve user's requests for model fine-tuning
-	if c.sink != nil {
-		c.sink(`{"cleaned":"` + s + `"}`)
-	}
 
 	var o DiagramGraph
 	if err := json.Unmarshal([]byte(s), &o); err != nil {

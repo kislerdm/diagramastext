@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/kislerdm/diagramastext/core"
 	coreHandler "github.com/kislerdm/diagramastext/core/handler"
 )
@@ -120,6 +121,7 @@ func Test_handler(t *testing.T) {
 		clientModel   core.ClientInputToGraph
 		clientDiagram core.ClientGraphToDiagram
 		corsHeaders   corsHeaders
+		clientStorage core.ClientStorage
 	}
 	type args struct {
 		ctx context.Context
@@ -131,6 +133,8 @@ func Test_handler(t *testing.T) {
 		"Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token'",
 		"Access-Control-Allow-Methods": "'POST,OPTIONS'",
 	}
+
+	ctx := lambdacontext.NewContext(context.TODO(), &lambdacontext.LambdaContext{AwsRequestID: "foobar"})
 
 	tests := []struct {
 		name    string
@@ -152,10 +156,11 @@ func Test_handler(t *testing.T) {
 					Resp: core.ResponseC4Diagram{SVG: "<svg></svg>"},
 					Err:  nil,
 				},
-				corsHeaders: expectedHandler,
+				corsHeaders:   expectedHandler,
+				clientStorage: core.MockClientStorage{},
 			},
 			args: args{
-				ctx: context.TODO(),
+				ctx: ctx,
 				req: events.APIGatewayProxyRequest{
 					Body: `{"prompt": "` + randomString(coreHandler.PromptLengthMin+1) + `"}`,
 				},
@@ -170,10 +175,11 @@ func Test_handler(t *testing.T) {
 		{
 			name: "unhappy path: faulty prompt",
 			fields: fields{
-				corsHeaders: expectedHandler,
+				corsHeaders:   expectedHandler,
+				clientStorage: core.MockClientStorage{},
 			},
 			args: args{
-				ctx: context.TODO(),
+				ctx: ctx,
 				req: events.APIGatewayProxyRequest{
 					Body: `{"prompt":`,
 				},
@@ -188,7 +194,8 @@ func Test_handler(t *testing.T) {
 		{
 			name: "unhappy path: invalid prompt",
 			fields: fields{
-				corsHeaders: expectedHandler,
+				corsHeaders:   expectedHandler,
+				clientStorage: core.MockClientStorage{},
 			},
 			args: args{
 				ctx: context.TODO(),
@@ -215,10 +222,11 @@ func Test_handler(t *testing.T) {
 						ServiceResponseStatusCode: http.StatusTooManyRequests,
 					},
 				},
-				corsHeaders: expectedHandler,
+				corsHeaders:   expectedHandler,
+				clientStorage: core.MockClientStorage{},
 			},
 			args: args{
-				ctx: context.TODO(),
+				ctx: ctx,
 				req: events.APIGatewayProxyRequest{
 					Body: `{"prompt": "` + randomString(100) + `"}`,
 				},
@@ -247,10 +255,11 @@ func Test_handler(t *testing.T) {
 						ServiceResponseStatusCode: http.StatusTooManyRequests,
 					},
 				},
-				corsHeaders: expectedHandler,
+				corsHeaders:   expectedHandler,
+				clientStorage: core.MockClientStorage{},
 			},
 			args: args{
-				ctx: context.TODO(),
+				ctx: ctx,
 				req: events.APIGatewayProxyRequest{
 					Body: `{"prompt": "` + randomString(100) + `"}`,
 				},
@@ -270,7 +279,7 @@ func Test_handler(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				got, gotErr := handler(
-					tt.fields.clientModel, tt.fields.clientDiagram, tt.fields.corsHeaders,
+					tt.fields.clientModel, tt.fields.clientDiagram, tt.fields.corsHeaders, tt.fields.clientStorage,
 				)(tt.args.ctx, tt.args.req)
 				if (gotErr != nil) != tt.wantErr {
 					t.Errorf("handler execution error = %v, wantErr %v", gotErr, tt.wantErr)

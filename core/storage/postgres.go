@@ -1,4 +1,4 @@
-package postgres
+package storage
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/kislerdm/diagramastext/core/storage"
+	"github.com/kislerdm/diagramastext/core"
 	_ "github.com/lib/pq"
 )
 
@@ -20,7 +20,7 @@ func (c client) Close(ctx context.Context) error {
 
 const tableWritePrompt = "public.user_prompt"
 
-func (c client) WritePrompt(ctx context.Context, v storage.UserInput) error {
+func (c client) WritePrompt(ctx context.Context, v core.UserInput) error {
 	if v.UserID == "" {
 		return errors.New("user_id is required")
 	}
@@ -47,7 +47,7 @@ func (c client) WritePrompt(ctx context.Context, v storage.UserInput) error {
 
 const tableWriteModelPrediction = "public.openai_response"
 
-func (c client) WriteModelPrediction(ctx context.Context, v storage.ModelOutput) error {
+func (c client) WriteModelPrediction(ctx context.Context, v core.ModelOutput) error {
 	if v.UserID == "" {
 		return errors.New("user_id is required")
 	}
@@ -88,7 +88,7 @@ func (m mockDbClient) ExecContext(ctx context.Context, query string, args ...any
 }
 
 // NewClient initiates the postgres client.
-func NewClient(ctx context.Context, host, dbname, user, password string) (storage.Client, error) {
+func NewClient(ctx context.Context, host, dbname, user, password string) (core.ClientStorage, error) {
 	if host == "" {
 		return nil, errors.New("host must be provided")
 	}

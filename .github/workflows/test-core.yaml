@@ -55,7 +55,7 @@ jobs:
 
       - name: Unittests-storage/postgres
         run: |
-          cd storage/postgres
+          cd storage
           go mod tidy
           go test -race -coverprofile=coverage-postgres.txt -covermode=atomic
 

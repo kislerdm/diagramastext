@@ -1,4 +1,4 @@
-package postgres
+package storage
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kislerdm/diagramastext/core/storage"
+	"github.com/kislerdm/diagramastext/core"
 )
 
 func TestNewClient(t *testing.T) {
@@ -21,7 +21,7 @@ func TestNewClient(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    storage.Client
+		want    core.ClientStorage
 		wantErr bool
 	}{
 		{
@@ -106,7 +106,7 @@ func Test_client_WritePrompt(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		v   storage.UserInput
+		v   core.UserInput
 	}
 	tests := []struct {
 		name    string
@@ -119,9 +119,11 @@ func Test_client_WritePrompt(t *testing.T) {
 			fields: fields{mockDbClient{}},
 			args: args{
 				ctx: context.TODO(),
-				v: storage.UserInput{
-					RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
-					UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				v: core.UserInput{
+					CallID: core.CallID{
+						RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+						UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+					},
 					Prompt:    "c4 diagram of four boxes",
 					Timestamp: time.Unix(0, 0),
 				},
@@ -137,9 +139,11 @@ func Test_client_WritePrompt(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				v: storage.UserInput{
-					RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
-					UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				v: core.UserInput{
+					CallID: core.CallID{
+						RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+						UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+					},
 					Prompt:    "c4 diagram of four boxes",
 					Timestamp: time.Unix(0, 0),
 				},
@@ -151,8 +155,10 @@ func Test_client_WritePrompt(t *testing.T) {
 			fields: fields{mockDbClient{}},
 			args: args{
 				ctx: context.TODO(),
-				v: storage.UserInput{
-					RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+				v: core.UserInput{
+					CallID: core.CallID{
+						RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+					},
 					Prompt:    "c4 diagram of four boxes",
 					Timestamp: time.Unix(0, 0),
 				},
@@ -164,8 +170,10 @@ func Test_client_WritePrompt(t *testing.T) {
 			fields: fields{mockDbClient{}},
 			args: args{
 				ctx: context.TODO(),
-				v: storage.UserInput{
-					UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				v: core.UserInput{
+					CallID: core.CallID{
+						UserID: "c40bad11-0822-4d84-9f61-44b9a97b0432",
+					},
 					Prompt:    "c4 diagram of four boxes",
 					Timestamp: time.Unix(0, 0),
 				},
@@ -177,9 +185,11 @@ func Test_client_WritePrompt(t *testing.T) {
 			fields: fields{mockDbClient{}},
 			args: args{
 				ctx: context.TODO(),
-				v: storage.UserInput{
-					RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
-					UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				v: core.UserInput{
+					CallID: core.CallID{
+						UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+						RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+					},
 					Timestamp: time.Unix(0, 0),
 				},
 			},
@@ -204,7 +214,7 @@ func Test_client_WriteModelPrediction(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		v   storage.ModelOutput
+		v   core.ModelOutput
 	}
 	tests := []struct {
 		name    string
@@ -217,9 +227,11 @@ func Test_client_WriteModelPrediction(t *testing.T) {
 			fields: fields{mockDbClient{}},
 			args: args{
 				ctx: context.TODO(),
-				v: storage.ModelOutput{
-					RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
-					UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				v: core.ModelOutput{
+					CallID: core.CallID{
+						RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+						UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+					},
 					Response:  `{"nodes:[{"id": "0"},{"id": "1"}],"links":[{"from":"0","to":"1"}]}`,
 					Timestamp: time.Unix(0, 0),
 				},
@@ -231,8 +243,10 @@ func Test_client_WriteModelPrediction(t *testing.T) {
 			fields: fields{mockDbClient{}},
 			args: args{
 				ctx: context.TODO(),
-				v: storage.ModelOutput{
-					RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+				v: core.ModelOutput{
+					CallID: core.CallID{
+						RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+					},
 					Response:  `{"nodes:[{"id": "0"},{"id": "1"}],"links":[{"from":"0","to":"1"}]}`,
 					Timestamp: time.Unix(0, 0),
 				},
@@ -244,8 +258,10 @@ func Test_client_WriteModelPrediction(t *testing.T) {
 			fields: fields{mockDbClient{}},
 			args: args{
 				ctx: context.TODO(),
-				v: storage.ModelOutput{
-					UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				v: core.ModelOutput{
+					CallID: core.CallID{
+						UserID: "c40bad11-0822-4d84-9f61-44b9a97b0432",
+					},
 					Response:  `{"nodes:[{"id": "0"},{"id": "1"}],"links":[{"from":"0","to":"1"}]}`,
 					Timestamp: time.Unix(0, 0),
 				},
@@ -257,9 +273,11 @@ func Test_client_WriteModelPrediction(t *testing.T) {
 			fields: fields{mockDbClient{}},
 			args: args{
 				ctx: context.TODO(),
-				v: storage.ModelOutput{
-					UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
-					RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+				v: core.ModelOutput{
+					CallID: core.CallID{
+						RequestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+						UserID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+					},
 					Timestamp: time.Unix(0, 0),
 				},
 			},
