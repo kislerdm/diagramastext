@@ -1,5 +1,5 @@
 locals {
-  lambda_c4 = "core-c4-${local.suffix}"
+  lambda_c4 = "core-c4${local.suffix}"
 }
 
 resource "aws_iam_policy" "lambda_core" {
@@ -89,7 +89,7 @@ resource "aws_lambda_function" "core_c4" {
       CORS_HEADERS       = jsonencode(local.cors_headers)
       NEON_DBNAME        = "core"
       NEON_USER          = "lambda"
-      NEON_HOST          = local.neon_project[var.environment]["endpoint"]
+      NEON_HOST          = local.neon_db[var.environment]["endpoint"]
       NEON_PASSWORD      = var.neon_password
     }
   }
@@ -98,13 +98,13 @@ resource "aws_lambda_function" "core_c4" {
 }
 
 locals {
+  lambda_secret = {
+    production = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
+  }
   neon_db = {
     production = {
       endpoint = "ep-wild-wind-389577.us-east-2.aws.neon.tech"
     }
-  }
-  lambda_secret = {
-    production = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
   }
 }
 
@@ -124,13 +124,13 @@ data "aws_iam_policy_document" "neon_lambda" {
       "secretsmanager:ListSecretVersionIds",
     ]
     resources = [
-      ""
+      local.lambda_secret[var.environment]
     ]
   }
 }
 
 resource "aws_iam_policy" "neon_lambda" {
-  name   = "main-core-lambda-${local.suffix}"
+  name   = "main-core-lambda${local.suffix}"
   path   = "/neon/read-only/"
   policy = data.aws_iam_policy_document.neon_lambda.json
 }
