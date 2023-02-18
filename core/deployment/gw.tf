@@ -102,10 +102,9 @@ resource "aws_api_gateway_model" "schema_response" {
 EOF
 }
 
-resource "aws_api_gateway_gateway_response" "response-4xx" {
-  for_each      = toset(["401", "403"])
+resource "aws_api_gateway_gateway_response" "response-401" {
   rest_api_id   = aws_api_gateway_rest_api.this.id
-  status_code   = each.value
+  status_code   = "401"
   response_type = "DEFAULT_4XX"
 
   response_templates = {
@@ -286,7 +285,7 @@ resource "aws_api_gateway_integration_response" "this" {
 # stage and deployment
 
 locals {
-  stages = ["production"]
+  stages = [var.environment]
 }
 
 resource "aws_cloudwatch_log_group" "gw" {
@@ -308,10 +307,12 @@ resource "aws_api_gateway_deployment" "this" {
 }
 
 resource "aws_api_gateway_stage" "this" {
-  for_each      = toset(local.stages)
-  deployment_id = aws_api_gateway_deployment.this.id
-  rest_api_id   = aws_api_gateway_rest_api.this.id
-  stage_name    = each.value
+  for_each              = toset(local.stages)
+  cache_cluster_size    = "0.5"
+  cache_cluster_enabled = false
+  deployment_id         = aws_api_gateway_deployment.this.id
+  rest_api_id           = aws_api_gateway_rest_api.this.id
+  stage_name            = each.value
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.gw[each.value].arn
     format = jsonencode({
