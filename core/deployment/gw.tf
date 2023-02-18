@@ -176,7 +176,7 @@ resource "aws_lambda_permission" "gw" {
   for_each      = local.lambda_trigger
   statement_id  = "InvokeGWMain-${each.key}"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.core_c4.function_name
+  function_name = aws_lambda_function.core.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/*/${each.value.method}/${each.value.path}"
 }
@@ -251,7 +251,7 @@ resource "aws_api_gateway_integration" "this" {
   integration_http_method = aws_api_gateway_method.this[each.key].http_method
   type                    = "AWS_PROXY"
   content_handling        = "CONVERT_TO_TEXT"
-  uri                     = aws_lambda_function.core_c4.invoke_arn
+  uri                     = aws_lambda_function.core.invoke_arn
 
   request_templates = {
     "application/json" = aws_api_gateway_model.schema_request.name
