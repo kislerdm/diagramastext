@@ -1,5 +1,5 @@
 locals {
-  lambda_c4 = "core-c4"
+  lambda_c4 = "core-c4-${local.suffix}"
 }
 
 resource "aws_iam_policy" "lambda_core" {
@@ -49,7 +49,7 @@ resource "aws_cloudwatch_log_group" "core_c4" {
 
 resource "null_resource" "core_c4" {
   triggers = {
-    md5 = join(",", [
+    md5 = base64sha256(join(",", [
       for file in concat(
         [for f in fileset("${path.module}/../", "{*.go,go.mod,go.sum}") : "${path.module}/../${f}"],
         [for f in fileset("${path.module}/../compression", "*.go") : "${path.module}/../compression/${f}"],
@@ -57,7 +57,7 @@ resource "null_resource" "core_c4" {
         [for f in fileset("${path.module}/../storage", "{*.go,go.mod,go.sum}") : "${path.module}/../storage/${f}"],
         [for f in fileset("${path.module}/../cmd/lambda", "{*.go,go.mod,go.sum}") : "${path.module}/../cmd/lambda/${f}"],
       ) : filemd5(file)
-    ])
+    ]))
   }
 
   provisioner "local-exec" {
@@ -75,7 +75,7 @@ resource "aws_lambda_function" "core_c4" {
   role          = aws_iam_role.lambda_core.arn
 
   filename         = data.local_file.core_c4.filename
-  source_code_hash = base64sha256(data.local_file.core_c4.content_base64)
+  source_code_hash = null_resource.core_c4.triggers.md5
   runtime          = "go1.x"
   handler          = "lambda"
   memory_size      = 256
@@ -87,12 +87,55 @@ resource "aws_lambda_function" "core_c4" {
       OPENAI_MAX_TOKENS  = var.openai_max_tokens
       OPENAI_TEMPERATURE = var.openai_temperature
       CORS_HEADERS       = jsonencode(local.cors_headers)
-      NEON_HOST          = local.neon_endpoint
-      NEON_DBNAME        = neon_database.this.name
-      NEON_USER          = neon_role.lambda.name
-      NEON_PASSWORD      = neon_role.lambda.password
+      NEON_DBNAME        = "core"
+      NEON_USER          = "lambda"
+      NEON_HOST          = local.neon_project[var.environment]["endpoint"]
+      NEON_PASSWORD      = var.neon_password
     }
   }
 
   depends_on = [null_resource.core_c4]
+}
+
+locals {
+  neon_db = {
+    production = {
+      endpoint = "ep-wild-wind-389577.us-east-2.aws.neon.tech"
+    }
+  }
+  lambda_secret = {
+    production = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
+  }
+}
+
+data "aws_iam_policy_document" "neon_lambda" {
+  statement {
+    effect    = "Allow"
+    actions   = ["secretsmanager:ListSecrets"]
+    resources = ["*"]
+  }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetResourcePolicy",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:ListSecretVersionIds",
+    ]
+    resources = [
+      ""
+    ]
+  }
+}
+
+resource "aws_iam_policy" "neon_lambda" {
+  name   = "main-core-lambda-${local.suffix}"
+  path   = "/neon/read-only/"
+  policy = data.aws_iam_policy_document.neon_lambda.json
+}
+
+resource "aws_iam_role_policy_attachment" "neon_lambda" {
+  policy_arn = aws_iam_policy.neon_lambda.arn
+  role       = aws_iam_role.lambda_core.name
 }

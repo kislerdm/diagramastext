@@ -22,3 +22,17 @@ EOT
   type    = number
   default = 0
 }
+
+variable "environment" {
+  type        = string
+  description = "Deployment environment."
+  validation {
+    condition     = var.environment == "production" || var.environment == "staging"
+    error_message = "'production' and 'staging' are the only allowed values"
+  }
+}
+
+variable "neon_password" {
+  type        = string
+  description = "(Temp!) Database access password."
+}

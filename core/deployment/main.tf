@@ -9,12 +9,6 @@ terraform {
       version = "~> 0.1.0"
     }
   }
-
-  backend "s3" {
-    bucket = "dev.diagramastext.terraform"
-    key    = "core"
-    region = "us-east-2"
-  }
 }
 
 provider "aws" {
@@ -22,3 +16,7 @@ provider "aws" {
 }
 
 provider "neon" {}
+
+locals {
+  suffix = var.environment == "production" ? "" : "-stg"
+}
