@@ -6,6 +6,7 @@ on:
       - "core/**/*.go"
       - "core/**/go.mod"
       - "core/**/go.sum"
+      - "core/deployment/**"
     pull_request:
       branches:
         - master
@@ -13,6 +14,7 @@ on:
         - "core/**/*.go"
         - "core/**/go.mod"
         - "core/**/go.sum"
+        - "core/deployment/**"
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -84,8 +86,10 @@ jobs:
           working-directory: "core"
 
   test-deployment:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    needs:
+      - unittest
+      - lint
     defaults:
       run:
         working-directory: "core/deployment"
@@ -112,6 +116,7 @@ jobs:
         run: terraform plan -lock-timeout=120s -no-color -out /tmp/terraform.tfplan
         continue-on-error: true
       - uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -152,3 +157,78 @@ jobs:
         run: |
           if [[ ! ${{ steps.validate.outputs.exitcode }} -eq 0 ]]; then echo "failed validation"; exit 1; fi
           if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
+
+  deploy-staging:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: "staging:core"
+    needs:
+      - unittest
+      - lint
+      - test-deployment
+    defaults:
+      run:
+        working-directory: "core/deployment"
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Configure AWS Credentials Action For GitHub Actions
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
+          role-duration-seconds: 900
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v2.0.2
+      - name: Terraform init
+        id: init
+        run: terraform init
+      - name: Terraform validate
+        id: validate
+        run: terraform validate
+      - name: Deploy
+        env:
+          TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          TF_VAR_neon_password: ${{ NEON_PASSWORD }}
+        run: |
+          terraform workspace select staging
+          terraform plan -lock-timeout=120s
+          terraform apply -auto-approve
+
+  deploy-production:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: "production:core"
+    needs:
+      - deploy-staging
+    defaults:
+      run:
+        working-directory: "core/deployment"
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Configure AWS Credentials Action For GitHub Actions
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
+          role-duration-seconds: 900
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v2.0.2
+      - name: Terraform init
+        id: init
+        run: terraform init
+      - name: Terraform validate
+        id: validate
+        run: terraform validate
+      - name: Deploy
+        env:
+          TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          TF_VAR_neon_password: ${{ NEON_PASSWORD }}
+        run: |
+          terraform plan -lock-timeout=120s
+          terraform apply -auto-approve  
