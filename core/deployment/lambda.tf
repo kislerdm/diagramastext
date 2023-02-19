@@ -1,13 +1,13 @@
 locals {
   lambda = "core${local.suffix}"
-  lambda_settings = {
+  lambda_settings_prod = {
     true = {
       secret_arn = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
       endpoint   = "ep-wild-wind-389577.us-east-2.aws.neon.tech"
     }
     false = {
       secret_arn = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
-      endpoint   = "ep-wild-wind-389577.us-east-2.aws.neon.tech"
+      endpoint   = "ep-fragrant-mouse-914820.us-east-2.aws.neon.tech"
     }
   }
 }
@@ -54,7 +54,7 @@ data "aws_iam_policy_document" "lambda_core" {
       "secretsmanager:ListSecretVersionIds",
     ]
     resources = [
-      local.lambda_settings[local.is_prod]["secret_arn"]
+      local.lambda_settings_prod[local.is_prod]["secret_arn"]
     ]
   }
 }
@@ -110,8 +110,8 @@ resource "aws_lambda_function" "core" {
       OPENAI_TEMPERATURE = var.openai_temperature
       CORS_HEADERS       = jsonencode(local.cors_headers)
       NEON_DBNAME        = "core"
-      NEON_USER          = "lambda"
-      NEON_HOST          = local.lambda_settings[local.is_prod]["endpoint"]
+      NEON_USER          = "lambda${local.suffix}"
+      NEON_HOST          = local.lambda_settings_prod[local.is_prod]["endpoint"]
       NEON_PASSWORD      = var.neon_password
     }
   }
