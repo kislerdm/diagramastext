@@ -18,8 +18,8 @@ provider "aws" {
 provider "neon" {}
 
 locals {
-  is_prod = terraform.workspace == "production" || terraform.workspace == "default"
-  suffix  = local.is_prod ? "" : "-stg"
+  is_prod          = terraform.workspace == "production" || terraform.workspace == "default"
+  suffix           = local.is_prod ? "" : "-stg"
   subdomain_prefix = local.is_prod ? "" : "stage."
 
   cors_headers = {

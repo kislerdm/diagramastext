@@ -52,20 +52,6 @@ resource "aws_api_gateway_model" "schema_response" {
 EOF
 }
 
-resource "aws_api_gateway_gateway_response" "response-401" {
-  rest_api_id   = aws_api_gateway_rest_api.this.id
-  status_code   = "401"
-  response_type = "DEFAULT_4XX"
-
-  response_templates = {
-    "application/json" = "{\"error\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin" = "'*'"
-  }
-}
-
 locals {
   allowed_headers_response = {
     "method.response.header.Access-Control-Allow-Origin"  = true
@@ -85,14 +71,6 @@ locals {
     }
   )
 
-  deployment_trigger = merge(
-    local.endpoints,
-    local.allowed_headers_response,
-    local.cors_headers_gw,
-    local.request_parameters,
-    local.lambda_trigger
-  )
-
   lambda_trigger = {
     for i in flatten([
       for k, v in local.endpoints : [
@@ -108,6 +86,15 @@ locals {
       path   = i.path
     }
   }
+
+  deployment_trigger_obj = merge(
+    local.endpoints,
+    local.allowed_headers_response,
+    local.cors_headers_gw,
+    local.request_parameters,
+    local.lambda_trigger,
+  )
+  deployment_trigger = jsonencode(local.deployment_trigger_obj)
 }
 
 resource "aws_api_gateway_resource" "route_top" {
@@ -238,14 +225,17 @@ resource "aws_api_gateway_deployment" "this" {
   rest_api_id = aws_api_gateway_rest_api.this.id
 
   triggers = {
-    redeployment = sha1(jsonencode(merge(
-      local.deployment_trigger,
-      {
-        a = aws_api_gateway_rest_api.this.id,
-        b = aws_api_gateway_request_validator.this.id,
-
-      }
-    )))
+    redeployment = sha1(jsonencode(
+      concat([
+        local.deployment_trigger,
+        aws_api_gateway_request_validator.this.id,
+        aws_api_gateway_rest_api.this.id,
+        aws_api_gateway_model.schema_request.schema,
+        aws_api_gateway_model.schema_response.schema,
+        ],
+        [for i in aws_api_gateway_resource.route_top : i.id],
+      )
+    ))
   }
 
   lifecycle {
