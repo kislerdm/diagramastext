@@ -3,6 +3,12 @@ variable "openai_api_key" {
   type        = string
 }
 
+variable "openai_model" {
+  description = "OpenAI Model ID/Name."
+  type        = string
+  default     = "code-davinci-002"
+}
+
 variable "openai_max_tokens" {
   description = <<EOT
 Max tokens.

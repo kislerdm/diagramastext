@@ -106,6 +106,7 @@ resource "aws_lambda_function" "core" {
   environment {
     variables = {
       OPENAI_API_KEY     = var.openai_api_key
+      OPENAI_MODEL       = var.openai_model
       OPENAI_MAX_TOKENS  = var.openai_max_tokens
       OPENAI_TEMPERATURE = var.openai_temperature
       CORS_HEADERS       = jsonencode(local.cors_headers)

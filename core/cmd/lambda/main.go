@@ -25,6 +25,7 @@ func main() {
 			Token:       os.Getenv("OPENAI_API_KEY"),
 			MaxTokens:   utils.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
 			Temperature: utils.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
+			Model:       os.Getenv("OPENAI_MODEL"),
 		},
 	)
 	if err != nil {
