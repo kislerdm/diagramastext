@@ -28,21 +28,15 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: actions/checkout@v3
-        name: Fetch stage repo
-        with:
-          repository: "kislerdm/diagramastext-webclient-stg"
-          fetch-depth: 0
-          path: webclient-stage
       - name: Sync webclient
-        run: |
-          cp -r webclient webclient-stage
-          cd webclient-stage
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add *
-          git commit -am "Deploy $GITHUB_SHA to staging"
-          git push origin master
+        uses: cpina/github-action-push-to-another-repository@v1.5.1
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
+        with:
+          source-directory: "webclient"
+          target-branch: "master"
+          destination-github-username: "kislerdm"
+          destination-repository-name: "diagramastext-webclient-stg"
 
   deploy:
     runs-on: ubuntu-20.04
