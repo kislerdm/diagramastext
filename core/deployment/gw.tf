@@ -20,6 +20,7 @@ EOF
 }
 
 resource "aws_api_gateway_account" "this" {
+  count = local.is_prod ? 1 : 0
   cloudwatch_role_arn = aws_iam_role.cloudwatch[0].arn
 }
 
@@ -142,6 +143,7 @@ locals {
     local.allowed_headers_response,
     local.cors_headers_gw,
     local.request_parameters,
+    local.lambda_trigger
   )
 
   lambda_trigger = {
@@ -289,7 +291,11 @@ resource "aws_api_gateway_deployment" "this" {
   rest_api_id = aws_api_gateway_rest_api.this.id
 
   triggers = {
-    redeployment = sha1(jsonencode(local.deployment_trigger))
+    redeployment = sha1(jsonencode(merge(
+      local.deployment_trigger,
+      aws_api_gateway_rest_api.this.id,
+      aws_api_gateway_request_validator.this.id,
+    )))
   }
 
   lifecycle {
