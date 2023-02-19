@@ -1,9 +1,6 @@
-resource "aws_api_gateway_account" "this" {
-  cloudwatch_role_arn = aws_iam_role.cloudwatch.arn
-}
-
 resource "aws_iam_role" "cloudwatch" {
-  name = "api_gateway_cloudwatch_global"
+  count = local.is_prod ? 1 : 0
+  name  = "api_gateway_cloudwatch_global"
 
   assume_role_policy = <<EOF
 {
@@ -22,9 +19,14 @@ resource "aws_iam_role" "cloudwatch" {
 EOF
 }
 
+resource "aws_api_gateway_account" "this" {
+  cloudwatch_role_arn = aws_iam_role.cloudwatch[0].arn
+}
+
 resource "aws_iam_role_policy" "cloudwatch" {
-  name = "GWCloudwatch"
-  role = aws_iam_role.cloudwatch.id
+  count = local.is_prod ? 1 : 0
+  name  = "GWCloudwatch"
+  role  = aws_iam_role.cloudwatch[0].id
 
   policy = <<EOF
 {
@@ -49,14 +51,14 @@ EOF
 }
 
 resource "aws_api_gateway_request_validator" "this" {
-  name                        = "main-validator"
+  name                        = "main-validator${local.suffix}"
   rest_api_id                 = aws_api_gateway_rest_api.this.id
   validate_request_body       = true
   validate_request_parameters = true
 }
 
 resource "aws_api_gateway_rest_api" "this" {
-  name           = "main"
+  name           = "main${local.suffix}"
   api_key_source = "HEADER"
 
   endpoint_configuration {
@@ -121,12 +123,6 @@ locals {
     "method.response.header.Access-Control-Allow-Origin"  = true
     "method.response.header.Access-Control-Allow-Headers" = true
     "method.response.header.Access-Control-Allow-Methods" = true
-  }
-
-  cors_headers = {
-    "Access-Control-Allow-Origin"  = "https://diagramastext.dev"
-    "Access-Control-Allow-Headers" = "Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token"
-    "Access-Control-Allow-Methods" = "POST,OPTIONS"
   }
 
   cors_headers_gw = { for k, v in local.cors_headers : "method.response.header.${k}" => "'${v}'" }
@@ -284,13 +280,8 @@ resource "aws_api_gateway_integration_response" "this" {
 
 # stage and deployment
 
-locals {
-  stages = [var.environment]
-}
-
 resource "aws_cloudwatch_log_group" "gw" {
-  for_each          = toset(local.stages)
-  name              = "API-Gateway-Execution-Logs_${aws_api_gateway_rest_api.this.id}/${each.value}"
+  name              = "API-Gateway-Execution-Logs_${aws_api_gateway_rest_api.this.id}"
   retention_in_days = 7
 }
 
@@ -307,14 +298,13 @@ resource "aws_api_gateway_deployment" "this" {
 }
 
 resource "aws_api_gateway_stage" "this" {
-  for_each              = toset(local.stages)
   cache_cluster_size    = "0.5"
   cache_cluster_enabled = false
   deployment_id         = aws_api_gateway_deployment.this.id
   rest_api_id           = aws_api_gateway_rest_api.this.id
-  stage_name            = each.value
+  stage_name            = "base"
   access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.gw[each.value].arn
+    destination_arn = aws_cloudwatch_log_group.gw.arn
     format = jsonencode({
       "requestId"         = "$context.requestId"
       "extendedRequestId" = "$context.extendedRequestId"
@@ -334,12 +324,12 @@ resource "aws_api_gateway_stage" "this" {
 # plan
 
 resource "aws_api_gateway_usage_plan" "test" {
-  name        = "test"
+  name        = "test${local.suffix}"
   description = "Test usage plan"
 
   api_stages {
     api_id = aws_api_gateway_rest_api.this.id
-    stage  = aws_api_gateway_stage.this["production"].stage_name
+    stage  = aws_api_gateway_stage.this.stage_name
     throttle {
       path        = "/c4/POST"
       burst_limit = 10
@@ -354,7 +344,7 @@ resource "aws_api_gateway_usage_plan" "test" {
 }
 # authN
 resource "aws_api_gateway_api_key" "main" {
-  name        = "main"
+  name        = "main${local.suffix}"
   description = "Main API key to authN/Z webclient"
   enabled     = true
 }
@@ -367,13 +357,13 @@ resource "aws_api_gateway_usage_plan_key" "main" {
 
 # custom domain
 resource "aws_api_gateway_domain_name" "this" {
-  domain_name     = "api.diagramastext.dev"
+  domain_name     = "api.${local.subdomain_prefix}diagramastext.dev"
   certificate_arn = "arn:aws:acm:us-east-1:027889758114:certificate/74feb1e2-797b-4ebb-8399-e1eee4ace87d"
 }
 
 resource "aws_api_gateway_base_path_mapping" "this" {
   api_id      = aws_api_gateway_rest_api.this.id
-  stage_name  = aws_api_gateway_stage.this["production"].stage_name
+  stage_name  = aws_api_gateway_stage.this.stage_name
   domain_name = aws_api_gateway_domain_name.this.domain_name
 }
 

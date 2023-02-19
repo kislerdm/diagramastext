@@ -1,12 +1,13 @@
 locals {
   lambda = "core${local.suffix}"
-  lambda_secret = {
-    production = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
-    staging    = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
-  }
-  neon_db = {
-    production = {
-      endpoint = "ep-wild-wind-389577.us-east-2.aws.neon.tech"
+  lambda_settings = {
+    true = {
+      secret_arn = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
+      endpoint   = "ep-wild-wind-389577.us-east-2.aws.neon.tech"
+    }
+    false = {
+      secret_arn = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
+      endpoint   = "ep-wild-wind-389577.us-east-2.aws.neon.tech"
     }
   }
 }
@@ -53,7 +54,7 @@ data "aws_iam_policy_document" "lambda_core" {
       "secretsmanager:ListSecretVersionIds",
     ]
     resources = [
-      local.lambda_secret[var.environment]
+      local.lambda_settings[local.is_prod]["secret_arn"]
     ]
   }
 }
@@ -91,16 +92,11 @@ resource "null_resource" "lambda_core" {
   }
 }
 
-data "local_file" "lambda_core" {
-  filename   = "${path.module}/../bin/lambda.zip"
-  depends_on = [null_resource.lambda_core]
-}
-
 resource "aws_lambda_function" "core" {
   function_name = local.lambda
   role          = aws_iam_role.lambda_core.arn
 
-  filename         = data.local_file.lambda_core.filename
+  filename         = "${path.module}/../bin/lambda.zip"
   source_code_hash = null_resource.lambda_core.triggers.md5
   runtime          = "go1.x"
   handler          = "lambda"
@@ -115,7 +111,7 @@ resource "aws_lambda_function" "core" {
       CORS_HEADERS       = jsonencode(local.cors_headers)
       NEON_DBNAME        = "core"
       NEON_USER          = "lambda"
-      NEON_HOST          = local.neon_db[var.environment]["endpoint"]
+      NEON_HOST          = local.lambda_settings[local.is_prod]["endpoint"]
       NEON_PASSWORD      = var.neon_password
     }
   }
