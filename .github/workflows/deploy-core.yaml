@@ -7,14 +7,14 @@ on:
       - "core/**/go.mod"
       - "core/**/go.sum"
       - "core/deployment/**"
-    pull_request:
-      branches:
-        - master
-      paths:
-        - "core/**/*.go"
-        - "core/**/go.mod"
-        - "core/**/go.sum"
-        - "core/deployment/**"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "core/**/*.go"
+      - "core/**/go.mod"
+      - "core/**/go.sum"
+      - "core/deployment/**"
 
 permissions:
   id-token: write # This is required for requesting the JWT
