@@ -19,6 +19,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  deploy-stage:
+    runs-on: ubuntu-20.04
+    environment:
+      name: "staging:webclient"
+    if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master' )
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v3
+        name: Fetch stage repo
+        with:
+          fetch-depth: 0
+          path: webclient-stage
+      - name: Sync webclient
+        run: |
+          cp -r webclient webclient-stage
+          cd webclient-stage
+          git add *
+          git commit -am "Deploy $GITHUB_SHA to staging"
+          git push origin master
+
   deploy:
     runs-on: ubuntu-20.04
     environment:
