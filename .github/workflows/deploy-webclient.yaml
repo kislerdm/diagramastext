@@ -41,6 +41,8 @@ jobs:
 
   deploy:
     runs-on: ubuntu-20.04
+    requires:
+      - "deploy-stage"
     environment:
       name: "production:webclient"
       url: ${{ steps.deployment.outputs.page_url }}
