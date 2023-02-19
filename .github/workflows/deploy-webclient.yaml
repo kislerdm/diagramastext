@@ -37,6 +37,8 @@ jobs:
         run: |
           cp -r webclient webclient-stage
           cd webclient-stage
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add *
           git commit -am "Deploy $GITHUB_SHA to staging"
           git push origin master
