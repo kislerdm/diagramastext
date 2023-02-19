@@ -1,56 +1,3 @@
-resource "aws_iam_role" "cloudwatch" {
-  count = local.is_prod ? 1 : 0
-  name  = "api_gateway_cloudwatch_global"
-
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "",
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "apigateway.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-EOF
-}
-
-resource "aws_api_gateway_account" "this" {
-  count = local.is_prod ? 1 : 0
-  cloudwatch_role_arn = aws_iam_role.cloudwatch[0].arn
-}
-
-resource "aws_iam_role_policy" "cloudwatch" {
-  count = local.is_prod ? 1 : 0
-  name  = "GWCloudwatch"
-  role  = aws_iam_role.cloudwatch[0].id
-
-  policy = <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:DescribeLogGroups",
-                "logs:DescribeLogStreams",
-                "logs:PutLogEvents",
-                "logs:GetLogEvents",
-                "logs:FilterLogEvents"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-EOF
-}
-
 resource "aws_api_gateway_request_validator" "this" {
   name                        = "main-validator${local.suffix}"
   rest_api_id                 = aws_api_gateway_rest_api.this.id
@@ -293,8 +240,11 @@ resource "aws_api_gateway_deployment" "this" {
   triggers = {
     redeployment = sha1(jsonencode(merge(
       local.deployment_trigger,
-      aws_api_gateway_rest_api.this.id,
-      aws_api_gateway_request_validator.this.id,
+      {
+        a = aws_api_gateway_rest_api.this.id,
+        b = aws_api_gateway_request_validator.this.id,
+
+      }
     )))
   }
 
