@@ -1,62 +1,12 @@
-resource "aws_api_gateway_account" "this" {
-  cloudwatch_role_arn = aws_iam_role.cloudwatch.arn
-}
-
-resource "aws_iam_role" "cloudwatch" {
-  name = "api_gateway_cloudwatch_global"
-
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "",
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "apigateway.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-EOF
-}
-
-resource "aws_iam_role_policy" "cloudwatch" {
-  name = "GWCloudwatch"
-  role = aws_iam_role.cloudwatch.id
-
-  policy = <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:DescribeLogGroups",
-                "logs:DescribeLogStreams",
-                "logs:PutLogEvents",
-                "logs:GetLogEvents",
-                "logs:FilterLogEvents"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-EOF
-}
-
 resource "aws_api_gateway_request_validator" "this" {
-  name                        = "main-validator"
+  name                        = "main-validator${local.suffix}"
   rest_api_id                 = aws_api_gateway_rest_api.this.id
   validate_request_body       = true
   validate_request_parameters = true
 }
 
 resource "aws_api_gateway_rest_api" "this" {
-  name           = "main"
+  name           = "main${local.suffix}"
   api_key_source = "HEADER"
 
   endpoint_configuration {
@@ -102,32 +52,11 @@ resource "aws_api_gateway_model" "schema_response" {
 EOF
 }
 
-resource "aws_api_gateway_gateway_response" "response-4xx" {
-  for_each      = toset(["401", "403"])
-  rest_api_id   = aws_api_gateway_rest_api.this.id
-  status_code   = each.value
-  response_type = "DEFAULT_4XX"
-
-  response_templates = {
-    "application/json" = "{\"error\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin" = "'*'"
-  }
-}
-
 locals {
   allowed_headers_response = {
     "method.response.header.Access-Control-Allow-Origin"  = true
     "method.response.header.Access-Control-Allow-Headers" = true
     "method.response.header.Access-Control-Allow-Methods" = true
-  }
-
-  cors_headers = {
-    "Access-Control-Allow-Origin"  = "https://diagramastext.dev"
-    "Access-Control-Allow-Headers" = "Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token"
-    "Access-Control-Allow-Methods" = "POST,OPTIONS"
   }
 
   cors_headers_gw = { for k, v in local.cors_headers : "method.response.header.${k}" => "'${v}'" }
@@ -140,13 +69,6 @@ locals {
     # "method.request.header.UserID" = true
     # "method.request.header.Authorization" = true
     }
-  )
-
-  deployment_trigger = merge(
-    local.endpoints,
-    local.allowed_headers_response,
-    local.cors_headers_gw,
-    local.request_parameters,
   )
 
   lambda_trigger = {
@@ -164,6 +86,15 @@ locals {
       path   = i.path
     }
   }
+
+  deployment_trigger_obj = merge(
+    local.endpoints,
+    local.allowed_headers_response,
+    local.cors_headers_gw,
+    local.request_parameters,
+    local.lambda_trigger,
+  )
+  deployment_trigger = jsonencode(local.deployment_trigger_obj)
 }
 
 resource "aws_api_gateway_resource" "route_top" {
@@ -177,7 +108,7 @@ resource "aws_lambda_permission" "gw" {
   for_each      = local.lambda_trigger
   statement_id  = "InvokeGWMain-${each.key}"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.core_c4.function_name
+  function_name = aws_lambda_function.core.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/*/${each.value.method}/${each.value.path}"
 }
@@ -252,7 +183,7 @@ resource "aws_api_gateway_integration" "this" {
   integration_http_method = aws_api_gateway_method.this[each.key].http_method
   type                    = "AWS_PROXY"
   content_handling        = "CONVERT_TO_TEXT"
-  uri                     = aws_lambda_function.core_c4.invoke_arn
+  uri                     = aws_lambda_function.core.invoke_arn
 
   request_templates = {
     "application/json" = aws_api_gateway_model.schema_request.name
@@ -285,13 +216,8 @@ resource "aws_api_gateway_integration_response" "this" {
 
 # stage and deployment
 
-locals {
-  stages = ["production"]
-}
-
 resource "aws_cloudwatch_log_group" "gw" {
-  for_each          = toset(local.stages)
-  name              = "API-Gateway-Execution-Logs_${aws_api_gateway_rest_api.this.id}/${each.value}"
+  name              = "API-Gateway-Execution-Logs_${aws_api_gateway_rest_api.this.id}"
   retention_in_days = 7
 }
 
@@ -299,7 +225,17 @@ resource "aws_api_gateway_deployment" "this" {
   rest_api_id = aws_api_gateway_rest_api.this.id
 
   triggers = {
-    redeployment = sha1(jsonencode(local.deployment_trigger))
+    redeployment = sha1(jsonencode(
+      concat([
+        local.deployment_trigger,
+        aws_api_gateway_request_validator.this.id,
+        aws_api_gateway_rest_api.this.id,
+        aws_api_gateway_model.schema_request.schema,
+        aws_api_gateway_model.schema_response.schema,
+        ],
+        [for i in aws_api_gateway_resource.route_top : i.id],
+      )
+    ))
   }
 
   lifecycle {
@@ -308,12 +244,13 @@ resource "aws_api_gateway_deployment" "this" {
 }
 
 resource "aws_api_gateway_stage" "this" {
-  for_each      = toset(local.stages)
-  deployment_id = aws_api_gateway_deployment.this.id
-  rest_api_id   = aws_api_gateway_rest_api.this.id
-  stage_name    = each.value
+  cache_cluster_size    = "0.5"
+  cache_cluster_enabled = false
+  deployment_id         = aws_api_gateway_deployment.this.id
+  rest_api_id           = aws_api_gateway_rest_api.this.id
+  stage_name            = "base"
   access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.gw[each.value].arn
+    destination_arn = aws_cloudwatch_log_group.gw.arn
     format = jsonencode({
       "requestId"         = "$context.requestId"
       "extendedRequestId" = "$context.extendedRequestId"
@@ -333,12 +270,12 @@ resource "aws_api_gateway_stage" "this" {
 # plan
 
 resource "aws_api_gateway_usage_plan" "test" {
-  name        = "test"
+  name        = "test${local.suffix}"
   description = "Test usage plan"
 
   api_stages {
     api_id = aws_api_gateway_rest_api.this.id
-    stage  = aws_api_gateway_stage.this["production"].stage_name
+    stage  = aws_api_gateway_stage.this.stage_name
     throttle {
       path        = "/c4/POST"
       burst_limit = 10
@@ -353,7 +290,7 @@ resource "aws_api_gateway_usage_plan" "test" {
 }
 # authN
 resource "aws_api_gateway_api_key" "main" {
-  name        = "main"
+  name        = "main${local.suffix}"
   description = "Main API key to authN/Z webclient"
   enabled     = true
 }
@@ -366,13 +303,13 @@ resource "aws_api_gateway_usage_plan_key" "main" {
 
 # custom domain
 resource "aws_api_gateway_domain_name" "this" {
-  domain_name     = "api.diagramastext.dev"
+  domain_name     = "api.${local.subdomain_prefix}diagramastext.dev"
   certificate_arn = "arn:aws:acm:us-east-1:027889758114:certificate/74feb1e2-797b-4ebb-8399-e1eee4ace87d"
 }
 
 resource "aws_api_gateway_base_path_mapping" "this" {
   api_id      = aws_api_gateway_rest_api.this.id
-  stage_name  = aws_api_gateway_stage.this["production"].stage_name
+  stage_name  = aws_api_gateway_stage.this.stage_name
   domain_name = aws_api_gateway_domain_name.this.domain_name
 }
 

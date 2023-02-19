@@ -22,3 +22,8 @@ EOT
   type    = number
   default = 0
 }
+
+variable "neon_password" {
+  type        = string
+  description = "(Temp!) Database access password."
+}

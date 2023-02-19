@@ -19,8 +19,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  deploy-stage:
+    runs-on: ubuntu-20.04
+    environment:
+      name: "staging:webclient"
+    if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master' )
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Sync webclient
+        uses: cpina/github-action-push-to-another-repository@v1.5.1
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
+        with:
+          target-branch: "master"
+          destination-github-username: "kislerdm"
+          destination-repository-name: "diagramastext-webclient-stg"
+          source-directory: "webclient"
+          target-directory: "webclient"
+
   deploy:
     runs-on: ubuntu-20.04
+    needs:
+      - "deploy-stage"
     environment:
       name: "production:webclient"
       url: ${{ steps.deployment.outputs.page_url }}

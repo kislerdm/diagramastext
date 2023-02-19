@@ -1,28 +1,19 @@
 locals {
-  lambda_c4 = "core-c4"
-}
-
-resource "aws_iam_policy" "lambda_core" {
-  name = "LambdaCore"
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = concat([
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-        ]
-        Resource = ["arn:aws:logs:*:*:*"]
-      },
-      ]
-    )
-  })
+  lambda = "core${local.suffix}"
+  lambda_settings_prod = {
+    true = {
+      secret_arn = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
+      endpoint   = "ep-wild-wind-389577.us-east-2.aws.neon.tech"
+    }
+    false = {
+      secret_arn = "arn:aws:secretsmanager:us-east-2:027889758114:secret:neon/main/core/lambda-C335bP"
+      endpoint   = "ep-fragrant-mouse-914820.us-east-2.aws.neon.tech"
+    }
+  }
 }
 
 resource "aws_iam_role" "lambda_core" {
-  name = "Lambda"
+  name = "Lambda${local.suffix}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -37,19 +28,55 @@ resource "aws_iam_role" "lambda_core" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "core_c4" {
+data "aws_iam_policy_document" "lambda_core" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = ["arn:aws:logs:*:*:*"]
+  }
+
+  statement {
+    effect    = "Allow"
+    actions   = ["secretsmanager:ListSecrets"]
+    resources = ["*"]
+  }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetResourcePolicy",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:ListSecretVersionIds",
+    ]
+    resources = [
+      local.lambda_settings_prod[local.is_prod]["secret_arn"]
+    ]
+  }
+}
+
+resource "aws_iam_policy" "lambda_core" {
+  name   = "LambdaCore${local.suffix}"
+  policy = data.aws_iam_policy_document.lambda_core.json
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_core" {
   policy_arn = aws_iam_policy.lambda_core.arn
   role       = aws_iam_role.lambda_core.name
 }
 
-resource "aws_cloudwatch_log_group" "core_c4" {
-  name              = "/aws/lambda/${local.lambda_c4}"
+resource "aws_cloudwatch_log_group" "lambda_core" {
+  name              = "/aws/lambda/${local.lambda}"
   retention_in_days = 7
 }
 
-resource "null_resource" "core_c4" {
+resource "null_resource" "lambda_core" {
   triggers = {
-    md5 = join(",", [
+    md5 = base64sha256(join(",", [
       for file in concat(
         [for f in fileset("${path.module}/../", "{*.go,go.mod,go.sum}") : "${path.module}/../${f}"],
         [for f in fileset("${path.module}/../compression", "*.go") : "${path.module}/../compression/${f}"],
@@ -57,7 +84,7 @@ resource "null_resource" "core_c4" {
         [for f in fileset("${path.module}/../storage", "{*.go,go.mod,go.sum}") : "${path.module}/../storage/${f}"],
         [for f in fileset("${path.module}/../cmd/lambda", "{*.go,go.mod,go.sum}") : "${path.module}/../cmd/lambda/${f}"],
       ) : filemd5(file)
-    ])
+    ]))
   }
 
   provisioner "local-exec" {
@@ -65,17 +92,12 @@ resource "null_resource" "core_c4" {
   }
 }
 
-data "local_file" "core_c4" {
-  filename   = "${path.module}/../bin/lambda.zip"
-  depends_on = [null_resource.core_c4]
-}
-
-resource "aws_lambda_function" "core_c4" {
-  function_name = local.lambda_c4
+resource "aws_lambda_function" "core" {
+  function_name = local.lambda
   role          = aws_iam_role.lambda_core.arn
 
-  filename         = data.local_file.core_c4.filename
-  source_code_hash = base64sha256(data.local_file.core_c4.content_base64)
+  filename         = "${path.module}/../bin/lambda.zip"
+  source_code_hash = null_resource.lambda_core.triggers.md5
   runtime          = "go1.x"
   handler          = "lambda"
   memory_size      = 256
@@ -87,12 +109,12 @@ resource "aws_lambda_function" "core_c4" {
       OPENAI_MAX_TOKENS  = var.openai_max_tokens
       OPENAI_TEMPERATURE = var.openai_temperature
       CORS_HEADERS       = jsonencode(local.cors_headers)
-      NEON_HOST          = local.neon_endpoint
-      NEON_DBNAME        = neon_database.this.name
-      NEON_USER          = neon_role.lambda.name
-      NEON_PASSWORD      = neon_role.lambda.password
+      NEON_DBNAME        = "core"
+      NEON_USER          = "lambda${local.suffix}"
+      NEON_HOST          = local.lambda_settings_prod[local.is_prod]["endpoint"]
+      NEON_PASSWORD      = var.neon_password
     }
   }
 
-  depends_on = [null_resource.core_c4]
+  depends_on = [null_resource.lambda_core]
 }
