@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-20.04
     environment:
       name: "staging:webclient"
-#    if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master' )
+    if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master' )
     steps:
       - uses: actions/checkout@v3
         with:
