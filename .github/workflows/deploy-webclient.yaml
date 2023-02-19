@@ -33,10 +33,11 @@ jobs:
         env:
           SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
         with:
-          source-directory: "webclient"
           target-branch: "master"
           destination-github-username: "kislerdm"
           destination-repository-name: "diagramastext-webclient-stg"
+          source-directory: "webclient"
+          target-directory: "webclient"
 
   deploy:
     runs-on: ubuntu-20.04
