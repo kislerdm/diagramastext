@@ -166,7 +166,7 @@ jobs:
           if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
 
   deploy-staging:
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: "staging:core"
@@ -204,7 +204,7 @@ jobs:
           terraform apply -auto-approve
 
   deploy-production:
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: "production:core"
