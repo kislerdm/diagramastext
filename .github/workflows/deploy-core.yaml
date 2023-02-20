@@ -72,6 +72,18 @@ jobs:
           flags: postgres
           files: coverage-postgres.txt
 
+      - name: Unittests-storage/secretsmanager
+        run: |
+          cd secretsmanager
+          go mod tidy
+          go test -race -coverprofile=coverage-secretsmanager.txt -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          flags: postgres
+          files: coverage-secretsmanager.txt
+
   lint:
     runs-on: ubuntu-latest
     name: "Lint"
