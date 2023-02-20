@@ -86,7 +86,10 @@ jobs:
           working-directory: "core"
 
   test-deployment:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    environment:
+      name: "staging:core"
     needs:
       - unittest
       - lint
@@ -112,11 +115,15 @@ jobs:
         id: validate
         run: terraform validate
       - name: Terraform plan
+        env:
+          TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          TF_VAR_neon_password: ${{ secrets.NEON_PASSWORD }}
         id: plan
-        run: terraform plan -lock-timeout=120s -no-color -out /tmp/terraform.tfplan
+        run: |
+          terraform workspace select staging
+          terraform plan -lock-timeout=120s -no-color -out /tmp/terraform.tfplan
         continue-on-error: true
       - uses: actions/github-script@v6
-        if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -166,7 +173,6 @@ jobs:
     needs:
       - unittest
       - lint
-      - test-deployment
     defaults:
       run:
         working-directory: "core/deployment"
