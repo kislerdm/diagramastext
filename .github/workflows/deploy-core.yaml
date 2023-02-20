@@ -191,7 +191,7 @@ jobs:
       - name: Deploy
         env:
           TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          TF_VAR_neon_password: ${{ NEON_PASSWORD }}
+          TF_VAR_neon_password: ${{ secrets.NEON_PASSWORD }}
         run: |
           terraform workspace select staging
           terraform plan -lock-timeout=120s
@@ -228,7 +228,7 @@ jobs:
       - name: Deploy
         env:
           TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          TF_VAR_neon_password: ${{ NEON_PASSWORD }}
+          TF_VAR_neon_password: ${{ secrets.NEON_PASSWORD }}
         run: |
           terraform plan -lock-timeout=120s
           terraform apply -auto-approve  
