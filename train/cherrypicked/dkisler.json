@@ -1,0 +1,41 @@
+[
+  {
+    "prompt": "three connected boxes",
+    "completion": {"nodes":[{"id":"0"},{"id":"1"},{"id":"2"}],"links":[{"from":"0","to":"1"},{"from":"1","to":"2"},{"from":"2","to":"0"}]}
+  },
+  {
+    "prompt": "Draw c4 container diagram with four containers,thee of which are external and belong to the system X.",
+    "completion":{"nodes":[{"id":"0"},{"id":"1","group":"X","external":true},{"id":"2","group":"X","external":true}, {"id":"3","group":"X","external":true}]}},
+  {
+    "prompt": "three connected boxes",
+    "completion":{"nodes":[{"id":"0"},{"id":"1"},{"id":"2"}],"links":[{"from":"0","to":"1"},{"from":"1","to":"2"},{"from":"2","to":"0"}]}
+  },
+  {
+    "prompt": "c4 containers:golang web server authenticating users read from external mysql database",
+    "completion":{"nodes":[{"id":"0","label":"Web Server","technology":"Go","description":"Authenticates users"},{"id":"1","label":"Database","technology":"MySQL","external":true,"is_database":true}],"links":[{"from":"0","to":"1","direction":"LR"}]}
+  },
+  {
+    "prompt": "Five containers in three groups. First container is a Flink Application which performs feature engineering using JSON encoded user behavioural clickstream consumed from AWS Kinesis Stream over HTTP. It publishes AVRO encoded results to the kafka topic over TCP and infers the machine learning model by sending JSON data over rest API. The Flink application is deployed to AWS KDA of the Business Domain account. Kafka topic is part of the Streaming Platform,which sinks the data to the Datalake,AWS S3 bucket. The model is deployed to the MLPlatform. MLPlatform,clickstream and datalake belong to the Data Platform. All but Flink application are external.",
+    "completion":[{"id":"0","label":"Go producer","technology":"Go","description":"Publishes to Kafka"},{"id":"1","label":"Kafka","technology":"Kafka","is_queue":true},{"id":"2","label":"Java consumer","technology":"Java","description":"Consumes from Kafka"}],"links":[{"from":"0","to":"1","label":"publishes to Kafka","technology":"TCP/Protobuf"},{"from":"2","to":"1","label":"consumes from Kafka","technology":"TCP/Protobuf"}]
+  },
+  {
+    "prompt": "draw c4 diagram with python backend reading from postgres over tcp",
+    "completion":{"nodes":[{"id":"0","label":"Postgres","technology":"Postgres","is_database":true},{"id":"1","label":"Backend","technology":"Python"}],"links":[{"from":"1","to":"0","label":"reads from postgres","technology":"TCP"}]}
+  },
+  {
+    "prompt": "draw c4 diagram with java backend reading from dynamoDB over tcp",
+    "completion":{"nodes":[{"id":"0","label":"DynamoDB","technology":"DynamoDB","is_database":true},{"id":"1","label":"Backend","technology":"Java"}],"links":[{"from":"1","to":"0","label":"reads from dynamoDB","technology":"TCP"}]}
+  },
+  {
+    "prompt": "c4 diagram with kotlin backend reading from mysql and publishing to kafka avro encoded events",
+    "completion":{"nodes":[{"id":"0","label":"Backend","technology":"Kotlin"},{"id":"1","label":"Kafka","technology":"Kafka","is_queue":true},{"id":"2","label":"Database","technology":"MySQL","is_database":true}],"links":[{"from":"0","to":"2","label":"reads from database","technology":"TCP"},{"from":"0","to":"2","label":"publishes to kafka","technology":"TCP/AVRO"}]}
+  },
+  {
+    "prompt": "two nodes, one link",
+    "completion": {"nodes": [{"id": "0"}, {"id": "1"}], "links": [{"from": "0", "to": "1"}]}
+  },
+  {
+    "prompt": "diagram with three nodes producer, broker and consumer, and links: producer to broker from left to right, \nand consumer to broker from right to left. \ntitle: foobar, footer: current date. \nnodes: producer, broker, consumer. \nproducer's technology is Go and label is Account, consumer's technology is Java and label is Moderation. \nbroker is kafka.\nconsumer and broker are external.",
+    "completion": {"title": "foobar", "footer": "current date", "nodes": [{"id": "producer", "label": "Account", "technology": "Go", "description": "Publishes account events"}, {"id": "broker", "label": "Kafka", "technology": "Kafka", "description": "Broker", "external": true}, {"id": "consumer", "label": "Moderation", "technology": "Java", "description": "Consumes account events", "external": true, "is_queue": true}], "links": [{"from": "producer", "to": "broker", "label": "Publishes events", "direction": "LR"}, {"from": "consumer", "to": "broker", "label": "Consumes events", "direction": "RL"}]}
+  }
+]
