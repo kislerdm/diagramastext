@@ -1,4 +1,4 @@
-module secretsmanager
+module github.com/kislerdm/diagramastext/core/secretsmanager
 
 go 1.19
 
