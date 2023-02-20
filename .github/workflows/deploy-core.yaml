@@ -104,7 +104,7 @@ jobs:
           role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
           role-duration-seconds: 900
       - name: Setup Terraform CLI
-        uses: hashicorp/setup-terraform@v2.0.2
+        uses: hashicorp/setup-terraform@v2.0.3
       - name: Terraform init
         id: init
         run: terraform init
@@ -181,7 +181,7 @@ jobs:
           role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
           role-duration-seconds: 900
       - name: Setup Terraform CLI
-        uses: hashicorp/setup-terraform@v2.0.2
+        uses: hashicorp/setup-terraform@v2.0.3
       - name: Terraform init
         id: init
         run: terraform init
@@ -218,7 +218,7 @@ jobs:
           role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
           role-duration-seconds: 900
       - name: Setup Terraform CLI
-        uses: hashicorp/setup-terraform@v2.0.2
+        uses: hashicorp/setup-terraform@v2.0.3
       - name: Terraform init
         id: init
         run: terraform init
