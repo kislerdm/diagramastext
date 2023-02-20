@@ -120,6 +120,9 @@ func handler(
 
 		if err := clientStorage.WritePrompt(ctx, userInput); err != nil {
 			log.Print("WritePrompt() error " + err.Error())
+			if v, err := json.Marshal(userInput); err != nil {
+				log.Printf("prompt: %s", string(v))
+			}
 		}
 
 		graph, err := clientModel.Do(ctx, prompt)
@@ -138,6 +141,9 @@ func handler(
 		}
 		if err := clientStorage.WriteModelPrediction(ctx, predictionOutput); err != nil {
 			log.Print("WriteModelPrediction() error " + err.Error())
+			if v, err := json.Marshal(predictionOutput); err != nil {
+				log.Printf("response: %s", string(v))
+			}
 		}
 
 		svg, err := clientDiagram.Do(ctx, graph)
