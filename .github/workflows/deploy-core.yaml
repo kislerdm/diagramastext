@@ -194,10 +194,11 @@ jobs:
       - name: Terraform validate
         id: validate
         run: terraform validate
-      - name: Deploy
+      - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
+      - name: Deploy
         env:
           TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           TF_VAR_neon_password: ${{ secrets.NEON_PASSWORD }}
@@ -234,10 +235,11 @@ jobs:
       - name: Terraform validate
         id: validate
         run: terraform validate
-      - name: Deploy
+      - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
+      - name: Deploy
         env:
           TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           TF_VAR_neon_password: ${{ secrets.NEON_PASSWORD }}
