@@ -42,6 +42,9 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancelFn()
+	defer func() { _ = clientStorage.Close(ctx) }()
 
 	clientPlantUML := core.NewPlantUMLClient()
 
@@ -84,8 +87,6 @@ func handler(
 	return func(
 		ctx context.Context, req events.APIGatewayProxyRequest,
 	) (events.APIGatewayProxyResponse, error) {
-		defer func() { _ = clientStorage.Close(ctx) }()
-
 		prompt, err := coreHandler.ReadPrompt([]byte(req.Body))
 		if err != nil {
 			return corsHeaders.setHeaders(
