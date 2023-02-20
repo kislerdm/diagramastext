@@ -2,19 +2,19 @@ name: "Deploy:Core"
 
 on:
   push:
-    paths:
-      - "core/**/*.go"
-      - "core/**/go.mod"
-      - "core/**/go.sum"
-      - "core/deployment/**"
-  pull_request:
     branches:
       - master
     paths:
-      - "core/**/*.go"
-      - "core/**/go.mod"
-      - "core/**/go.sum"
-      - "core/deployment/**"
+      - "core/**"
+      - "!core/**.md"
+      - "!core/fig/**"
+      - "!core/Makefile"
+  pull_request:
+    paths:
+      - "!core/**.md"
+      - "!core/fig/**"
+      - "!core/Makefile"
+  workflow_dispatch:
 
 permissions:
   id-token: write # This is required for requesting the JWT
