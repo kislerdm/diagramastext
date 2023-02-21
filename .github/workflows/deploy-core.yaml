@@ -209,6 +209,7 @@ jobs:
           go-version: 1.19
       - name: Deploy
         run: |
+          terraform workspace select staging
           terraform plan -lock-timeout=120s
           terraform apply -auto-approve  
 
