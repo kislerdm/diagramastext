@@ -100,7 +100,7 @@ jobs:
           working-directory: "core"
 
   test-infra:
-    if: github.event_name == 'pull_request'
+    if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master')
     runs-on: ubuntu-latest
     needs:
       - unittest
@@ -175,7 +175,7 @@ jobs:
           if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
 
   deployment-staging:
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master' )
     runs-on: ubuntu-latest
     environment:
       name: "staging:core"
