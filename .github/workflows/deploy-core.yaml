@@ -1,6 +1,12 @@
 name: "Deploy:Core"
 
 on:
+  pull_request:
+    paths:
+      - "core/**"
+      - "!core/**.md"
+      - "!core/fig/**"
+      - "!core/Makefile"
   push:
     branches:
       - master
@@ -9,11 +15,7 @@ on:
       - "!core/**.md"
       - "!core/fig/**"
       - "!core/Makefile"
-  pull_request:
-    paths:
-      - "!core/**.md"
-      - "!core/fig/**"
-      - "!core/Makefile"
+
   workflow_dispatch:
 
 permissions:
