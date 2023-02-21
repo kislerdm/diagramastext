@@ -1,4 +1,4 @@
-module postgres
+module github.com/kislerdm/diagramastext/core/storage
 
 go 1.19
 
