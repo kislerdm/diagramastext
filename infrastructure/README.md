@@ -15,3 +15,11 @@ to setup OIDC authentication.
 
 See the official AWS github action's [documentation](https://github.com/aws-actions/configure-aws-credentials) as for
 reference.
+
+## Secrets
+
+AWS Secretsmanager is used to store authentication credentials for the core logic to access OpenAI and database.
+
+**Note** that the secret's value shall be set manually. It is done for the sake of security and to avoid tf states cross
+dependencies at the early state of product development. However, it shall be reconsidered after release of v0.2.0 of the
+product, i.e. in Q3'23.

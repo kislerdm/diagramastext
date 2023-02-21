@@ -1,6 +1,12 @@
 name: "Deploy:Core"
 
 on:
+  pull_request:
+    paths:
+      - "core/**"
+      - "!core/**.md"
+      - "!core/fig/**"
+      - "!core/Makefile"
   push:
     branches:
       - master
@@ -9,11 +15,7 @@ on:
       - "!core/**.md"
       - "!core/fig/**"
       - "!core/Makefile"
-  pull_request:
-    paths:
-      - "!core/**.md"
-      - "!core/fig/**"
-      - "!core/Makefile"
+
   workflow_dispatch:
 
 permissions:
@@ -72,6 +74,18 @@ jobs:
           flags: postgres
           files: coverage-postgres.txt
 
+      - name: Unittests-storage/secretsmanager
+        run: |
+          cd secretsmanager
+          go mod tidy
+          go test -race -coverprofile=coverage-secretsmanager.txt -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          flags: secretsmanager
+          files: coverage-secretsmanager.txt
+
   lint:
     runs-on: ubuntu-latest
     name: "Lint"
@@ -85,11 +99,9 @@ jobs:
           version: latest
           working-directory: "core"
 
-  test-deployment:
+  test-infra:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    environment:
-      name: "staging:core"
     needs:
       - unittest
       - lint
@@ -115,9 +127,6 @@ jobs:
         id: validate
         run: terraform validate
       - name: Terraform plan
-        env:
-          TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          TF_VAR_neon_password: ${{ secrets.NEON_PASSWORD }}
         id: plan
         run: |
           terraform workspace select staging
@@ -165,14 +174,13 @@ jobs:
           if [[ ! ${{ steps.validate.outputs.exitcode }} -eq 0 ]]; then echo "failed validation"; exit 1; fi
           if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
 
-  deploy-staging:
+  deployment-staging:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: "staging:core"
     needs:
-      - unittest
-      - lint
+      - test-infra
     defaults:
       run:
         working-directory: "core/deployment"
@@ -199,21 +207,17 @@ jobs:
         with:
           go-version: 1.19
       - name: Deploy
-        env:
-          TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          TF_VAR_neon_password: ${{ secrets.NEON_PASSWORD }}
         run: |
-          terraform workspace select staging
           terraform plan -lock-timeout=120s
-          terraform apply -auto-approve
+          terraform apply -auto-approve  
 
-  deploy-production:
+  deployment-production:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: "production:core"
     needs:
-      - deploy-staging
+      - deployment-staging
     defaults:
       run:
         working-directory: "core/deployment"
@@ -240,9 +244,6 @@ jobs:
         with:
           go-version: 1.19
       - name: Deploy
-        env:
-          TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          TF_VAR_neon_password: ${{ secrets.NEON_PASSWORD }}
         run: |
           terraform plan -lock-timeout=120s
           terraform apply -auto-approve  

@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/kislerdm/diagramastext/core/secretsmanager"
 	"github.com/kislerdm/diagramastext/core/storage"
 
 	coreHandler "github.com/kislerdm/diagramastext/core/handler"
@@ -19,30 +21,89 @@ import (
 	"github.com/kislerdm/diagramastext/core"
 )
 
-func main() {
+type secret struct {
+	OpenAiAPIKey string `json:"openai_api_key"`
+	DBHost       string `json:"db_host"`
+	DBName       string `json:"db_name"`
+	DBUser       string `json:"db_user"`
+	DBPassword   string `json:"db_password"`
+}
+
+func configureInterfaceClients(ctx context.Context, client secretsmanager.Client, secretARN string) (
+	core.ClientInputToGraph, core.ClientStorage, error,
+) {
+	var s secret
+
+	if err := client.ReadLatestSecret(ctx, secretARN, &s); err != nil {
+		s = secret{
+			OpenAiAPIKey: os.Getenv("OPENAI_API_KEY"),
+			DBHost:       os.Getenv("DB_HOST"),
+			DBName:       os.Getenv("DB_DBNAME"),
+			DBUser:       os.Getenv("DB_USER"),
+			DBPassword:   os.Getenv("DB_PASSWORD"),
+		}
+	}
+
 	clientOpenAI, err := core.NewOpenAIClient(
 		core.ConfigOpenAI{
-			Token:       os.Getenv("OPENAI_API_KEY"),
+			Token:       s.OpenAiAPIKey,
 			MaxTokens:   utils.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
 			Temperature: utils.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
 			Model:       os.Getenv("OPENAI_MODEL"),
 		},
 	)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, nil, core.Error{
+			Service: core.ServiceOpenAI,
+			Stage:   core.StageInit,
+			Message: err.Error(),
+		}
 	}
 
-	clientStorage, err := storage.NewClient(
-		context.Background(),
-		os.Getenv("NEON_HOST"),
-		os.Getenv("NEON_DBNAME"),
-		os.Getenv("NEON_USER"),
-		os.Getenv("NEON_PASSWORD"),
-	)
+	clientStorage, err := storage.NewClient(ctx, s.DBHost, s.DBName, s.DBUser, s.DBPassword)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, nil, core.Error{
+			Service: core.ServiceStorage,
+			Stage:   core.StageInit,
+			Message: err.Error(),
+		}
 	}
-	ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+
+	return clientOpenAI, clientStorage, nil
+}
+
+func main() {
+	ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*20)
+	defer cancelFn()
+
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Fatal(
+			core.Error{
+				Service: "aws-config",
+				Stage:   core.StageInit,
+				Message: err.Error(),
+			},
+		)
+	}
+
+	clientOpenAI, clientStorage, err := configureInterfaceClients(
+		ctx, secretsmanager.NewAWSSecretManagerFromConfig(cfg), os.Getenv("ACCESS_CREDENTIALS_ARN"),
+	)
+	switch err.(type) {
+	case nil:
+	case core.Error:
+		// NOTE: no need to terminate on cold start if no connection to db can be established
+		// It is an avoidable UX disruption because we only use db to persist prompts for models finetune yet.
+		// FIXME: to remove when the "history" feature is rolled out, i.e. after v0.0.3
+		if err.(core.Error).Service == core.ServiceStorage {
+			log.Print(err)
+		}
+	default:
+		log.Fatal(err)
+	}
+
+	ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
 	defer cancelFn()
 	defer func() { _ = clientStorage.Close(ctx) }()
 

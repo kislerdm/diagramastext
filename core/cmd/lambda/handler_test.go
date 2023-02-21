@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"math/rand"
 	"net/http"
 	"reflect"
@@ -13,6 +15,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/kislerdm/diagramastext/core"
 	coreHandler "github.com/kislerdm/diagramastext/core/handler"
+	"github.com/kislerdm/diagramastext/core/secretsmanager"
 )
 
 func randomString(length int) string {
@@ -333,6 +336,128 @@ func Test_corsHeaders_setHeaders(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				if got := tt.h.setHeaders(tt.args.resp); !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("setHeaders() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+type mockSecretManagerClient struct {
+	v []byte
+}
+
+func (m mockSecretManagerClient) ReadLatestSecret(ctx context.Context, uri string, output interface{}) error {
+	if m.v == nil {
+		return errors.New("no secret found")
+	}
+	return json.Unmarshal(m.v, output)
+}
+
+func mustMarshal(v interface{}) []byte {
+	o, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return o
+}
+
+func Test_configureInterfaceClients(t *testing.T) {
+	type args struct {
+		ctx       context.Context
+		client    secretsmanager.Client
+		secretARN string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		envVars map[string]string
+		wantErr bool
+	}{
+		{
+			name:    "happy path",
+			envVars: map[string]string{},
+			args: args{
+				ctx: context.TODO(),
+				client: mockSecretManagerClient{
+					v: mustMarshal(
+						secret{
+							OpenAiAPIKey: "sk-foobar",
+							DBHost:       "mock",
+							DBName:       "dbname",
+							DBUser:       "user",
+							DBPassword:   "password",
+						},
+					),
+				},
+				secretARN: "arn:aws:secretsmanager:us-east-2:027889758114:secret:foo/bar/core/lambda-C335bP",
+			},
+			wantErr: false,
+		},
+		{
+			name: "happy path: environment variables",
+			envVars: map[string]string{
+				"OPENAI_API_KEY": "sk-foobar",
+				"DB_HOST":        "mock",
+				"DB_DBNAME":      "dbname",
+				"DB_USER":        "user",
+				"DB_PASSWORD":    "password",
+			},
+			args: args{
+				ctx:       context.TODO(),
+				client:    mockSecretManagerClient{},
+				secretARN: "arn:aws:secretsmanager:us-east-2:027889758114:secret:not-exists-C335bP",
+			},
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: no openAI token found",
+			args: args{
+				ctx: context.TODO(),
+				client: mockSecretManagerClient{
+					v: mustMarshal(
+						secret{
+							DBHost:     "mock",
+							DBName:     "dbname",
+							DBUser:     "user",
+							DBPassword: "password",
+						},
+					),
+				},
+				secretARN: "arn:aws:secretsmanager:us-east-2:027889758114:secret:no-token-C335bP",
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: cannot connect to db",
+			args: args{
+				ctx: context.TODO(),
+				client: mockSecretManagerClient{
+					v: mustMarshal(
+						secret{
+							OpenAiAPIKey: "sk-foobar",
+							DBName:       "dbname",
+							DBUser:       "user",
+							DBPassword:   "password",
+						},
+					),
+				},
+				secretARN: "arn:aws:secretsmanager:us-east-2:027889758114:secret:no-db-host-C335bP",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				for k, v := range tt.envVars {
+					t.Setenv(k, v)
+				}
+				_, _, err := configureInterfaceClients(
+					tt.args.ctx, tt.args.client, tt.args.secretARN,
+				)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("configureInterfaceClients() error = %v, wantErr %v", err, tt.wantErr)
+					return
 				}
 			},
 		)

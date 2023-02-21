@@ -18,6 +18,7 @@ func (e Error) Error() string {
 const (
 	ServiceOpenAI  = "OpenAI"
 	ServiePlantUML = "PlantUML"
+	ServiceStorage = "Storage"
 )
 
 const (

@@ -1,8 +1,3 @@
-variable "openai_api_key" {
-  description = "OpenAI API Key"
-  type        = string
-}
-
 variable "openai_model" {
   description = "OpenAI Model ID/Name."
   type        = string
@@ -27,9 +22,4 @@ EOT
 
   type    = number
   default = 0
-}
-
-variable "neon_password" {
-  type        = string
-  description = "(Temp!) Database access password."
 }

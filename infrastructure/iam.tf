@@ -1,6 +1,6 @@
 # API GW
 resource "aws_iam_role" "gw_cloudwatch" {
-  name  = "api_gateway_cloudwatch_global"
+  name = "api_gateway_cloudwatch_global"
 
   assume_role_policy = <<EOF
 {
@@ -24,8 +24,8 @@ resource "aws_api_gateway_account" "main" {
 }
 
 resource "aws_iam_role_policy" "gw_cloudwatch" {
-  name  = "GWCloudwatch"
-  role  = aws_iam_role.gw_cloudwatch.id
+  name = "GWCloudwatch"
+  role = aws_iam_role.gw_cloudwatch.id
 
   policy = <<EOF
 {

@@ -55,20 +55,3 @@ resource "neon_role" "lambda-stg" {
   project_id = neon_project.this.id
   branch_id  = neon_branch.stage.id
 }
-
-resource "aws_secretsmanager_secret" "neon_lambda" {
-  name                    = "neon/main/core/lambda"
-  recovery_window_in_days = 0
-}
-
-#resource "aws_secretsmanager_secret_version" "neon_lambda" {
-#  secret_id = aws_secretsmanager_secret.neon_lambda.id
-#  secret_string = jsonencode({
-#    branch_id  = local.neon_branch_id
-#    host       = local.neon_endpoint
-#    project_id = neon_project.this.id
-#    dbname     = neon_database.this.id
-#    user       = neon_role.lambda.name
-#    password   = neon_role.lambda.password
-#  })
-#}
