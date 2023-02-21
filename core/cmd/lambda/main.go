@@ -37,10 +37,10 @@ func configureInterfaceClients(ctx context.Context, client secretsmanager.Client
 	if err := client.ReadLatestSecret(ctx, secretARN, &s); err != nil {
 		s = secret{
 			OpenAiAPIKey: os.Getenv("OPENAI_API_KEY"),
-			DBHost:       os.Getenv("NEON_HOST"),
-			DBName:       os.Getenv("NEON_DBNAME"),
-			DBUser:       os.Getenv("NEON_USER"),
-			DBPassword:   os.Getenv("NEON_PASSWORD"),
+			DBHost:       os.Getenv("DB_HOST"),
+			DBName:       os.Getenv("DB_DBNAME"),
+			DBUser:       os.Getenv("DB_USER"),
+			DBPassword:   os.Getenv("DB_PASSWORD"),
 		}
 	}
 
@@ -53,12 +53,20 @@ func configureInterfaceClients(ctx context.Context, client secretsmanager.Client
 		},
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, core.Error{
+			Service: core.ServiceOpenAI,
+			Stage:   core.StageInit,
+			Message: err.Error(),
+		}
 	}
 
 	clientStorage, err := storage.NewClient(ctx, s.DBHost, s.DBName, s.DBUser, s.DBPassword)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, core.Error{
+			Service: core.ServiceStorage,
+			Stage:   core.StageInit,
+			Message: err.Error(),
+		}
 	}
 
 	return clientOpenAI, clientStorage, nil
@@ -70,14 +78,29 @@ func main() {
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		log.Fatalf("cannot initialise the process %+v", err)
+		log.Fatal(
+			core.Error{
+				Service: "aws-config",
+				Stage:   core.StageInit,
+				Message: err.Error(),
+			},
+		)
 	}
 
 	clientOpenAI, clientStorage, err := configureInterfaceClients(
 		ctx, secretsmanager.NewAWSSecretManagerFromConfig(cfg), os.Getenv("ACCESS_CREDENTIALS_ARN"),
 	)
-	if err != nil {
-		log.Fatalf("cannot initialise the process %+v", err)
+	switch err.(type) {
+	case nil:
+	case core.Error:
+		// NOTE: no need to terminate on cold start if no connection to db can be established
+		// It is an avoidable UX disruption because we only use db to persist prompts for models finetune yet.
+		// FIXME: to remove when the "history" feature is rolled out, i.e. after v0.0.3
+		if err.(core.Error).Service == core.ServiceStorage {
+			log.Print(err)
+		}
+	default:
+		log.Fatal(err)
 	}
 
 	ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
