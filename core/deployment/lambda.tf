@@ -72,21 +72,27 @@ resource "aws_cloudwatch_log_group" "lambda_core" {
   retention_in_days = 7
 }
 
+locals {
+  codebase_md5 = base64sha256(join(",", [
+    for file in concat(
+      [for f in fileset("${path.module}/../", "{*.go,go.mod,go.sum}") : "${path.module}/../${f}"],
+      [for f in fileset("${path.module}/../compression", "*.go") : "${path.module}/../compression/${f}"],
+      [for f in fileset("${path.module}/../handler", "*.go") : "${path.module}/../handler/${f}"],
+      [for f in fileset("${path.module}/../storage", "{*.go,go.mod,go.sum}") : "${path.module}/../storage/${f}"],
+      [for f in fileset("${path.module}/../secretsmanager", "{*.go,go.mod,go.sum}") : "${path.module}/../secretsmanager/${f}"],
+      [for f in fileset("${path.module}/../cmd/lambda", "{*.go,go.mod,go.sum}") : "${path.module}/../cmd/lambda/${f}"],
+    ) : filemd5(file)
+  ]))
+  archive_name = "${local.lambda}-${local.codebase_md5}"
+}
+
 resource "null_resource" "lambda_core" {
   triggers = {
-    md5 = base64sha256(join(",", [
-      for file in concat(
-        [for f in fileset("${path.module}/../", "{*.go,go.mod,go.sum}") : "${path.module}/../${f}"],
-        [for f in fileset("${path.module}/../compression", "*.go") : "${path.module}/../compression/${f}"],
-        [for f in fileset("${path.module}/../handler", "*.go") : "${path.module}/../handler/${f}"],
-        [for f in fileset("${path.module}/../storage", "{*.go,go.mod,go.sum}") : "${path.module}/../storage/${f}"],
-        [for f in fileset("${path.module}/../cmd/lambda", "{*.go,go.mod,go.sum}") : "${path.module}/../cmd/lambda/${f}"],
-      ) : filemd5(file)
-    ]))
+    md5 = local.codebase_md5
   }
 
   provisioner "local-exec" {
-    command = "cd ${path.module}/.. && make build"
+    command = "cd ${path.module}/.. && make build ZIPNAME=${local.archive_name}"
   }
 }
 
@@ -94,12 +100,12 @@ resource "aws_lambda_function" "core" {
   function_name = local.lambda
   role          = aws_iam_role.lambda_core.arn
 
-  filename         = "${path.module}/../bin/lambda.zip"
-  source_code_hash = null_resource.lambda_core.triggers.md5
-  runtime          = "go1.x"
-  handler          = "lambda"
-  memory_size      = 256
-  timeout          = 120
+  filename = "${path.module}/../bin/lambda.zip"
+  #  source_code_hash = null_resource.lambda_core.triggers.md5
+  runtime     = "go1.x"
+  handler     = "lambda"
+  memory_size = 256
+  timeout     = 120
 
   environment {
     variables = {

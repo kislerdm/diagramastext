@@ -24,7 +24,7 @@ provider "aws" {
 }
 
 locals {
-  neon_branch_id  = "br-steep-silence-472824"
+  neon_branch_id = "br-steep-silence-472824"
 }
 
 resource "neon_project" "this" {

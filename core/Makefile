@@ -26,8 +26,10 @@ compile:
  		go mod tidy && \
   		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../../bin/lambda -ldflags="-s -w" .
 
+ZIPNAME := lambda.zip
+
 build: compile ## Builds the lambda binary and archives it.
-	@ cd bin && zip -9 lambda.zip lambda && rm lambda
+	@ cd bin && zip -9 $(ZIPNAME) lambda && rm lambda
 
 deploy-lambda: ## Deploys the core logic as AWS lambda.
 	@ cd deployment && terraform plan && terraform apply -auto-approve
