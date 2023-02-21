@@ -175,12 +175,13 @@ jobs:
           if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
 
   deployment-staging:
-    if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master' )
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: "staging:core"
     needs:
-      - test-infra
+      - unittest
+      - lint
     defaults:
       run:
         working-directory: "core/deployment"
@@ -212,7 +213,7 @@ jobs:
           terraform apply -auto-approve  
 
   deployment-production:
-    if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master')
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: "production:core"
