@@ -99,10 +99,9 @@ jobs:
           version: latest
           working-directory: "core"
 
-  staging:
+  test-infra:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    environment:
-      name: "staging:core"
     needs:
       - unittest
       - lint
@@ -134,7 +133,6 @@ jobs:
           terraform plan -lock-timeout=120s -no-color -out /tmp/terraform.tfplan
         continue-on-error: true
       - uses: actions/github-script@v6
-        if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -175,23 +173,51 @@ jobs:
         run: |
           if [[ ! ${{ steps.validate.outputs.exitcode }} -eq 0 ]]; then echo "failed validation"; exit 1; fi
           if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
+
+  deployment-staging:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: "staging:core"
+    needs:
+      - test-infra
+    defaults:
+      run:
+        working-directory: "core/deployment"
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Configure AWS Credentials Action For GitHub Actions
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
+          role-duration-seconds: 900
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v2.0.2
+      - name: Terraform init
+        id: init
+        run: terraform init
+      - name: Terraform validate
+        id: validate
+        run: terraform validate
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
       - name: Deploy
-        if: github.event_name != 'pull_request'
         run: |
-          terraform workspace select staging
-          terraform apply -auto-approve -state=/tmp/terraform.tfplan
+          terraform plan -lock-timeout=120s
+          terraform apply -auto-approve  
 
-  production:
+  deployment-production:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: "production:core"
     needs:
-      - staging
+      - deployment-staging
     defaults:
       run:
         working-directory: "core/deployment"
