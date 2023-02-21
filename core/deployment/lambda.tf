@@ -83,7 +83,7 @@ locals {
       [for f in fileset("${path.module}/../cmd/lambda", "{*.go,go.mod,go.sum}") : "${path.module}/../cmd/lambda/${f}"],
     ) : filemd5(file)
   ]))
-  archive_name = "${local.lambda}-${local.codebase_md5}"
+  archive_name = "${local.lambda}-${local.codebase_md5}.zip"
 }
 
 resource "null_resource" "lambda_core" {
@@ -100,7 +100,7 @@ resource "aws_lambda_function" "core" {
   function_name = local.lambda
   role          = aws_iam_role.lambda_core.arn
 
-  filename = "${path.module}/../bin/lambda.zip"
+  filename = "${path.module}/../bin/${local.archive_name}"
   #  source_code_hash = null_resource.lambda_core.triggers.md5
   runtime     = "go1.x"
   handler     = "lambda"
