@@ -49,6 +49,9 @@ func main() {
 						API_URL: os.Getenv("API_URL"),
 						VERSION: os.Getenv("VERSION"),
 						TOKEN:   os.Getenv("TOKEN"),
+						AUTH0_DOMAIN: os.Getenv("AUTH0_DOMAIN")
+						AUTH0_CLIENT_ID: os.Getenv("AUTH0_CLIENT_ID")
+						AUTH_REDIRECT: os.Getenv("AUTH_REDIRECT")
 					},
 				},
 			); err != nil {

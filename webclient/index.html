@@ -12,6 +12,7 @@
     <link rel="mask-icon" href="static/icons/safari-pinned-tab.svg" color="#5bbad5">
     <meta name="msapplication-TileColor" content="#da532c">
     <meta name="theme-color" content="#ffffff">
+    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
     <style>
         *, :after, :before {
             box-sizing: border-box;
@@ -525,6 +526,7 @@
 
 <script>
     const version = "{{.Env.VERSION}}";
+    let auth0Client = null;
 
     function generateFeedbackLink(prompt) {
         let url = "https://github.com/kislerdm/diagramastext/issues/new";
@@ -613,6 +615,8 @@ Please describe what should have happened following the actions you described.
         const apiKey = "{{ .Env.TOKEN }}";
 
         if (placeholder !== prompt) {
+            authentication();
+
             loaderShow();
 
             try {
@@ -680,6 +684,35 @@ Please describe what should have happened following the actions you described.
         link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
         link.click();
     }
+
+
+
+    const configureAuthClient = async ()=>{
+
+        const config = {domain: "{{ .Env.AUTH0_DOMAIN }}", clientId: "{{ .Env.AUTH0_CLIENT_ID }}"};
+
+        auth0Client =  await auth0.createAuth0Client({
+            domain: config.domain,
+            clientId: config.clientId,
+            cacheLocation: 'localstorage'
+        });
+    }
+
+    const authentication = async () => {
+        await configureAuthClient();
+
+        const isAuthenticated = await auth0Client.isAuthenticated();
+
+        if(isAuthenticated){
+           return;
+        }
+
+        await auth0Client.loginWithRedirect({
+             authorizationParams:{
+                 redirect_uri: "{ .Env.AUTH_REDIRECT }"
+             }
+         })
+    };
 
 </script>
 
