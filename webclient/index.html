@@ -528,6 +528,11 @@
     const version = "{{.Env.VERSION}}";
     let auth0Client = null;
 
+    window.addEventListener("load", function (){
+        configureAuthClient();
+    })
+
+
     function generateFeedbackLink(prompt) {
         let url = "https://github.com/kislerdm/diagramastext/issues/new";
         const params = {
@@ -688,8 +693,7 @@ Please describe what should have happened following the actions you described.
 
 
     const configureAuthClient = async ()=>{
-
-        const config = {domain: "{{ .Env.AUTH0_DOMAIN }}", clientId: "{{ .Env.AUTH0_CLIENT_ID }}"};
+        const config = {domain: '{{ .Env.AUTH0_DOMAIN }}', clientId: '{{ .Env.AUTH0_CLIENT_ID }}'};
 
         auth0Client =  await auth0.createAuth0Client({
             domain: config.domain,
@@ -699,8 +703,6 @@ Please describe what should have happened following the actions you described.
     }
 
     const authentication = async () => {
-        await configureAuthClient();
-
         const isAuthenticated = await auth0Client.isAuthenticated();
 
         if(isAuthenticated){
@@ -709,7 +711,7 @@ Please describe what should have happened following the actions you described.
 
         await auth0Client.loginWithRedirect({
              authorizationParams:{
-                 redirect_uri: "{ .Env.AUTH_REDIRECT }"
+                 redirect_uri: '{{ .Env.AUTH_REDIRECT }}'
              }
          })
     };
