@@ -10,10 +10,10 @@ variable "path_lambda_module" {
 
 variable "codebase_rebuild_trigger" {
   type = object({
-    base         = string
-    modules_dirs = list(string)
+    base                 = string
+    modules_dir_patterns = list(string)
   })
-  description = "Location of the codebase which change will trigger lambda rebuild and redeployment."
+  description = "Patterns of the codebase dirs which change will trigger lambda rebuild and redeployment."
   default     = null
 }
 

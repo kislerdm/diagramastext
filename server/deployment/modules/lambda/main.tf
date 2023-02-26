@@ -48,7 +48,7 @@ resource "aws_iam_role_policy_attachment" "logs" {
 resource "aws_iam_role_policy_attachment" "custom" {
   for_each   = toset(var.policy_arn_list)
   policy_arn = each.value
-  role       = aws_iam_role.this.arn
+  role       = aws_iam_role.this.name
 }
 
 resource "aws_cloudwatch_log_group" "logs" {
@@ -64,7 +64,7 @@ locals {
 
   files_list_dependencies = var.codebase_rebuild_trigger == null ? [] : flatten(
     [
-      for pattern in var.codebase_rebuild_trigger.modules_dirs :
+      for pattern in var.codebase_rebuild_trigger.modules_dir_patterns :
       [
         for f in fileset(var.codebase_rebuild_trigger.base, "${pattern}{*.go,go.mod,go.sum}") :
         "${var.codebase_rebuild_trigger.base}/${f}"
@@ -72,20 +72,22 @@ locals {
     ]
   )
 
-  codebase_sha = sha256(
-    join(",", [for file in concat(local.files_list_lambda_module, local.files_list_dependencies) : filesha256(file)])
+  codebase_md5 = md5(
+    join(",", [for file in concat(local.files_list_lambda_module, local.files_list_dependencies) : filemd5(file)])
   )
 
-  archive_name = "${var.name}-${local.codebase_sha}.zip"
+  archive_name = "${var.name}-${local.codebase_md5}.zip"
+  dir_module   = abspath(path.module)
 }
 
 resource "null_resource" "this" {
   triggers = {
-    sha = local.codebase_sha
+    md5  = local.codebase_md5
+    name = local.archive_name
   }
 
   provisioner "local-exec" {
-    command = "cd ${path.module} && mkdir bin && make build ZIPNAME=${local.archive_name} CODE_PATH=${var.path_lambda_module}"
+    command = "cd ${local.dir_module} && make build ZIPNAME=${local.archive_name} CODE_PATH=${var.path_lambda_module}"
   }
 }
 
@@ -93,7 +95,7 @@ resource "aws_lambda_function" "this" {
   function_name = var.name
   role          = aws_iam_role.this.arn
 
-  filename = "${path.module}/bin/${local.archive_name}"
+  filename = "${local.dir_module}/bin/${local.archive_name}"
   runtime  = "go1.x"
   handler  = "lambda"
 

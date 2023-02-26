@@ -33,7 +33,7 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_codebase_rebuild_trigger"></a> [codebase\_rebuild\_trigger](#input\_codebase\_rebuild\_trigger) | Location of the codebase which change will trigger lambda rebuild and redeployment. | <pre>object({<br>    base         = string<br>    modules_dirs = list(string)<br>  })</pre> | `null` | no |
+| <a name="input_codebase_rebuild_trigger"></a> [codebase\_rebuild\_trigger](#input\_codebase\_rebuild\_trigger) | Patterns of the codebase dirs which change will trigger lambda rebuild and redeployment. | <pre>object({<br>    base                 = string<br>    modules_dir_patterns = list(string)<br>  })</pre> | `null` | no |
 | <a name="input_env_vars"></a> [env\_vars](#input\_env\_vars) | Key-value pairs to set environemnt variables. | `map(string)` | `{}` | no |
 | <a name="input_exec_timeout_sec"></a> [exec\_timeout\_sec](#input\_exec\_timeout\_sec) | Lambda invocation timeout in sec. | `number` | `30` | no |
 | <a name="input_lambda_memory"></a> [lambda\_memory](#input\_lambda\_memory) | Lambda RAM in Mb. | `number` | `256` | no |
