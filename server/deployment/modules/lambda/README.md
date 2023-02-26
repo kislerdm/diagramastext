@@ -47,6 +47,7 @@ No modules.
 | Name | Description |
 |------|-------------|
 | <a name="output_arn"></a> [arn](#output\_arn) | Amazon Resource Name (ARN) identifying your Lambda Function. |
+| <a name="output_codebase_md5"></a> [codebase\_md5](#output\_codebase\_md5) | Lambda codebase md5 sum. |
 | <a name="output_function_name"></a> [function\_name](#output\_function\_name) | Unique name for your Lambda Function. |
 | <a name="output_invoke_arn"></a> [invoke\_arn](#output\_invoke\_arn) | ARN to be used for invoking Lambda Function from API Gateway. |
 <!-- END_TF_DOCS -->

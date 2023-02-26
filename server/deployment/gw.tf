@@ -93,6 +93,9 @@ locals {
     local.cors_headers_gw,
     local.request_parameters,
     local.lambda_trigger,
+    {
+      "${module.core_rendering_c4.function_name}" = module.core_rendering_c4.codebase_md5
+    },
   )
   deployment_trigger = jsonencode(local.deployment_trigger_obj)
 }
