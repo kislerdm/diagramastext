@@ -19,6 +19,7 @@ provider "neon" {}
 
 locals {
   is_prod          = terraform.workspace == "production" || terraform.workspace == "default"
+  environment      = local.is_prod ? "production" : "staging"
   suffix           = local.is_prod ? "" : "-stg"
   subdomain_prefix = local.is_prod ? "" : "stage."
 
