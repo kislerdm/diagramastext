@@ -9,7 +9,7 @@ BIN_PATH := $(PWD)/bin
 
 compile:
 	@ test -d $(BIN_PATH) || mkdir -p $(BIN_PATH) && \
-		test $(CODE_PATH) || echo "CODE_PATH not set" && exit 137  &&\
+		test $(CODE_PATH) || (echo "CODE_PATH not set" && exit 137)  &&\
 		cd $(CODE_PATH) && \
  		go mod tidy && \
   		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $(BIN_PATH)/lambda -ldflags="-s -w" .
