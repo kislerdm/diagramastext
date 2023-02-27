@@ -113,7 +113,13 @@ Thank you! 🙏
 
 ### Architecture
 
-![architecture](https://www.plantuml.com/plantuml/svg/RP3DRk8m58NtUGfFf151cf3DhAggeeK8gFY9-56NaHDV4akE7TatBRnzxM1eKPjDh7FEPvzxnmQfnguHmHykIz4n83LYQnwIHDEFKSMnxehEW2wLH90uAbMJj89AnyG6cU15ClaVPquwh9P9Gms2jb8-SSG9HwsxFK2E0aZ8EAqqTI5dCNWdvIL6l1C6mL4f14t2HuIo7lyWdaXC_ZAA40tEzejNgvYnmT226MYZP9wUC7AL_v7mO7_XC0XsPuitKSUzHXOIGHzf2TRrPW7Md2Zz9VKtgHOaTTp67fuNz-Pr4zQ-Ri0zjmMHRts7_iqfc98NO0ZMS9sKS4bIMGbkwj16zdOyothKGdsVJAkMLXGzschLjEZYy_q-IrvtcxLd3dt_Mzc5F8A-C8rY87v3fZtoROGPID0KxslUo1SkgJxtsvnltl9bEalNqsWOZ44ooty2)
+#### C4 Context Level
+
+![architecture-context](architecture_c4_l1.svg)
+
+#### C4 Container Level
+
+![architecture-containers](architecture_c4_l2.svg)
 
 ### Local setup
 
