@@ -1,20 +1,20 @@
-name: "Deploy:Core"
+name: "Deploy:Server"
 
 on:
   pull_request:
     paths:
-      - "core/**"
-      - "!core/**.md"
-      - "!core/fig/**"
-      - "!core/Makefile"
+      - "server/**"
+      - "!server/**.md"
+      - "!server/fig/**"
+      - "!server/Makefile"
   push:
     branches:
       - master
     paths:
-      - "core/**"
-      - "!core/**.md"
-      - "!core/fig/**"
-      - "!core/Makefile"
+      - "server/**"
+      - "!server/**.md"
+      - "!server/fig/**"
+      - "!server/Makefile"
 
   workflow_dispatch:
 
@@ -24,12 +24,33 @@ permissions:
   pull-requests: write
 
 jobs:
+  list_modules:
+    defaults:
+      run:
+        working-directory: "server"
+    runs-on: ubuntu-latest
+    name: "List modules"
+    outputs:
+      modules: ${{ steps.ls.outputs.modules }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - name: ls
+        id: ls
+        run: echo "modules=$(python3 .github/workflows/scripts/ls_modules.py -p .)" >> $GITHUB_OUTPUT
+
   unittest:
     defaults:
       run:
-        working-directory: "core"
+        working-directory: "server"
     runs-on: ubuntu-latest
     name: "Unittest"
+    needs:
+      - list_modules
+    strategy:
+      matrix:
+        module: ${{ fromJSON(needs.list_modules.outputs.modules) }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -38,53 +59,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
-
       - name: Unittests
         run: |
+          cd ${{ matrix.module.path }}
           go mod tidy
-          go test -race -coverprofile=coverage.txt -covermode=atomic ./...
-
+          go test -race -coverprofile=${{ matrix.module.flag }}.txt -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          flags: module
-          files: coverage.txt
-
-      - name: Unittests-lambda
-        run: |
-          cd cmd/lambda
-          go mod tidy
-          go test -race -coverprofile=coverage-lambda.txt -covermode=atomic
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          flags: lambda
-          files: coverage-lambda.txt
-
-      - name: Unittests-storage/postgres
-        run: |
-          cd storage
-          go mod tidy
-          go test -race -coverprofile=coverage-postgres.txt -covermode=atomic
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          flags: postgres
-          files: coverage-postgres.txt
-
-      - name: Unittests-storage/secretsmanager
-        run: |
-          cd secretsmanager
-          go mod tidy
-          go test -race -coverprofile=coverage-secretsmanager.txt -covermode=atomic
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          flags: secretsmanager
-          files: coverage-secretsmanager.txt
+          flags: ${{ matrix.module.flag }}
+          files: ${{ matrix.module.flag }}.txt
 
   lint:
     runs-on: ubuntu-latest
@@ -97,7 +81,7 @@ jobs:
       - uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          working-directory: "core"
+          working-directory: "server"
 
   test-infra:
     if: github.event_name == 'pull_request'
@@ -107,7 +91,7 @@ jobs:
       - lint
     defaults:
       run:
-        working-directory: "core/deployment"
+        working-directory: "server/deployment"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -178,13 +162,13 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
-      name: "staging:core"
+      name: "staging:server"
     needs:
       - unittest
       - lint
     defaults:
       run:
-        working-directory: "core/deployment"
+        working-directory: "server/deployment"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -217,12 +201,12 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
-      name: "production:core"
+      name: "production:server"
     needs:
       - deployment-staging
     defaults:
       run:
-        working-directory: "core/deployment"
+        working-directory: "server/deployment"
     steps:
       - uses: actions/checkout@v3
         with:
