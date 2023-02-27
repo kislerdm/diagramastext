@@ -1,13 +1,11 @@
 // Package handler defines the client-server communication entrypoint handler.
-package handler
+package server
 
 import (
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
-
-	"github.com/kislerdm/diagramastext/server"
 )
 
 // ResponseError error object to use as response.
@@ -19,7 +17,7 @@ type ResponseError struct {
 // ParseClientError parses core error.
 func ParseClientError(err error) ResponseError {
 	msg := "unknown"
-	if e, ok := err.(server.Error); ok {
+	if e, ok := err.(Error); ok {
 		if e.ServiceResponseStatusCode == http.StatusTooManyRequests {
 			return ResponseError{
 				StatusCode: e.ServiceResponseStatusCode,
@@ -27,9 +25,9 @@ func ParseClientError(err error) ResponseError {
 			}
 		}
 		switch e.Service {
-		case server.ServiceOpenAI:
+		case ServiceOpenAI:
 			msg = "could not recognise diagram description"
-		case server.ServiePlantUML:
+		case ServiePlantUML:
 			msg = "could not generate diagram using provided description"
 		}
 	}

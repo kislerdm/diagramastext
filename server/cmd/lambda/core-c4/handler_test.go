@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/kislerdm/diagramastext/server"
-	coreHandler "github.com/kislerdm/diagramastext/server/handler"
 	"github.com/kislerdm/diagramastext/server/pkg/rendering/plantuml"
 	"github.com/kislerdm/diagramastext/server/pkg/secretsmanager"
 	"github.com/kislerdm/diagramastext/server/pkg/storage"
@@ -167,7 +166,7 @@ func Test_handler(t *testing.T) {
 			args: args{
 				ctx: ctx,
 				req: events.APIGatewayProxyRequest{
-					Body: `{"prompt": "` + randomString(coreHandler.PromptLengthMin+1) + `"}`,
+					Body: `{"prompt": "` + randomString(server.PromptLengthMin+1) + `"}`,
 				},
 			},
 			want: events.APIGatewayProxyResponse{
@@ -205,14 +204,14 @@ func Test_handler(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				req: events.APIGatewayProxyRequest{
-					Body: `{"prompt":"` + randomString(coreHandler.PromptLengthMin-1) + `"}`,
+					Body: `{"prompt":"` + randomString(server.PromptLengthMin-1) + `"}`,
 				},
 			},
 			want: events.APIGatewayProxyResponse{
 				Headers:    expectedHandler,
 				StatusCode: http.StatusBadRequest,
-				Body: "prompt length must be between " + strconv.Itoa(coreHandler.PromptLengthMin) + " and " +
-					strconv.Itoa(coreHandler.PromptLengthMax) + " characters",
+				Body: "prompt length must be between " + strconv.Itoa(server.PromptLengthMin) + " and " +
+					strconv.Itoa(server.PromptLengthMax) + " characters",
 			},
 			wantErr: true,
 		},

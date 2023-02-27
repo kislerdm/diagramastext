@@ -15,9 +15,6 @@ import (
 	"github.com/kislerdm/diagramastext/server/pkg/secretsmanager"
 	"github.com/kislerdm/diagramastext/server/pkg/storage"
 
-	coreHandler "github.com/kislerdm/diagramastext/server/handler"
-	"github.com/kislerdm/diagramastext/server/utils"
-
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-lambda-go/lambdacontext"
@@ -49,8 +46,8 @@ func configureInterfaceClients(ctx context.Context, client secretsmanager.Client
 	clientOpenAI, err := core.NewOpenAIClient(
 		core.ConfigOpenAI{
 			Token:       s.OpenAiAPIKey,
-			MaxTokens:   utils.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
-			Temperature: utils.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
+			MaxTokens:   server.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
+			Temperature: server.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
 			Model:       os.Getenv("OPENAI_MODEL"),
 		},
 	)
@@ -150,7 +147,7 @@ func handler(
 	return func(
 		ctx context.Context, req events.APIGatewayProxyRequest,
 	) (events.APIGatewayProxyResponse, error) {
-		prompt, err := coreHandler.ReadPrompt([]byte(req.Body))
+		prompt, err := server.ReadPrompt([]byte(req.Body))
 		if err != nil {
 			return corsHeaders.setHeaders(
 				events.APIGatewayProxyResponse{
@@ -160,7 +157,7 @@ func handler(
 			), err
 		}
 
-		if err := coreHandler.ValidatePrompt(prompt); err != nil {
+		if err := server.ValidatePrompt(prompt); err != nil {
 			return corsHeaders.setHeaders(
 				events.APIGatewayProxyResponse{
 					StatusCode: http.StatusBadRequest,
@@ -234,7 +231,7 @@ func readUserID(h map[string]string) string {
 }
 
 func parseClientError(err error) events.APIGatewayProxyResponse {
-	v := coreHandler.ParseClientError(err)
+	v := server.ParseClientError(err)
 	return events.APIGatewayProxyResponse{
 		StatusCode: v.StatusCode,
 		Body:       string(v.Body),
