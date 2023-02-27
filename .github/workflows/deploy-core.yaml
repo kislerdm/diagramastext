@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 1
       - name: ls
         id: ls
-        run: echo "modules=$(python3 .github/workflows/scripts/ls_modules.py -p .)" >> $GITHUB_OUTPUT
+        run: echo "modules=$(python3 ../.github/workflows/scripts/ls_modules.py -p .)" >> $GITHUB_OUTPUT
 
   unittest:
     defaults:
