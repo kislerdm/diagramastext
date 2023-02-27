@@ -12,12 +12,9 @@ import (
 	"os"
 	"strconv"
 
-	coreHandler "github.com/kislerdm/diagramastext/server/handler"
+	"github.com/kislerdm/diagramastext/server"
 	"github.com/kislerdm/diagramastext/server/pkg/core"
 	"github.com/kislerdm/diagramastext/server/pkg/rendering/plantuml"
-	"github.com/kislerdm/diagramastext/server/utils"
-
-	"github.com/kislerdm/diagramastext/server"
 )
 
 type httpHandler struct {
@@ -52,27 +49,27 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// FIXME: add proper sink to preserve user's requests for model fine-tuning
 	log.Println(string(body))
 
-	prompt, err := coreHandler.ReadPrompt(body)
+	prompt, err := server.ReadPrompt(body)
 	if err != nil {
 		h.response(w, []byte("could not recognise the prompt format"), http.StatusUnprocessableEntity, err)
 		return
 	}
 
-	if err := coreHandler.ValidatePrompt(prompt); err != nil {
+	if err := server.ValidatePrompt(prompt); err != nil {
 		h.response(w, []byte(err.Error()), http.StatusUnprocessableEntity, err)
 		return
 	}
 
 	graph, err := h.clientModel.Do(context.Background(), prompt)
 	if err != nil {
-		e := coreHandler.ParseClientError(err)
+		e := server.ParseClientError(err)
 		h.response(w, e.Body, e.StatusCode, err)
 		return
 	}
 
 	svg, err := h.clientDiagram.Do(context.Background(), graph)
 	if err != nil {
-		e := coreHandler.ParseClientError(err)
+		e := server.ParseClientError(err)
 		h.response(w, e.Body, e.StatusCode, err)
 		return
 	}
@@ -84,8 +81,8 @@ func main() {
 	clientOpenAI, err := core.NewOpenAIClient(
 		core.ConfigOpenAI{
 			Token:       os.Getenv("OPENAI_API_KEY"),
-			MaxTokens:   utils.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
-			Temperature: utils.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
+			MaxTokens:   server.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
+			Temperature: server.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
 		},
 		core.WithSinkFn(
 			// FIXME: add proper sink to preserve user's requests for model fine-tuning
@@ -109,7 +106,7 @@ func main() {
 	}
 
 	port := 9000
-	if v := utils.MustParseInt(os.Getenv("PORT")); v > 0 {
+	if v := server.MustParseInt(os.Getenv("PORT")); v > 0 {
 		port = v
 	}
 
