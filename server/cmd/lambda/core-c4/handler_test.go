@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/kislerdm/diagramastext/server"
-	"github.com/kislerdm/diagramastext/server/pkg/rendering/plantuml"
+	"github.com/kislerdm/diagramastext/server/pkg/rendering/c4container"
 	"github.com/kislerdm/diagramastext/server/pkg/secretsmanager"
 	"github.com/kislerdm/diagramastext/server/pkg/storage"
 )
@@ -157,7 +157,7 @@ func Test_handler(t *testing.T) {
 					Err: nil,
 				},
 				clientDiagram: mockClientGraphToDiagram{
-					Resp: plantuml.ResponseC4Diagram{SVG: "<svg></svg>"},
+					Resp: c4container.ResponseC4Diagram{SVG: "<svg></svg>"},
 					Err:  nil,
 				},
 				corsHeaders:   expectedHandler,
@@ -172,7 +172,7 @@ func Test_handler(t *testing.T) {
 			want: events.APIGatewayProxyResponse{
 				Headers:    expectedHandler,
 				StatusCode: http.StatusOK,
-				Body:       string(plantuml.ResponseC4Diagram{SVG: "<svg></svg>"}.MustMarshal()),
+				Body:       string(c4container.ResponseC4Diagram{SVG: "<svg></svg>"}.MustMarshal()),
 			},
 			wantErr: false,
 		},

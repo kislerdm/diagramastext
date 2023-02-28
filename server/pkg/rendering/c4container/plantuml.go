@@ -1,7 +1,7 @@
-// Package plantuml defines client to convert the graph object
+// Package c4container defines client to convert the graph object
 // to the PlantUMP DSL
-// and to generate a diagram artifact as SVG.
-package plantuml
+// and to generate a C4 Container diagram artifact as SVG.
+package c4container
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/kislerdm/diagramastext/server"
-	"github.com/kislerdm/diagramastext/server/pkg/rendering/plantuml/compression"
+	"github.com/kislerdm/diagramastext/server/pkg/rendering/c4container/compression"
 )
 
 // ResponseC4Diagram resulting C4 diagram.
