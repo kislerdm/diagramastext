@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/kislerdm/diagramastext/server"
 	"github.com/kislerdm/diagramastext/server/pkg/core"
-	"github.com/kislerdm/diagramastext/server/pkg/rendering/plantuml"
+	"github.com/kislerdm/diagramastext/server/pkg/rendering/c4container"
 	"github.com/kislerdm/diagramastext/server/pkg/secretsmanager"
 	"github.com/kislerdm/diagramastext/server/pkg/storage"
 
@@ -106,7 +106,7 @@ func main() {
 	defer cancelFn()
 	defer func() { _ = clientStorage.Close(ctx) }()
 
-	clientPlantUML := plantuml.NewClient()
+	clientPlantUML := c4container.NewClient()
 
 	var corsHeaders corsHeaders
 	if v := os.Getenv("CORS_HEADERS"); v != "" {

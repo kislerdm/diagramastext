@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.18.14
 	github.com/kislerdm/diagramastext/server v0.0.2
 	github.com/kislerdm/diagramastext/server/pkg/core v0.0.1
-	github.com/kislerdm/diagramastext/server/pkg/rendering/plantuml v0.0.1
+	github.com/kislerdm/diagramastext/server/pkg/rendering/c4container v0.0.1
 	github.com/kislerdm/diagramastext/server/pkg/secretsmanager v0.0.1
 	github.com/kislerdm/diagramastext/server/pkg/storage v0.0.1
 )
@@ -31,7 +31,7 @@ require (
 replace (
 	github.com/kislerdm/diagramastext/server v0.0.2 => ./../../../
 	github.com/kislerdm/diagramastext/server/pkg/core v0.0.1 => ./../../../pkg/core
-	github.com/kislerdm/diagramastext/server/pkg/rendering/plantuml v0.0.1 => ./../../../pkg/rendering/plantuml
+	github.com/kislerdm/diagramastext/server/pkg/rendering/c4container v0.0.1 => ./../../../pkg/rendering/c4container
 	github.com/kislerdm/diagramastext/server/pkg/secretsmanager v0.0.1 => ./../../../pkg/secretsmanager
 	github.com/kislerdm/diagramastext/server/pkg/storage v0.0.1 => ./../../../pkg/storage
 )

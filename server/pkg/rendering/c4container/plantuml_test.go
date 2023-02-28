@@ -1,4 +1,4 @@
-package plantuml
+package c4container
 
 import (
 	"context"

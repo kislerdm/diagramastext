@@ -1,4 +1,4 @@
-module github.com/kislerdm/diagramastext/server/pkg/rendering/plantuml
+module github.com/kislerdm/diagramastext/server/pkg/rendering/c4container
 
 go 1.19
 

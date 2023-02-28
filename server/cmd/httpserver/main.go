@@ -14,7 +14,7 @@ import (
 
 	"github.com/kislerdm/diagramastext/server"
 	"github.com/kislerdm/diagramastext/server/pkg/core"
-	"github.com/kislerdm/diagramastext/server/pkg/rendering/plantuml"
+	"github.com/kislerdm/diagramastext/server/pkg/rendering/c4container"
 )
 
 type httpHandler struct {
@@ -97,7 +97,7 @@ func main() {
 
 	handler := httpHandler{
 		clientModel:   clientOpenAI,
-		clientDiagram: plantuml.NewClient(),
+		clientDiagram: c4container.NewClient(),
 		reportErrorFn: func(err error) { log.Println(err) },
 	}
 
