@@ -297,10 +297,11 @@
         <textarea id="prompt" minlength="3"
                   maxlength="500"
                   rows="3"
+                  disabled
                   placeholder="Type in the diagram description">C4 diagram of a Go web server reading from external Postgres database over TCP
         </textarea>
         <div>
-            <button id="trigger" onclick=trigger()>Generate Diagram</button>
+            <button id="trigger" onclick=authentication()>Try by yourself</button>
         </div>
     </div>
     <div id="error-msg" class="modal">
@@ -528,9 +529,25 @@
     const version = "{{.Env.VERSION}}";
     let auth0Client = null;
 
-    window.addEventListener("load", function (){
-        configureAuthClient();
-    })
+    window.onload = async () => {
+        await configureAuthClient();
+        await updateUI()
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if(isAuthenticated) {
+            return
+        }
+        await urlCleaner();
+    }
+
+
+    async function urlCleaner (){
+        const query = window.location.search;
+        if(query.includes("code=")&& query.includes("state=")){
+            await auth0Client.handleRedirectCallback();
+            await updateUI()
+            window.history.replaceState({}, document.title, "/");
+        }
+    }
 
 
     function generateFeedbackLink(prompt) {
@@ -620,7 +637,6 @@ Please describe what should have happened following the actions you described.
         const apiKey = "{{ .Env.TOKEN }}";
 
         if (placeholder !== prompt) {
-            authentication();
 
             loaderShow();
 
@@ -690,31 +706,31 @@ Please describe what should have happened following the actions you described.
         link.click();
     }
 
-
-
     const configureAuthClient = async ()=>{
         const config = {domain: '{{ .Env.AUTH0_DOMAIN }}', clientId: '{{ .Env.AUTH0_CLIENT_ID }}'};
-
         auth0Client =  await auth0.createAuth0Client({
             domain: config.domain,
             clientId: config.clientId,
-            cacheLocation: 'localstorage'
+            cacheLocation: 'memory'
         });
     }
 
     const authentication = async () => {
-        const isAuthenticated = await auth0Client.isAuthenticated();
-
-        if(isAuthenticated){
-           return;
-        }
-
         await auth0Client.loginWithRedirect({
              authorizationParams:{
                  redirect_uri: '{{ .Env.AUTH_REDIRECT }}'
              }
          })
     };
+
+    const updateUI = async () => {
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if(isAuthenticated){
+            document.getElementById("prompt").removeAttribute("disabled");
+            document.getElementById("trigger").innerHTML = "Generate Diagram"
+            document.getElementById("trigger").onclick = function () { trigger() };
+        }
+    }
 
 </script>
 
