@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"log"
 	"net/http"
@@ -25,17 +24,6 @@ import (
 type CallID struct {
 	UserID    string
 	RequestID string
-}
-
-func validateSVG(v []byte) error {
-	type svg struct {
-		SVG string `xml:"svg"`
-	}
-	var probe svg
-	if err := xml.Unmarshal(v, &probe); err != nil {
-		return err
-	}
-	return nil
 }
 
 const (
@@ -139,7 +127,7 @@ func (h handlerC4Containers) GenerateSVG(ctx context.Context, prompt string, cal
 		return nil, err
 	}
 
-	if err := validateSVG(diagram); err != nil {
+	if err := utils.ValidateSVG(diagram); err != nil {
 		return nil, errs.Error{
 			Stage:   errs.CombineStages(errs.StageResponse, errs.StageValidation),
 			Message: err.Error(),
