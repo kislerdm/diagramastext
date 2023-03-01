@@ -1,4 +1,4 @@
-package sdk
+package server
 
 import (
 	"context"
@@ -20,6 +20,12 @@ import (
 	"github.com/kislerdm/diagramastext/server/storage"
 	"github.com/kislerdm/diagramastext/server/utils"
 )
+
+// CallID sdk invocation ID.
+type CallID struct {
+	UserID    string
+	RequestID string
+}
 
 func validateSVG(v []byte) error {
 	type svg struct {
@@ -50,7 +56,7 @@ func validatePrompt(prompt string) error {
 // Handler handles diagram generation end-to-end.
 type Handler interface {
 	// GenerateSVG generates the diagram as SVG given user's input.
-	GenerateSVG(ctx context.Context, prompt string, callID storage.CallID) ([]byte, error)
+	GenerateSVG(ctx context.Context, prompt string, callID CallID) ([]byte, error)
 
 	// Stop closes connections for all clients.
 	Stop(ctx context.Context) error
@@ -69,7 +75,7 @@ func (h handlerC4Containers) Stop(ctx context.Context) error {
 	return h.clientStorage.Close(ctx)
 }
 
-func (h handlerC4Containers) GenerateSVG(ctx context.Context, prompt string, callID storage.CallID) ([]byte, error) {
+func (h handlerC4Containers) GenerateSVG(ctx context.Context, prompt string, callID CallID) ([]byte, error) {
 	if err := validatePrompt(prompt); err != nil {
 		return nil, errs.Error{
 			Stage:                     errs.CombineStages(errs.StageRequest, errs.StageValidation),
@@ -78,11 +84,16 @@ func (h handlerC4Containers) GenerateSVG(ctx context.Context, prompt string, cal
 		}
 	}
 
+	cID := storage.CallID{
+		RequestID: callID.RequestID,
+		UserID:    callID.UserID,
+	}
+
 	// FIXME: decide on execution path when db write fails
 	if h.clientStorage != nil {
 		if err := h.clientStorage.WritePrompt(
 			ctx, storage.UserInput{
-				CallID:    callID,
+				CallID:    cID,
 				Prompt:    prompt,
 				Timestamp: time.Now().UTC(),
 			},
@@ -103,7 +114,7 @@ func (h handlerC4Containers) GenerateSVG(ctx context.Context, prompt string, cal
 	if h.clientStorage != nil {
 		if err := h.clientStorage.WriteModelPrediction(
 			ctx, storage.ModelOutput{
-				CallID:    callID,
+				CallID:    cID,
 				Response:  string(graphPrediction),
 				Timestamp: time.Now().UTC(),
 			},
@@ -248,7 +259,7 @@ func NewC4DiagramHandler(ctx context.Context, secretARN string) (Handler, error)
 	var secretsManagerClient secretsmanager.Client
 
 	// FIXME: add aws config error handling(?)
-	if awsCfg, err := config.LoadDefaultConfig(ctx); err != nil {
+	if awsCfg, err := config.LoadDefaultConfig(ctx); err == nil {
 		secretsManagerClient = secretsmanager.NewAWSSecretManagerFromConfig(awsCfg)
 	}
 
@@ -273,6 +284,6 @@ func NewC4DiagramHandler(ctx context.Context, secretARN string) (Handler, error)
 		clientModel:     clientOpenAI,
 		clientRendering: c4container.NewClient(),
 		clientStorage:   clientStorage,
-		Logger:          nil,
+		Logger:          log.New(os.Stdin, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Llongfile),
 	}, nil
 }

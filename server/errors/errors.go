@@ -26,11 +26,9 @@ func (e Error) Error() string {
 }
 
 const (
-	ServiceOpenAI            = "OpenAI"
-	ServiePlantUML           = "PlantUML"
-	ServiceStorage           = "Storage"
-	ServiceAWSConfig         = "AWSConfig"
-	ServiceAWSSecretsManager = "AWSSecretsmanager"
+	ServiceOpenAI  = "OpenAI"
+	ServiePlantUML = "PlantUML"
+	ServiceStorage = "Storage"
 )
 
 const (

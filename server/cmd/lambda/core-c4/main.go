@@ -6,29 +6,21 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/kislerdm/diagramastext/server"
 	errs "github.com/kislerdm/diagramastext/server/errors"
-	"github.com/kislerdm/diagramastext/server/sdk"
-	"github.com/kislerdm/diagramastext/server/storage"
 )
 
 func main() {
-	ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*20)
-	defer cancelFn()
-
-	client, err := sdk.NewC4DiagramHandler(ctx, os.Getenv("ACCESS_CREDENTIALS_ARN"))
+	client, err := server.NewC4DiagramHandler(context.Background(), os.Getenv("ACCESS_CREDENTIALS_ARN"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
-	defer cancelFn()
-	defer func() { _ = client.Stop(ctx) }()
+	defer func() { _ = client.Stop(context.Background()) }()
 
 	var corsHeaders corsHeaders
 	if v := os.Getenv("CORS_HEADERS"); v != "" {
@@ -62,7 +54,7 @@ func (h corsHeaders) setHeaders(resp events.APIGatewayProxyResponse) events.APIG
 	return resp
 }
 
-func handler(client sdk.Handler, corsHeaders corsHeaders) func(
+func handler(client server.Handler, corsHeaders corsHeaders) func(
 	ctx context.Context, req events.APIGatewayProxyRequest,
 ) (events.APIGatewayProxyResponse, error) {
 	return func(
@@ -78,7 +70,7 @@ func handler(client sdk.Handler, corsHeaders corsHeaders) func(
 			), err
 		}
 
-		callID := storage.CallID{
+		callID := server.CallID{
 			RequestID: readRequestID(ctx),
 			UserID:    readUserID(req.Headers),
 		}
@@ -88,15 +80,7 @@ func handler(client sdk.Handler, corsHeaders corsHeaders) func(
 			return corsHeaders.setHeaders(parseClientError(err)), err
 		}
 
-		output, err := json.Marshal(server.ResponseSVG{SVG: string(diagram)})
-		if err != nil {
-			return corsHeaders.setHeaders(
-				events.APIGatewayProxyResponse{
-					StatusCode: http.StatusInternalServerError,
-					Body:       "could not serialise output",
-				},
-			), err
-		}
+		output, _ := json.Marshal(server.ResponseSVG{SVG: string(diagram)})
 
 		return corsHeaders.setHeaders(
 			events.APIGatewayProxyResponse{
@@ -114,7 +98,7 @@ func readRequestID(ctx context.Context) string {
 
 func readUserID(h map[string]string) string {
 	// FIXME: extract UserID from the headers when authN is implemented
-	return "00000000-0000-0000-0000-000000000000"
+	return "NA"
 }
 
 func parseClientError(err error) events.APIGatewayProxyResponse {
