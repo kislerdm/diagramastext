@@ -14,7 +14,7 @@ import (
 
 	"github.com/kislerdm/diagramastext/server"
 	"github.com/kislerdm/diagramastext/server/pkg/core"
-	"github.com/kislerdm/diagramastext/server/pkg/rendering/c4container"
+	"github.com/kislerdm/diagramastext/server/rendering/c4container"
 )
 
 type httpHandler struct {

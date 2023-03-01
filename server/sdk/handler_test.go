@@ -1,4 +1,4 @@
-package server
+package sdk
 
 import (
 	"errors"
@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	errors2 "github.com/kislerdm/diagramastext/server/errors"
 )
 
 func TestReadPrompt(t *testing.T) {
@@ -131,7 +133,7 @@ func TestParseClientError(t *testing.T) {
 		{
 			name: "too many requests",
 			args: args{
-				err: Error{
+				err: errors2.Error{
 					ServiceResponseStatusCode: http.StatusTooManyRequests,
 				},
 			},
@@ -143,8 +145,8 @@ func TestParseClientError(t *testing.T) {
 		{
 			name: "opanAI failed to predict",
 			args: args{
-				err: Error{
-					Service:                   ServiceOpenAI,
+				err: errors2.Error{
+					Service:                   errors2.ServiceOpenAI,
 					ServiceResponseStatusCode: http.StatusInternalServerError,
 				},
 			},
@@ -156,8 +158,8 @@ func TestParseClientError(t *testing.T) {
 		{
 			name: "plantUML failed to predict",
 			args: args{
-				err: Error{
-					Service:                   ServiePlantUML,
+				err: errors2.Error{
+					Service:                   errors2.ServiePlantUML,
 					ServiceResponseStatusCode: http.StatusInternalServerError,
 				},
 			},
@@ -169,7 +171,7 @@ func TestParseClientError(t *testing.T) {
 		{
 			name: "unknown",
 			args: args{
-				err: Error{},
+				err: errors2.Error{},
 			},
 			want: ResponseError{
 				StatusCode: http.StatusInternalServerError,

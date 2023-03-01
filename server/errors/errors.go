@@ -1,8 +1,11 @@
 package errors
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
-// Error `modelinference` client's error.
+// Error client's error.
 type Error struct {
 	Service                   string
 	Stage                     string
@@ -15,7 +18,11 @@ func (e Error) Error() string {
 	if e.ServiceResponseStatusCode != 0 {
 		status = "[http code:" + strconv.Itoa(e.ServiceResponseStatusCode) + "]"
 	}
-	return "[stage:" + e.Stage + "]" + status + " " + e.Message
+	service := ""
+	if e.Service != "" {
+		service = "[service:" + e.Service + "]"
+	}
+	return "[stage:" + e.Stage + "]" + service + status + " " + e.Message
 }
 
 const (
@@ -33,4 +40,9 @@ const (
 	StageResponse        = "response"
 	StageSerialization   = "serialization"
 	StageDeserialization = "deserialization"
+	StageValidation      = "validation"
 )
+
+func CombineStages(stages ...string) string {
+	return strings.Join(stages, ":")
+}
