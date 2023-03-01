@@ -5,20 +5,15 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	errs "errors"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/kislerdm/diagramastext/server/errors"
+	errs "github.com/kislerdm/diagramastext/server/errors"
 )
-
-// Client interface defining the client to infer a model to convert user's prompt to a serialised data structure.
-type Client interface {
-	Do(ctx context.Context, prompt string) ([]byte, error)
-}
 
 /*
 	Defines client to communicate to OpenAI over http
@@ -92,7 +87,11 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 	}
 
 	if err := resolveConfigurations(&c); err != nil {
-		return nil, err
+		return nil, errs.Error{
+			Service: errs.ServiceOpenAI,
+			Stage:   errs.StageInit,
+			Message: err.Error(),
+		}
 	}
 
 	resolveHTTPClientOpenAI(&c)
@@ -116,7 +115,7 @@ func WithSinkFn(sinkFn func(string)) func(o *clientOpenAI) {
 
 func resolveConfigurations(c *clientOpenAI) error {
 	if c.token == "" {
-		return errs.New(
+		return errors.New(
 			"'Token' must be specified, see: https://platform.openai.com/docs/api-reference/authentication",
 		)
 	}
@@ -220,9 +219,9 @@ func (c *clientOpenAI) Do(ctx context.Context, prompt string) ([]byte, error) {
 
 	respBytes, err := c.requestHandler(ctx, payload)
 	if err != nil {
-		return nil, errors.Error{
-			Service: errors.ServiceOpenAI,
-			Stage:   errors.StageRequest,
+		return nil, errs.Error{
+			Service: errs.ServiceOpenAI,
+			Stage:   errs.StageRequest,
 			Message: err.Error(),
 		}
 	}
@@ -241,17 +240,17 @@ func (c *clientOpenAI) setHeader(req *http.Request) {
 func (c *clientOpenAI) decodeResponse(ctx context.Context, respBytes []byte) ([]byte, error) {
 	var resp openAIResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return nil, errors.Error{
-			Service: errors.ServiceOpenAI,
-			Stage:   errors.StageDeserialization,
+		return nil, errs.Error{
+			Service: errs.ServiceOpenAI,
+			Stage:   errs.StageDeserialization,
 			Message: err.Error(),
 		}
 	}
 
 	if len(resp.Choices) == 0 {
-		return nil, errors.Error{
-			Service: errors.ServiceOpenAI,
-			Stage:   errors.StageDeserialization,
+		return nil, errs.Error{
+			Service: errs.ServiceOpenAI,
+			Stage:   errs.StageDeserialization,
 			Message: "openAI could not convert the input prompt",
 		}
 	}
@@ -278,9 +277,9 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	var w bytes.Buffer
 	err := json.NewEncoder(&w).Encode(payload)
 	if err != nil {
-		return nil, errors.Error{
-			Service: errors.ServiceOpenAI,
-			Stage:   errors.StageSerialization,
+		return nil, errs.Error{
+			Service: errs.ServiceOpenAI,
+			Stage:   errs.StageSerialization,
 			Message: err.Error(),
 		}
 	}
@@ -291,17 +290,17 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Error{
-			Service: errors.ServiceOpenAI,
-			Stage:   errors.StageRequest,
+		return nil, errs.Error{
+			Service: errs.ServiceOpenAI,
+			Stage:   errs.StageRequest,
 			Message: err.Error(),
 		}
 	}
 
 	if resp.StatusCode > 209 {
-		o := errors.Error{
-			Service:                   errors.ServiceOpenAI,
-			Stage:                     errors.StageResponse,
+		o := errs.Error{
+			Service:                   errs.ServiceOpenAI,
+			Stage:                     errs.StageResponse,
 			Message:                   "error status code: " + strconv.Itoa(resp.StatusCode),
 			ServiceResponseStatusCode: resp.StatusCode,
 		}
@@ -319,9 +318,9 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	buf, err := io.ReadAll(resp.Body)
 	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
-		return nil, errors.Error{
-			Service: errors.ServiceOpenAI,
-			Stage:   errors.StageDeserialization,
+		return nil, errs.Error{
+			Service: errs.ServiceOpenAI,
+			Stage:   errs.StageDeserialization,
 			Message: err.Error(),
 		}
 	}
