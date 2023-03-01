@@ -2,3 +2,4 @@
 .env
 .terraform*
 bin
+.DS_Store
