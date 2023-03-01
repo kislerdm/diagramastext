@@ -14,7 +14,7 @@ TBD
 
 - [zopfi](https://github.com/google/zopfli): The library used to compress and encode the C4 Diagram definition as code
   as the string request content to generate diagram using [PlantUML](www.plantuml.com/plantuml/uml) server.
-- The encoding [logic](pkg/rendering/plantuml/plantump-webclient-mimic/src/converter.js)
+- The encoding [logic](rendering/plantuml/plantump-webclient-mimic/src/converter.js)
 
 ## DNS
 

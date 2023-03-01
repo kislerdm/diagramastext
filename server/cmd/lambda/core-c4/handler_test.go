@@ -14,9 +14,9 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/kislerdm/diagramastext/server"
-	"github.com/kislerdm/diagramastext/server/pkg/rendering/c4container"
 	"github.com/kislerdm/diagramastext/server/pkg/secretsmanager"
 	"github.com/kislerdm/diagramastext/server/pkg/storage"
+	"github.com/kislerdm/diagramastext/server/rendering/c4container"
 )
 
 func randomString(length int) string {
@@ -286,11 +286,11 @@ func Test_handler(t *testing.T) {
 					tt.fields.clientModel, tt.fields.clientDiagram, tt.fields.corsHeaders, tt.fields.clientStorage,
 				)(tt.args.ctx, tt.args.req)
 				if (gotErr != nil) != tt.wantErr {
-					t.Errorf("handler execution error = %v, wantErr %v", gotErr, tt.wantErr)
+					t.Errorf("sdk execution error = %v, wantErr %v", gotErr, tt.wantErr)
 					return
 				}
 				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("handler execution got: %v, want: %v", got, tt.want)
+					t.Errorf("sdk execution got: %v, want: %v", got, tt.want)
 				}
 			},
 		)

@@ -32,7 +32,7 @@ resource "neon_project" "this" {
 }
 
 #resource "neon_database" "this" {
-#  name       = "core"
+#  name       = "modelinference"
 #  project_id = neon_project.this.id
 #  branch_id  = local.neon_branch_id
 #  owner_name = local.neon_owner_name

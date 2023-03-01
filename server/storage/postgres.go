@@ -105,7 +105,7 @@ func (c pgClient) WriteModelPrediction(ctx context.Context, v ModelOutput) error
 			Message: err.Error(),
 		}
 	}
-	
+
 	return nil
 }
 
