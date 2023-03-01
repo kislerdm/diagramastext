@@ -1,12 +1,12 @@
-package server
+package c4container
 
 import (
 	"context"
 	"net/http"
 )
 
-// DiagramGraph defines the diagram graph.
-type DiagramGraph struct {
+// Graph defines the diagram graph.
+type Graph struct {
 	Title  string  `json:"title,omitempty"`
 	Footer string  `json:"footer,omitempty"`
 	Nodes  []*Node `json:"nodes"`
@@ -33,20 +33,9 @@ type Link struct {
 	Technology string `json:"technology,omitempty"`
 }
 
-// ResponseDiagram response object.
-type ResponseDiagram interface {
-	// MustMarshal serialises the result as JSON.
-	MustMarshal() []byte
-}
-
-// ClientInputToGraph client to convert user input inquiry to the DiagramGraph.
-type ClientInputToGraph interface {
-	Do(context.Context, string) (DiagramGraph, error)
-}
-
-// ClientGraphToDiagram client to convert DiagramGraph to diagram artifact, e.g. svg image.
-type ClientGraphToDiagram interface {
-	Do(context.Context, DiagramGraph) (ResponseDiagram, error)
+// Client client to generate a diagram artifact, e.g. svg image.
+type Client interface {
+	Do(context.Context, Graph) ([]byte, error)
 }
 
 // HttpClient http base client.
