@@ -266,7 +266,7 @@ func cleanRawResponse(s string) string {
 	if s[:1] != "{" {
 		s = "{" + s
 	}
-	if s[len(s)-1:len(s)] != "}" {
+	if s[len(s)-1:] != "}" {
 		s += "}"
 	}
 	return s
