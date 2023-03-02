@@ -55,7 +55,6 @@ type openAIRequest struct {
 type clientOpenAI struct {
 	httpClient   HttpClient
 	payload      openAIRequest
-	sink         func(s string)
 	token        string
 	organization string
 	baseURL      string
@@ -79,7 +78,6 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 			BestOf:           defaultBestOf,
 		},
 		baseURL: baseURLOpenAI,
-		sink:    nil,
 	}
 
 	for _, fn := range optFns {
@@ -103,13 +101,6 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 func WithHTTPClientOpenAI(c HttpClient) func(o *clientOpenAI) {
 	return func(o *clientOpenAI) {
 		o.httpClient = c
-	}
-}
-
-// WithSinkFn sets sink function to record model's input and output.
-func WithSinkFn(sinkFn func(string)) func(o *clientOpenAI) {
-	return func(o *clientOpenAI) {
-		o.sink = sinkFn
 	}
 }
 
