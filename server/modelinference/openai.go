@@ -24,20 +24,14 @@ import (
 //   - https://platform.openai.com/docs/api-reference/authentication
 //   - https://platform.openai.com/docs/api-reference/completions
 type ConfigOpenAI struct {
+	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-max_tokens
+	MaxTokens int
+
 	// https://platform.openai.com/docs/api-reference/authentication
 	Token string
 
 	// https://platform.openai.com/docs/api-reference/requesting-organization
 	Organization string
-
-	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-model
-	Model string
-
-	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-max_tokens
-	MaxTokens int
-
-	// https://platform.openai.com/docs/api-reference/completions/create#completions/create-temperature
-	Temperature float32
 }
 
 type openAIRequest struct {
@@ -49,7 +43,7 @@ type openAIRequest struct {
 	TopP             float32  `json:"top_p"`
 	FrequencyPenalty float32  `json:"frequency_penalty"`
 	PresencePenalty  float32  `json:"presence_penalty"`
-	BestOf           int8     `json:"best_of"`
+	BestOf           uint8    `json:"best_of"`
 }
 
 type clientOpenAI struct {
@@ -67,12 +61,12 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 		token:        cfg.Token,
 		organization: cfg.Organization,
 		payload: openAIRequest{
-			Model:            cfg.Model,
+			Model:            defaultModelOpenAI,
 			Prompt:           "",
 			Stop:             []string{"\n"},
 			MaxTokens:        cfg.MaxTokens,
 			TopP:             defaultTopP,
-			Temperature:      cfg.Temperature,
+			Temperature:      defaultTemperature,
 			FrequencyPenalty: 0,
 			PresencePenalty:  0,
 			BestOf:           defaultBestOf,
@@ -111,16 +105,8 @@ func resolveConfigurations(c *clientOpenAI) error {
 		)
 	}
 
-	if c.payload.Model == "" {
-		c.payload.Model = defaultModelOpenAI
-	}
-
 	if c.payload.MaxTokens <= 0 || c.payload.MaxTokens > 2048 {
 		c.payload.MaxTokens = defaultMaxTokens
-	}
-
-	if c.payload.Temperature <= 0 || c.payload.Temperature > 1 {
-		c.payload.Temperature = defaultTemperature
 	}
 
 	return nil
@@ -135,11 +121,11 @@ func resolveHTTPClientOpenAI(c *clientOpenAI) {
 const (
 	baseURLOpenAI        = "https://api.openai.com/v1/"
 	defaultTimeoutOpenAI = 3 * time.Minute
-	defaultModelOpenAI   = "code-cushman-001"
-	defaultMaxTokens     = 768
+	defaultModelOpenAI   = "code-davinci-002"
+	defaultMaxTokens     = 200
 	defaultTemperature   = 0.2
 	defaultTopP          = 1
-	defaultBestOf        = 3
+	defaultBestOf        = 2
 )
 
 type openAIResponse struct {
@@ -160,20 +146,44 @@ type openAIResponse struct {
 	} `json:"usage"`
 }
 
-func (c *clientOpenAI) Do(ctx context.Context, prompt string) ([]byte, error) {
+func (c *clientOpenAI) Do(ctx context.Context, req Request) ([]byte, error) {
+	if err := c.validatePrompt(req.Prompt); err != nil {
+		return nil, err
+	}
+
 	payload := c.payload
-	payload.Prompt = prompt
+	payload.Prompt = req.Prompt
+	if req.BestOf > 0 {
+		payload.BestOf = req.BestOf
+	}
 
 	respBytes, err := c.requestHandler(ctx, payload)
 	if err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceOpenAI,
-			Stage:   errs.StageRequest,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
 
 	return c.decodeResponse(ctx, respBytes)
+}
+
+func (c *clientOpenAI) modelContextMaxTokes() int {
+	switch c.payload.Model {
+	case "code-davinci-002":
+		return 8000
+	case "code-cushman-001":
+		return 2048
+	default:
+		return 2048
+	}
+}
+
+func (c *clientOpenAI) validatePrompt(prompt string) error {
+	if len(prompt)+c.payload.MaxTokens > c.modelContextMaxTokes() {
+		return errors.New(
+			"prompt exceeds the model's context length." +
+				"see: https://platform.openai.com/docs/api-reference/completions/create#completions/create-max_tokens",
+		)
+	}
+	return nil
 }
 
 func (c *clientOpenAI) setHeader(req *http.Request) {
@@ -219,7 +229,6 @@ func cleanRawResponse(s string) string {
 	return s
 }
 
-// REFACTOR: take to a dedicated helper function.
 func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest) ([]byte, error) {
 	var w bytes.Buffer
 	err := json.NewEncoder(&w).Encode(payload)

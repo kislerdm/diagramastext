@@ -77,58 +77,6 @@ func TestNewOpenAIClient(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "happy path: overwrite model, max tokens and temperature",
-			args: args{
-				cfg: ConfigOpenAI{
-					Token:       mockToken,
-					Model:       "code-davinci-002",
-					Temperature: 0.5,
-					MaxTokens:   100,
-				},
-			},
-			want: &clientOpenAI{
-				httpClient: &http.Client{
-					Timeout: defaultTimeoutOpenAI,
-				},
-				payload: openAIRequest{
-					Model:       "code-davinci-002",
-					Stop:        []string{"\n"},
-					MaxTokens:   100,
-					Temperature: 0.5,
-					TopP:        defaultTopP,
-					BestOf:      defaultBestOf,
-				},
-				token:   mockToken,
-				baseURL: baseURLOpenAI,
-			},
-			wantErr: false,
-		},
-		{
-			name: "happy path: temperature outside the limits",
-			args: args{
-				cfg: ConfigOpenAI{
-					Token:       mockToken,
-					Temperature: 100,
-				},
-			},
-			want: &clientOpenAI{
-				httpClient: &http.Client{
-					Timeout: defaultTimeoutOpenAI,
-				},
-				payload: openAIRequest{
-					Model:       defaultModelOpenAI,
-					Stop:        []string{"\n"},
-					MaxTokens:   defaultMaxTokens,
-					Temperature: defaultTemperature,
-					TopP:        defaultTopP,
-					BestOf:      defaultBestOf,
-				},
-				token:   mockToken,
-				baseURL: baseURLOpenAI,
-			},
-			wantErr: false,
-		},
-		{
 			name: "happy path: max tokens outside the limits",
 			args: args{
 				cfg: ConfigOpenAI{
