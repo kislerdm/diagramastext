@@ -1,14 +1,14 @@
-package server
+package core
 
 import (
 	"context"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/config"
-	errs "github.com/kislerdm/diagramastext/server/errors"
-	"github.com/kislerdm/diagramastext/server/openai"
-	"github.com/kislerdm/diagramastext/server/secretsmanager"
-	"github.com/kislerdm/diagramastext/server/utils"
+	errs "github.com/kislerdm/diagramastext/server/core/errors"
+	"github.com/kislerdm/diagramastext/server/core/openai"
+	"github.com/kislerdm/diagramastext/server/core/secretsmanager"
+	"github.com/kislerdm/diagramastext/server/core/utils"
 )
 
 // Config `core` client configuration.

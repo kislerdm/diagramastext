@@ -3,18 +3,18 @@ name: "Deploy:Server"
 on:
   pull_request:
     paths:
-      - "server/**"
-      - "!server/**.md"
-      - "!server/fig/**"
-      - "!server/Makefile"
+      - "server/core/**"
+      - "!server/core/**.md"
+      - "!server/core/fig/**"
+      - "!server/core/Makefile"
   push:
     branches:
       - master
     paths:
-      - "server/**"
-      - "!server/**.md"
-      - "!server/fig/**"
-      - "!server/Makefile"
+      - "server/core/**"
+      - "!server/core/**.md"
+      - "!server/core/fig/**"
+      - "!server/core/Makefile"
 
   workflow_dispatch:
 
@@ -27,7 +27,7 @@ jobs:
   list_modules:
     defaults:
       run:
-        working-directory: "server"
+        working-directory: "server/core/core"
     runs-on: ubuntu-latest
     name: "List modules"
     outputs:
@@ -43,7 +43,7 @@ jobs:
   unittest:
     defaults:
       run:
-        working-directory: "server"
+        working-directory: "server/core"
     runs-on: ubuntu-latest
     name: "Unittest"
     needs:
@@ -63,7 +63,7 @@ jobs:
         run: |
           cd ${{ matrix.module.path }}
           go mod tidy
-          go test -race -coverprofile=${{ matrix.module.flag }}.txt -covermode=atomic
+          go test -race -coverprofile=${{ matrix.module.flag }}.txt -covermode=atomic ./...
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
@@ -81,7 +81,7 @@ jobs:
       - uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          working-directory: "server"
+          working-directory: "server/core"
 
   test-infra:
     if: github.event_name == 'pull_request'
@@ -91,7 +91,7 @@ jobs:
       - lint
     defaults:
       run:
-        working-directory: "server/deployment"
+        working-directory: "server/core/deployment"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -168,7 +168,7 @@ jobs:
       - lint
     defaults:
       run:
-        working-directory: "server/deployment"
+        working-directory: "server/core/deployment"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -206,7 +206,7 @@ jobs:
       - deployment-staging
     defaults:
       run:
-        working-directory: "server/deployment"
+        working-directory: "server/core/deployment"
     steps:
       - uses: actions/checkout@v3
         with:

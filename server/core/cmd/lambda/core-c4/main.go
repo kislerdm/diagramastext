@@ -9,13 +9,13 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/kislerdm/diagramastext/server"
-	"github.com/kislerdm/diagramastext/server/c4container"
-	errs "github.com/kislerdm/diagramastext/server/errors"
+	"github.com/kislerdm/diagramastext/server/core"
+	"github.com/kislerdm/diagramastext/server/core/c4container"
+	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 func main() {
-	cfg, err := server.LoadDefaultConfig(context.Background())
+	cfg, err := core.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,7 +65,7 @@ type response struct {
 	SVG string `json:"svg"`
 }
 
-func handler(client server.Client, corsHeaders corsHeaders) func(
+func handler(client core.Client, corsHeaders corsHeaders) func(
 	ctx context.Context, req events.APIGatewayProxyRequest,
 ) (events.APIGatewayProxyResponse, error) {
 	return func(
@@ -81,7 +81,7 @@ func handler(client server.Client, corsHeaders corsHeaders) func(
 			), err
 		}
 
-		inquiry := server.Request{
+		inquiry := core.Request{
 			Prompt:                 input.Prompt,
 			UserID:                 readUserID(req.Headers),
 			IsRegisteredUser:       isRegisteredUser(req.Headers),

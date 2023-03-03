@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	compression2 "github.com/kislerdm/diagramastext/server/c4container/compression"
-	errs "github.com/kislerdm/diagramastext/server/errors"
+	compression2 "github.com/kislerdm/diagramastext/server/core/c4container/compression"
+	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 type optionsPlantUMLClient struct {

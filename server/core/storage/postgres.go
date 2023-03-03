@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/kislerdm/diagramastext/server/errors"
+	"github.com/kislerdm/diagramastext/server/core/errors"
 
 	_ "github.com/lib/pq"
 )

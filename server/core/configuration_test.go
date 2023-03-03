@@ -1,4 +1,4 @@
-package server
+package core
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/kislerdm/diagramastext/server/openai"
+	"github.com/kislerdm/diagramastext/server/core/openai"
 )
 
 const (

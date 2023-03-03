@@ -11,8 +11,8 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
-	"github.com/kislerdm/diagramastext/server"
-	errs "github.com/kislerdm/diagramastext/server/errors"
+	"github.com/kislerdm/diagramastext/server/core"
+	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 func randomString(length int) string {
@@ -30,7 +30,7 @@ type mockHandlerC4Diagram struct {
 	err error
 }
 
-func (m mockHandlerC4Diagram) TextToDiagram(ctx context.Context, req server.Request) ([]byte, error) {
+func (m mockHandlerC4Diagram) TextToDiagram(ctx context.Context, req core.Request) ([]byte, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -39,7 +39,7 @@ func (m mockHandlerC4Diagram) TextToDiagram(ctx context.Context, req server.Requ
 
 func Test_handler(t *testing.T) {
 	type fields struct {
-		client      server.Client
+		client      core.Client
 		corsHeaders corsHeaders
 	}
 	type args struct {

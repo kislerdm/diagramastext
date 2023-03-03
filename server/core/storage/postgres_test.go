@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kislerdm/diagramastext/server/errors"
+	"github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 func TestNewClient(t *testing.T) {
