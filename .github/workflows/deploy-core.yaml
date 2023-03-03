@@ -25,9 +25,6 @@ permissions:
 
 jobs:
   list_modules:
-    defaults:
-      run:
-        working-directory: "server/core"
     runs-on: ubuntu-latest
     name: "List modules"
     outputs:
@@ -38,7 +35,7 @@ jobs:
           fetch-depth: 1
       - name: ls
         id: ls
-        run: echo "modules=$(python3 ../.github/workflows/scripts/ls_modules.py -p .)" >> $GITHUB_OUTPUT
+        run: echo "modules=$(python3 .github/workflows/scripts/ls_modules.py -p server/core)" >> $GITHUB_OUTPUT
 
   unittest:
     defaults:
