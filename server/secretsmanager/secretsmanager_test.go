@@ -55,7 +55,7 @@ func TestAWSSecretManager_ReadLatestSecret(t *testing.T) {
 			},
 			args: args{
 				ctx:    context.TODO(),
-				uri:    "arn:aws:secretsmanager:us-east-2:027889758114:secret:foo/bar/modelinference/lambda-C335bP",
+				uri:    "arn:aws:secretsmanager:us-east-2:027889758114:secret:foo/bar/openai/lambda-C335bP",
 				output: &output{},
 			},
 			want:    &output{Foo: "bar"},

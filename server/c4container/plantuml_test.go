@@ -291,7 +291,7 @@ func Test_diagramNode2UML(t *testing.T) {
 			want: `ContainerDb_Ext(foo, "foo")`,
 		},
 		{
-			name: "modelinference logic example",
+			name: "openai logic example",
 			args: args{
 				n: &Node{
 					ID:    "0",

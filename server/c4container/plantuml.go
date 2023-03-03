@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
+	compression2 "github.com/kislerdm/diagramastext/server/c4container/compression"
 	errs "github.com/kislerdm/diagramastext/server/errors"
-	"github.com/kislerdm/diagramastext/server/rendering/c4container/compression"
 )
 
 type optionsPlantUMLClient struct {
@@ -32,7 +32,6 @@ func (c *clientPlantUML) Do(ctx context.Context, v Graph) ([]byte, error) {
 	if err != nil {
 		return nil, errs.Error{
 			Service: errs.ServiePlantUML,
-			Stage:   errs.StageSerialization,
 			Message: err.Error(),
 		}
 	}
@@ -41,7 +40,6 @@ func (c *clientPlantUML) Do(ctx context.Context, v Graph) ([]byte, error) {
 	if err != nil {
 		return nil, errs.Error{
 			Service: errs.ServiePlantUML,
-			Stage:   errs.StageSerialization,
 			Message: err.Error(),
 		}
 	}
@@ -57,7 +55,6 @@ func (c *clientPlantUML) requestHandler(ctx context.Context, encodedDiagramStrin
 	if err != nil {
 		return nil, errs.Error{
 			Service: errs.ServiePlantUML,
-			Stage:   errs.StageRequest,
 			Message: err.Error(),
 		}
 	}
@@ -66,7 +63,6 @@ func (c *clientPlantUML) requestHandler(ctx context.Context, encodedDiagramStrin
 		return nil,
 			errs.Error{
 				Service:                   errs.ServiePlantUML,
-				Stage:                     errs.StageRequest,
 				Message:                   "error status code: " + strconv.Itoa(resp.StatusCode),
 				ServiceResponseStatusCode: resp.StatusCode,
 			}
@@ -77,7 +73,6 @@ func (c *clientPlantUML) requestHandler(ctx context.Context, encodedDiagramStrin
 	if err != nil {
 		return nil, errs.Error{
 			Service: errs.ServiePlantUML,
-			Stage:   errs.StageResponse,
 			Message: err.Error(),
 		}
 	}
@@ -144,9 +139,9 @@ func code2Path(s string) (string, error) {
 }
 
 func compress(v []byte) ([]byte, error) {
-	var options = compression.DefaultOptions()
+	var options = compression2.DefaultOptions()
 	var w bytes.Buffer
-	if err := compression.Compress(&options, compression.FORMAT_DEFLATE, v, &w); err != nil {
+	if err := compression2.Compress(&options, compression2.FORMAT_DEFLATE, v, &w); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil

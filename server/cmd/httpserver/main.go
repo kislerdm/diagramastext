@@ -13,13 +13,12 @@ import (
 	"strconv"
 
 	"github.com/kislerdm/diagramastext/server"
-	"github.com/kislerdm/diagramastext/server/pkg/core"
-	"github.com/kislerdm/diagramastext/server/rendering/c4container"
+	"github.com/kislerdm/diagramastext/server/c4container"
+	"github.com/kislerdm/diagramastext/server/utils"
 )
 
 type httpHandler struct {
-	clientModel   server.ClientInputToGraph
-	clientDiagram server.ClientGraphToDiagram
+	client        server.Client
 	reportErrorFn func(err error)
 	corsHeaders   corsHeaders
 }
@@ -31,6 +30,14 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, status int, er
 	h.corsHeaders.setHeaders(w.Header())
 	w.WriteHeader(status)
 	_, _ = w.Write(body)
+}
+
+type request struct {
+	Prompt string `json:"prompt"`
+}
+
+type response struct {
+	SVG string `json:"svg"`
 }
 
 func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,59 +52,65 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.response(w, []byte("could not recognise the prompt format"), http.StatusUnprocessableEntity, err)
 		return
 	}
-
-	// FIXME: add proper sink to preserve user's requests for model fine-tuning
-	log.Println(string(body))
-
-	prompt, err := server.ReadPrompt(body)
-	if err != nil {
+	var input request
+	if err := json.Unmarshal(body, &input); err != nil {
 		h.response(w, []byte("could not recognise the prompt format"), http.StatusUnprocessableEntity, err)
 		return
 	}
 
-	if err := server.ValidatePrompt(prompt); err != nil {
-		h.response(w, []byte(err.Error()), http.StatusUnprocessableEntity, err)
-		return
-	}
+	// FIXME: add proper sink to preserve user's requests for model fine-tuning
+	log.Println(input.Prompt)
 
-	graph, err := h.clientModel.Do(context.Background(), prompt)
+	diagram, err := h.client.TextToDiagram(
+		context.Background(), server.Request{
+			Prompt:                 input.Prompt,
+			UserID:                 readUserID(r.Header),
+			IsRegisteredUser:       isRegisteredUser(r.Header),
+			OptOutFromSavingPrompt: isOptOutFromSavingPrompt(r.Header),
+		},
+	)
 	if err != nil {
-		e := server.ParseClientError(err)
-		h.response(w, e.Body, e.StatusCode, err)
+		h.response(w, []byte(err.Error()), http.StatusInternalServerError, err)
 		return
 	}
 
-	svg, err := h.clientDiagram.Do(context.Background(), graph)
+	o, err := json.Marshal(response{SVG: string(diagram)})
 	if err != nil {
-		e := server.ParseClientError(err)
-		h.response(w, e.Body, e.StatusCode, err)
+		h.response(w, []byte(err.Error()), http.StatusInternalServerError, err)
 		return
 	}
 
-	h.response(w, svg.MustMarshal(), http.StatusOK, nil)
+	h.response(w, o, http.StatusOK, nil)
+}
+
+func isOptOutFromSavingPrompt(headers http.Header) bool {
+	// FIXME: extract registration from JWT when authN is implemented
+	return false
+}
+
+func isRegisteredUser(headers http.Header) bool {
+	// FIXME: extract registration from JWT when authN is implemented
+	return false
+}
+
+func readUserID(headers http.Header) string {
+	// FIXME: extract UserID from the headers when authN is implemented
+	return "NA"
 }
 
 func main() {
-	clientOpenAI, err := core.NewOpenAIClient(
-		core.ConfigOpenAI{
-			Token:       os.Getenv("OPENAI_API_KEY"),
-			MaxTokens:   server.MustParseInt(os.Getenv("OPENAI_MAX_TOKENS")),
-			Temperature: server.MustParseFloat32(os.Getenv("OPENAI_TEMPERATURE")),
-		},
-		core.WithSinkFn(
-			// FIXME: add proper sink to preserve user's requests for model fine-tuning
-			func(s string) {
-				log.Println(s)
-			},
-		),
-	)
+	cfg, err := server.LoadDefaultConfig(context.Background())
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	c, err := c4container.NewFromConfig(cfg)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	handler := httpHandler{
-		clientModel:   clientOpenAI,
-		clientDiagram: c4container.NewClient(),
+		client:        c,
 		reportErrorFn: func(err error) { log.Println(err) },
 	}
 
@@ -106,7 +119,7 @@ func main() {
 	}
 
 	port := 9000
-	if v := server.MustParseInt(os.Getenv("PORT")); v > 0 {
+	if v := utils.MustParseInt(os.Getenv("PORT")); v > 0 {
 		port = v
 	}
 

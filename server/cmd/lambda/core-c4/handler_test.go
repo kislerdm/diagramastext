@@ -30,20 +30,16 @@ type mockHandlerC4Diagram struct {
 	err error
 }
 
-func (m mockHandlerC4Diagram) GenerateSVG(ctx context.Context, prompt string, callID server.CallID) ([]byte, error) {
+func (m mockHandlerC4Diagram) TextToDiagram(ctx context.Context, req server.Request) ([]byte, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	return m.svg, nil
 }
 
-func (m mockHandlerC4Diagram) Stop(ctx context.Context) error {
-	return nil
-}
-
 func Test_handler(t *testing.T) {
 	type fields struct {
-		client      server.Handler
+		client      server.Client
 		corsHeaders corsHeaders
 	}
 	type args struct {
@@ -77,7 +73,7 @@ func Test_handler(t *testing.T) {
 			args: args{
 				ctx: ctx,
 				req: events.APIGatewayProxyRequest{
-					Body: `{"prompt": "` + randomString(server.PromptLengthMin+1) + `"}`,
+					Body: `{"prompt": "` + randomString(10) + `"}`,
 				},
 			},
 			want: events.APIGatewayProxyResponse{
@@ -85,7 +81,7 @@ func Test_handler(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Body: string(
 					mustMarshal(
-						server.ResponseSVG{
+						response{
 							SVG: `<?xml version="1.0" encoding="us-ascii" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>`,
 						},
 					),
@@ -119,7 +115,6 @@ func Test_handler(t *testing.T) {
 				client: mockHandlerC4Diagram{
 					err: errs.Error{
 						Service:                   errs.ServiceOpenAI,
-						Stage:                     errs.StageRequest,
 						Message:                   "too many requests",
 						ServiceResponseStatusCode: http.StatusTooManyRequests,
 					},
@@ -128,7 +123,7 @@ func Test_handler(t *testing.T) {
 			args: args{
 				ctx: lambdacontext.NewContext(context.TODO(), &lambdacontext.LambdaContext{AwsRequestID: "foobar"}),
 				req: events.APIGatewayProxyRequest{
-					Body: `{"prompt":"` + randomString(server.PromptLengthMin+1) + `"}`,
+					Body: `{"prompt":"` + randomString(50) + `"}`,
 				},
 			},
 			want: events.APIGatewayProxyResponse{
@@ -136,7 +131,6 @@ func Test_handler(t *testing.T) {
 				StatusCode: http.StatusTooManyRequests,
 				Body: errs.Error{
 					Service:                   errs.ServiceOpenAI,
-					Stage:                     errs.StageRequest,
 					Message:                   "too many requests",
 					ServiceResponseStatusCode: http.StatusTooManyRequests,
 				}.Error(),
@@ -150,7 +144,6 @@ func Test_handler(t *testing.T) {
 				client: mockHandlerC4Diagram{
 					err: errs.Error{
 						Service: errs.ServiceOpenAI,
-						Stage:   errs.StageRequest,
 						Message: "foobar",
 					},
 				},
@@ -158,7 +151,7 @@ func Test_handler(t *testing.T) {
 			args: args{
 				ctx: lambdacontext.NewContext(context.TODO(), &lambdacontext.LambdaContext{AwsRequestID: "foobar"}),
 				req: events.APIGatewayProxyRequest{
-					Body: `{"prompt":"` + randomString(server.PromptLengthMin+1) + `"}`,
+					Body: `{"prompt":"` + randomString(50) + `"}`,
 				},
 			},
 			want: events.APIGatewayProxyResponse{
@@ -166,7 +159,6 @@ func Test_handler(t *testing.T) {
 				StatusCode: http.StatusInternalServerError,
 				Body: errs.Error{
 					Service: errs.ServiceOpenAI,
-					Stage:   errs.StageRequest,
 					Message: "foobar",
 				}.Error(),
 			},
