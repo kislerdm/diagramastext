@@ -15,7 +15,7 @@ data "aws_iam_policy_document" "core_rendering_c4_secret" {
   }
 
   statement {
-    effect  = "Allow"
+    effect = "Allow"
     actions = [
       "secretsmanager:GetResourcePolicy",
       "secretsmanager:GetSecretValue",
@@ -34,11 +34,11 @@ resource "aws_iam_policy" "core_rendering_c4_secret" {
 }
 
 module "core_rendering_c4" {
-  source                   = "./modules/lambda"
-  name                     = "core-rendering-c4${local.suffix}"
-  path_lambda_module       = "${abspath(path.module)}/../cmd/lambda/core-c4"
+  source             = "./modules/lambda"
+  name               = "core-rendering-c4${local.suffix}"
+  path_lambda_module = "${abspath(path.module)}/../cmd/lambda/core-c4"
   codebase_rebuild_trigger = {
-    base                 = abspath("${path.module}/..")
+    base = abspath("${path.module}/..")
     modules_dir_patterns = [
       "",
       "{errors,openai,secretsmanager,storage,utils}/**",
@@ -46,15 +46,16 @@ module "core_rendering_c4" {
       "cmd/lambda/core-c4",
     ]
   }
-  policy_arn_list = [aws_iam_policy.core_rendering_c4_secret.arn]
-  env_vars        = {
+  exec_timeout_sec = 180
+  policy_arn_list  = [aws_iam_policy.core_rendering_c4_secret.arn]
+  env_vars = {
     ACCESS_CREDENTIALS_ARN = local.core_rendering_c4_lambda_settings.secret_arn_is_prod[local.is_prod]
     CORS_HEADERS           = jsonencode(local.cors_headers)
   }
   tags = {
-    environment    = local.environment
-    system         = "core"
-    backend        = "c4containers"
+    environment = local.environment
+    system      = "core"
+    backend     = "c4containers"
   }
   depends_on = [aws_iam_policy.core_rendering_c4_secret]
 }

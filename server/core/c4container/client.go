@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/kislerdm/diagramastext/server/core"
 	"github.com/kislerdm/diagramastext/server/core/utils"
@@ -38,23 +39,18 @@ type Link struct {
 	Technology string `json:"technology,omitempty"`
 }
 
-// Client client to generate a diagram artifact, e.g. svg image.
-type Client interface {
-	Do(context.Context, Graph) ([]byte, error)
-}
-
 // HttpClient http base client.
 type HttpClient interface {
 	Do(req *http.Request) (resp *http.Response, err error)
 }
 
-type handler struct {
-	clientCore             core.Handler
-	clientDiagramRendering Client
-}
+const defaultTimeout = 1 * time.Minute
 
-func (h handler) TextToDiagram(ctx context.Context, req core.Request) ([]byte, error) {
-	graphPrediction, err := h.clientCore.InferModel(
+var defaultHttpClient = http.Client{Timeout: defaultTimeout}
+
+// Handler generates the diagram.
+func Handler(ctx context.Context, clientCore core.ModelInferenceClient, req core.Request) ([]byte, error) {
+	graphPrediction, err := clientCore.Do(
 		ctx, core.Inquiry{
 			Request:           req,
 			Model:             defineModel(req),
@@ -70,7 +66,8 @@ func (h handler) TextToDiagram(ctx context.Context, req core.Request) ([]byte, e
 		return nil, err
 	}
 
-	diagram, err := h.clientDiagramRendering.Do(ctx, graph)
+	// REFACTOR: rework the client struct to be a function.
+	diagram, err := renderDiagram(ctx, &defaultHttpClient, graph)
 	if err != nil {
 		return nil, err
 	}
@@ -85,21 +82,9 @@ func (h handler) TextToDiagram(ctx context.Context, req core.Request) ([]byte, e
 func defineModel(req core.Request) string {
 	if req.IsRegisteredUser {
 		// FIXME: change for fine-tuned model after it's trained
-		return "code-cushman-001"
-		//return "code-davinci-002"
+		return "code-davinci-002"
 	}
 	return "code-davinci-002"
-}
-
-func NewFromConfig(cfg core.Config) (core.Client, error) {
-	c, err := core.NewFromConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &handler{
-		clientCore:             c,
-		clientDiagramRendering: NewClient(),
-	}, nil
 }
 
 func addPromptRequestConditionC4Containers(prompt string) string {

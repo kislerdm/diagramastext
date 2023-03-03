@@ -25,21 +25,22 @@ func randomString(length int) string {
 	return string(b)
 }
 
-type mockHandlerC4Diagram struct {
-	svg []byte
-	err error
+type mockModelInferenceClient struct {
+	graph []byte
+	err   error
 }
 
-func (m mockHandlerC4Diagram) TextToDiagram(ctx context.Context, req core.Request) ([]byte, error) {
+func (m mockModelInferenceClient) Do(_ context.Context, _ core.Inquiry) ([]byte, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	return m.svg, nil
+	return m.graph, nil
 }
 
 func Test_handler(t *testing.T) {
 	type fields struct {
-		client      core.Client
+		handler     core.DiagramRenderingHandler
+		client      core.ModelInferenceClient
 		corsHeaders corsHeaders
 	}
 	type args struct {
@@ -53,8 +54,6 @@ func Test_handler(t *testing.T) {
 		"Access-Control-Allow-Methods": "'POST,OPTIONS'",
 	}
 
-	ctx := lambdacontext.NewContext(context.TODO(), &lambdacontext.LambdaContext{AwsRequestID: "foobar"})
-
 	tests := []struct {
 		name    string
 		fields  fields
@@ -65,13 +64,16 @@ func Test_handler(t *testing.T) {
 		{
 			name: "happy path",
 			fields: fields{
-				client: mockHandlerC4Diagram{
-					svg: []byte(`<?xml version="1.0" encoding="us-ascii" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>`),
+				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
+					[]byte, error,
+				) {
+					return []byte(`<?xml version="1.0" encoding="us-ascii" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>`), nil
 				},
+				client:      mockModelInferenceClient{},
 				corsHeaders: expectedHandler,
 			},
 			args: args{
-				ctx: ctx,
+				ctx: context.TODO(),
 				req: events.APIGatewayProxyRequest{
 					Body: `{"prompt": "` + randomString(10) + `"}`,
 				},
@@ -92,11 +94,16 @@ func Test_handler(t *testing.T) {
 		{
 			name: "unhappy path: faulty prompt",
 			fields: fields{
+				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
+					[]byte, error,
+				) {
+					return nil, nil
+				},
+				client:      mockModelInferenceClient{},
 				corsHeaders: expectedHandler,
-				client:      mockHandlerC4Diagram{},
 			},
 			args: args{
-				ctx: ctx,
+				ctx: context.TODO(),
 				req: events.APIGatewayProxyRequest{
 					Body: `{"prompt":`,
 				},
@@ -112,7 +119,19 @@ func Test_handler(t *testing.T) {
 			name: "unhappy path: high RPS",
 			fields: fields{
 				corsHeaders: expectedHandler,
-				client: mockHandlerC4Diagram{
+				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
+					[]byte, error,
+				) {
+					if _, err := inferenceClient.Do(
+						ctx, core.Inquiry{
+							Request: req,
+						},
+					); err != nil {
+						return nil, err
+					}
+					return nil, nil
+				},
+				client: mockModelInferenceClient{
 					err: errs.Error{
 						Service:                   errs.ServiceOpenAI,
 						Message:                   "too many requests",
@@ -138,10 +157,22 @@ func Test_handler(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "unhappy path: handler error",
+			name: "unhappy path: model inference client error",
 			fields: fields{
 				corsHeaders: expectedHandler,
-				client: mockHandlerC4Diagram{
+				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
+					[]byte, error,
+				) {
+					if _, err := inferenceClient.Do(
+						ctx, core.Inquiry{
+							Request: req,
+						},
+					); err != nil {
+						return nil, err
+					}
+					return nil, nil
+				},
+				client: mockModelInferenceClient{
 					err: errs.Error{
 						Service: errs.ServiceOpenAI,
 						Message: "foobar",
@@ -171,7 +202,9 @@ func Test_handler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, gotErr := handler(tt.fields.client, tt.fields.corsHeaders)(tt.args.ctx, tt.args.req)
+				got, gotErr := handler(tt.fields.handler, tt.fields.client, tt.fields.corsHeaders)(
+					tt.args.ctx, tt.args.req,
+				)
 				if (gotErr != nil) != tt.wantErr {
 					t.Errorf("sdk execution error = %v, wantErr %v", gotErr, tt.wantErr)
 					return

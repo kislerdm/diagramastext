@@ -18,9 +18,10 @@ import (
 )
 
 type httpHandler struct {
-	client        core.Client
-	reportErrorFn func(err error)
-	corsHeaders   corsHeaders
+	clientModelInference    core.ModelInferenceClient
+	diagramRenderingHandler core.DiagramRenderingHandler
+	reportErrorFn           func(err error)
+	corsHeaders             corsHeaders
 }
 
 func (h httpHandler) response(w http.ResponseWriter, body []byte, status int, err error) {
@@ -61,8 +62,8 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// FIXME: add proper sink to preserve user's requests for model fine-tuning
 	log.Println(input.Prompt)
 
-	diagram, err := h.client.TextToDiagram(
-		context.Background(), core.Request{
+	diagram, err := h.diagramRenderingHandler(
+		context.Background(), h.clientModelInference, core.Request{
 			Prompt:                 input.Prompt,
 			UserID:                 readUserID(r.Header),
 			IsRegisteredUser:       isRegisteredUser(r.Header),
@@ -104,14 +105,15 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	c, err := c4container.NewFromConfig(cfg)
+	c, err := core.NewModelInferenceClientFromConfig(cfg)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	handler := httpHandler{
-		client:        c,
-		reportErrorFn: func(err error) { log.Println(err) },
+		clientModelInference:    c,
+		diagramRenderingHandler: c4container.Handler,
+		reportErrorFn:           func(err error) { log.Println(err) },
 	}
 
 	if v := os.Getenv("CORS_HEADERS"); v != "" {

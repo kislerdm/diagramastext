@@ -57,6 +57,9 @@ func LoadDefaultConfig(ctx context.Context, awsOptFn ...func(*config.LoadOptions
 		}
 	}
 
+	cfg.ModelInferenceConfig.Token = s.OpenAiAPIKey
+	cfg.StorageConfig = s.storageConfig
+
 	return cfg, nil
 }
 
