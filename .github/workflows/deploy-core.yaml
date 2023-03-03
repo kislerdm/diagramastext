@@ -27,7 +27,7 @@ jobs:
   list_modules:
     defaults:
       run:
-        working-directory: "server/core/core"
+        working-directory: "server/core"
     runs-on: ubuntu-latest
     name: "List modules"
     outputs:
