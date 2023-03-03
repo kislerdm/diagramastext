@@ -117,10 +117,6 @@ Thank you! 🙏
 
 ![architecture-context](architecture_c4_l1.svg)
 
-#### C4 Container Level
-
-![architecture-containers](architecture_c4_l2.svg)
-
 ### Local setup
 
 #### Requirements

@@ -1,4 +1,4 @@
-package server
+package core
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/rand"
-	"github.com/kislerdm/diagramastext/server/openai"
-	"github.com/kislerdm/diagramastext/server/storage"
+	"github.com/kislerdm/diagramastext/server/core/openai"
+	"github.com/kislerdm/diagramastext/server/core/storage"
 )
 
 const (

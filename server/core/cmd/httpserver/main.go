@@ -12,13 +12,13 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/kislerdm/diagramastext/server"
-	"github.com/kislerdm/diagramastext/server/c4container"
-	"github.com/kislerdm/diagramastext/server/utils"
+	"github.com/kislerdm/diagramastext/server/core"
+	"github.com/kislerdm/diagramastext/server/core/c4container"
+	"github.com/kislerdm/diagramastext/server/core/utils"
 )
 
 type httpHandler struct {
-	client        server.Client
+	client        core.Client
 	reportErrorFn func(err error)
 	corsHeaders   corsHeaders
 }
@@ -62,7 +62,7 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Println(input.Prompt)
 
 	diagram, err := h.client.TextToDiagram(
-		context.Background(), server.Request{
+		context.Background(), core.Request{
 			Prompt:                 input.Prompt,
 			UserID:                 readUserID(r.Header),
 			IsRegisteredUser:       isRegisteredUser(r.Header),
@@ -99,7 +99,7 @@ func readUserID(headers http.Header) string {
 }
 
 func main() {
-	cfg, err := server.LoadDefaultConfig(context.Background())
+	cfg, err := core.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatalln(err)
 	}

@@ -3,20 +3,59 @@ package c4container
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strings"
 
-	"github.com/kislerdm/diagramastext/server"
-	"github.com/kislerdm/diagramastext/server/utils"
+	"github.com/kislerdm/diagramastext/server/core"
+	"github.com/kislerdm/diagramastext/server/core/utils"
 )
 
+// Graph defines the diagram graph.
+type Graph struct {
+	Title  string  `json:"title,omitempty"`
+	Footer string  `json:"footer,omitempty"`
+	Nodes  []*Node `json:"nodes"`
+	Links  []*Link `json:"links,omitempty"`
+}
+
+// Node diagram's definition node.
+type Node struct {
+	ID         string `json:"id"`
+	Label      string `json:"label,omitempty"`
+	Group      string `json:"group,omitempty"`
+	Technology string `json:"technology,omitempty"`
+	External   bool   `json:"external,omitempty"`
+	IsQueue    bool   `json:"is_queue,omitempty"`
+	IsDatabase bool   `json:"is_database,omitempty"`
+}
+
+// Link diagram's definition link.
+type Link struct {
+	From       string `json:"from"`
+	To         string `json:"to"`
+	Direction  string `json:"direction,omitempty"`
+	Label      string `json:"label,omitempty"`
+	Technology string `json:"technology,omitempty"`
+}
+
+// Client client to generate a diagram artifact, e.g. svg image.
+type Client interface {
+	Do(context.Context, Graph) ([]byte, error)
+}
+
+// HttpClient http base client.
+type HttpClient interface {
+	Do(req *http.Request) (resp *http.Response, err error)
+}
+
 type handler struct {
-	clientCore             server.Handler
+	clientCore             core.Handler
 	clientDiagramRendering Client
 }
 
-func (h handler) TextToDiagram(ctx context.Context, req server.Request) ([]byte, error) {
+func (h handler) TextToDiagram(ctx context.Context, req core.Request) ([]byte, error) {
 	graphPrediction, err := h.clientCore.InferModel(
-		ctx, server.Inquiry{
+		ctx, core.Inquiry{
 			Request:           req,
 			Model:             defineModel(req),
 			PrefixTransformFn: addPromptRequestConditionC4Containers,
@@ -43,7 +82,7 @@ func (h handler) TextToDiagram(ctx context.Context, req server.Request) ([]byte,
 	return diagram, nil
 }
 
-func defineModel(req server.Request) string {
+func defineModel(req core.Request) string {
 	if req.IsRegisteredUser {
 		// FIXME: change for fine-tuned model after it's trained
 		return "code-davinci-002"
@@ -51,8 +90,8 @@ func defineModel(req server.Request) string {
 	return "code-davinci-002"
 }
 
-func NewFromConfig(cfg server.Config) (server.Client, error) {
-	c, err := server.NewFromConfig(cfg)
+func NewFromConfig(cfg core.Config) (core.Client, error) {
+	c, err := core.NewFromConfig(cfg)
 	if err != nil {
 		return nil, err
 	}

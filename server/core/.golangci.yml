@@ -2,7 +2,7 @@ run:
   allow-parallel-runners: true
   go: "1.19"
   skip-files:
-    - pkg/rendering/plantuml/compression/
+    - c4container/compression/
 
 issues:
   exclude-use-default: false
@@ -29,20 +29,20 @@ linters:
     - govet
     - gofmt
     - goimports
-#    - staticcheck
-#    - tenv
-#    - gocyclo
-#    - cyclop
-#    - lll
-#    - errcheck
-#    - unused
-#    - ineffassign
-#    - asciicheck
-#    - bodyclose
-#    - containedctx
-#    - contextcheck
-#    - makezero
-#    - nilerr
+    - staticcheck
+    - tenv
+    - gocyclo
+    - cyclop
+    - lll
+    - errcheck
+    - unused
+    - ineffassign
+    - asciicheck
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - makezero
+    - nilerr
 
 linters-settings:
   gofmt:

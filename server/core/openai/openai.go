@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	errs "github.com/kislerdm/diagramastext/server/errors"
+	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 // HttpClient http base client.
