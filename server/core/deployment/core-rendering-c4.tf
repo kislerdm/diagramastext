@@ -15,7 +15,7 @@ data "aws_iam_policy_document" "core_rendering_c4_secret" {
   }
 
   statement {
-    effect = "Allow"
+    effect  = "Allow"
     actions = [
       "secretsmanager:GetResourcePolicy",
       "secretsmanager:GetSecretValue",
@@ -34,29 +34,27 @@ resource "aws_iam_policy" "core_rendering_c4_secret" {
 }
 
 module "core_rendering_c4" {
-  source             = "modules/lambda"
-  name               = "core-rendering-c4${local.suffix}"
-  path_lambda_module = "${abspath(path.module)}/../cmd/lambda/core-c4"
+  source                   = "./modules/lambda"
+  name                     = "core-rendering-c4${local.suffix}"
+  path_lambda_module       = "${abspath(path.module)}/../cmd/lambda/core-c4"
   codebase_rebuild_trigger = {
-    base = abspath("${path.module}/..")
+    base                 = abspath("${path.module}/..")
     modules_dir_patterns = [
       "",
-      "handler",
-      "pkg/{storage,secretsmanager,core,rendering}/**/",
+      "{errors,openai,secretsmanager,storage,utils}/**",
+      "c4container/**",
+      "cmd/lambda/core-c4",
     ]
   }
   policy_arn_list = [aws_iam_policy.core_rendering_c4_secret.arn]
-  env_vars = {
+  env_vars        = {
     ACCESS_CREDENTIALS_ARN = local.core_rendering_c4_lambda_settings.secret_arn_is_prod[local.is_prod]
-    OPENAI_MODEL           = var.openai_model
-    OPENAI_MAX_TOKENS      = var.openai_max_tokens
-    OPENAI_TEMPERATURE     = var.openai_temperature
     CORS_HEADERS           = jsonencode(local.cors_headers)
   }
   tags = {
     environment    = local.environment
-    in_deprecation = true
-    system         = "mono:core+rendering-c4"
+    system         = "core"
+    backend        = "c4containers"
   }
   depends_on = [aws_iam_policy.core_rendering_c4_secret]
 }

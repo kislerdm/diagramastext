@@ -5,14 +5,12 @@ services:
     container_name: diagranastext-core
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_MAX_TOKENS: 500
-      OPENAI_TEMPERATURE: 0
       CORS_HEADERS: '{"Access-Control-Allow-Origin":"http://localhost:${PORT_CLIENT}","Access-Control-Allow-Methods":"POST,OPTIONS","Access-Control-Allow-Headers":"Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token"}'
       PORT: 9000
     ports:
       - ${PORT_SERVER}:9000
     volumes:
-      - ./core:/app
+      - ./server/core:/app
     working_dir: /app
     command: ["/bin/sh", "-c", "go mod tidy && go run cmd/httpserver/main.go"]
 

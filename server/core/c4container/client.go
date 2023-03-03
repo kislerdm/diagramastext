@@ -85,7 +85,8 @@ func (h handler) TextToDiagram(ctx context.Context, req core.Request) ([]byte, e
 func defineModel(req core.Request) string {
 	if req.IsRegisteredUser {
 		// FIXME: change for fine-tuned model after it's trained
-		return "code-davinci-002"
+		return "code-cushman-001"
+		//return "code-davinci-002"
 	}
 	return "code-davinci-002"
 }

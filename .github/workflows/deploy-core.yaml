@@ -63,7 +63,7 @@ jobs:
         run: |
           cd ${{ matrix.module.path }}
           go mod tidy
-          go test -race -coverprofile=${{ matrix.module.flag }}.txt -covermode=atomic ./...
+          go test -race -tags=unittest -coverprofile=${{ matrix.module.flag }}.txt -covermode=atomic ./...
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
