@@ -20,7 +20,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	client, err := c4container.NewFromConfig(cfg)
+	clientModelInference, err := core.NewModelInferenceClientFromConfig(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func main() {
 		}
 	}
 
-	lambda.Start(handler(client, corsHeaders))
+	lambda.Start(handler(c4container.Handler, clientModelInference, corsHeaders))
 }
 
 type corsHeaders map[string]string
@@ -65,7 +65,7 @@ type response struct {
 	SVG string `json:"svg"`
 }
 
-func handler(client core.Client, corsHeaders corsHeaders) func(
+func handler(handler core.DiagramRenderingHandler, client core.ModelInferenceClient, corsHeaders corsHeaders) func(
 	ctx context.Context, req events.APIGatewayProxyRequest,
 ) (events.APIGatewayProxyResponse, error) {
 	return func(
@@ -88,7 +88,7 @@ func handler(client core.Client, corsHeaders corsHeaders) func(
 			OptOutFromSavingPrompt: isOptOutFromSavingPrompt(req.Headers),
 		}
 
-		diagram, err := client.TextToDiagram(ctx, inquiry)
+		diagram, err := handler(ctx, client, inquiry)
 		if err != nil {
 			return corsHeaders.setHeaders(parseClientError(err)), err
 		}

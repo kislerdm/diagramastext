@@ -66,11 +66,6 @@ func validatePromptRegisteredUser(prompt string) error {
 	return validatePromptLength(prompt, promptLengthMaxRegistered)
 }
 
-type Client interface {
-	// TextToDiagram converts English inquiry to SVG diagram.
-	TextToDiagram(ctx context.Context, req Request) ([]byte, error)
-}
-
 type Inquiry struct {
 	Request
 
@@ -78,17 +73,17 @@ type Inquiry struct {
 	PrefixTransformFn func(string) string
 }
 
-// Handler the logic to infer the model and predict a diagram graph.
-type Handler interface {
-	InferModel(ctx context.Context, req Inquiry) ([]byte, error)
+// ModelInferenceClient the logic to infer the model and predict a diagram graph.
+type ModelInferenceClient interface {
+	Do(ctx context.Context, req Inquiry) ([]byte, error)
 }
 
-type handler struct {
+type client struct {
 	clientModel   openai.Client
 	clientStorage storage.Client
 }
 
-func (h handler) InferModel(ctx context.Context, req Inquiry) ([]byte, error) {
+func (h client) Do(ctx context.Context, req Inquiry) ([]byte, error) {
 	if err := req.validatePrompt(); err != nil {
 		return nil, err
 	}
@@ -150,7 +145,8 @@ func generateRequestID() string {
 	return o
 }
 
-func NewFromConfig(cfg Config) (Handler, error) {
+// NewModelInferenceClientFromConfig initialises the client to infer the model.
+func NewModelInferenceClientFromConfig(cfg Config) (ModelInferenceClient, error) {
 	clientOpenAI, err := openai.NewClient(cfg.ModelInferenceConfig)
 	if err != nil {
 		return nil, err
@@ -164,8 +160,13 @@ func NewFromConfig(cfg Config) (Handler, error) {
 		log.Print(err.Error())
 	}
 
-	return &handler{
+	return &client{
 		clientModel:   clientOpenAI,
 		clientStorage: clientStorage,
 	}, nil
 }
+
+// DiagramRenderingHandler functional entrypoint to render the text prompt to a diagram.
+type DiagramRenderingHandler func(ctx context.Context, inferenceClient ModelInferenceClient, req Request) (
+	[]byte, error,
+)

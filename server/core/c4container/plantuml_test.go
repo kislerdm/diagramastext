@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 )
 
 func Test_diagramGraph2plantUMLCode(t *testing.T) {
@@ -143,13 +142,13 @@ Rel_L(2, 1, "Consumes domain events", "TCP/Protobuf")
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := diagramGraph2plantUMLCode(tt.args.graph)
+				got, err := defineDiagramPlantUMLDSL(tt.args.graph)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("diagramGraph2plantUMLCode() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("defineDiagramPlantUMLDSL() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 				if got != tt.want {
-					t.Errorf("diagramGraph2plantUMLCode() = %v, want %v", got, tt.want)
+					t.Errorf("defineDiagramPlantUMLDSL() = %v, want %v", got, tt.want)
 				}
 			},
 		)
@@ -448,8 +447,8 @@ func TestCode2Path(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if got, _ := code2Path(tt.args.s); got != tt.want {
-					t.Errorf("code2Path() = %v, want %v", got, tt.want)
+				if got, _ := plantUMLRequestPath(tt.args.s); got != tt.want {
+					t.Errorf("plantUMLRequestPath() = %v, want %v", got, tt.want)
 				}
 			},
 		)
@@ -660,95 +659,38 @@ func Test_encode64(t *testing.T) {
 	}
 }
 
-func TestNewPlantUMLClient(t *testing.T) {
-	type args struct {
-		optFns []func(*optionsPlantUMLClient)
-	}
-	tests := []struct {
-		name string
-		args args
-		want Client
-	}{
-		{
-			name: "default",
-			args: args{},
-			want: &clientPlantUML{
-				options: optionsPlantUMLClient{
-					httpClient: &http.Client{
-						Timeout: defaultTimeoutPlanUML,
-					},
-				},
-				baseURL: baseURLPlanUML,
-			},
-		},
-		{
-			name: "custom http client",
-			args: args{
-				optFns: []func(*optionsPlantUMLClient){
-					WithHTTPClientPlantUML(&http.Client{Timeout: 2 * time.Minute}),
-				},
-			},
-			want: &clientPlantUML{
-				options: optionsPlantUMLClient{
-					httpClient: &http.Client{
-						Timeout: 2 * time.Minute,
-					},
-				},
-				baseURL: baseURLPlanUML,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(
-			tt.name, func(t *testing.T) {
-				if got := NewClient(tt.args.optFns...); !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("NewClient() = %v, want %v", got, tt.want)
-				}
-			},
-		)
-	}
-}
-
-type mockPlantUMLClient struct {
+type mockHTTPClient struct {
 	resp *http.Response
 	err  error
 }
 
-func (m mockPlantUMLClient) Do(req *http.Request) (resp *http.Response, err error) {
+func (m mockHTTPClient) Do(req *http.Request) (resp *http.Response, err error) {
 	return m.resp, m.err
 }
 
-func Test_clientPlantUML_Do(t *testing.T) {
-	type fields struct {
-		options optionsPlantUMLClient
-		baseURL string
-	}
+func Test_renderDiagram(t *testing.T) {
 	type args struct {
-		ctx context.Context
-		v   Graph
+		ctx        context.Context
+		httpClient HttpClient
+		v          Graph
 	}
 	tests := []struct {
 		name    string
-		fields  fields
 		args    args
 		want    []byte
 		wantErr bool
 	}{
 		{
 			name: "happy path",
-			fields: fields{
-				options: optionsPlantUMLClient{
-					httpClient: &mockPlantUMLClient{
-						resp: &http.Response{
-							StatusCode: http.StatusOK,
-							Body:       io.NopCloser(strings.NewReader(`<svg xmlns="http://www.w3.org/2000/svg" "></svg>`)),
-						},
-					},
-				},
-				baseURL: baseURLPlanUML,
-			},
 			args: args{
 				ctx: context.TODO(),
+				httpClient: mockHTTPClient{
+					resp: &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`<svg xmlns="http://www.w3.org/2000/svg" "></svg>`)),
+					},
+					err: nil,
+				},
 				v: Graph{
 					Nodes: []*Node{
 						{
@@ -761,8 +703,7 @@ func Test_clientPlantUML_Do(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:   "unhappy path: faulty graph",
-			fields: fields{},
+			name: "unhappy path: faulty graph",
 			args: args{
 				ctx: context.TODO(),
 				v:   Graph{},
@@ -772,16 +713,11 @@ func Test_clientPlantUML_Do(t *testing.T) {
 		},
 		{
 			name: "unhappy path: http client error",
-			fields: fields{
-				options: optionsPlantUMLClient{
-					httpClient: &mockPlantUMLClient{
-						err: errors.New("foobar"),
-					},
-				},
-				baseURL: baseURLPlanUML,
-			},
 			args: args{
 				ctx: context.TODO(),
+				httpClient: &mockHTTPClient{
+					err: errors.New("foobar"),
+				},
 				v: Graph{
 					Nodes: []*Node{
 						{
@@ -795,17 +731,13 @@ func Test_clientPlantUML_Do(t *testing.T) {
 		},
 		{
 			name: "unhappy path: server error",
-			fields: fields{
-				options: optionsPlantUMLClient{
-					httpClient: &mockPlantUMLClient{
-						resp: &http.Response{
-							StatusCode: http.StatusInternalServerError,
-						},
+			args: args{
+				ctx: context.TODO(),
+				httpClient: &mockHTTPClient{
+					resp: &http.Response{
+						StatusCode: http.StatusInternalServerError,
 					},
 				},
-				baseURL: baseURLPlanUML,
-			},
-			args: args{
 				v: Graph{
 					Nodes: []*Node{
 						{
@@ -821,17 +753,13 @@ func Test_clientPlantUML_Do(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				c := &clientPlantUML{
-					options: tt.fields.options,
-					baseURL: tt.fields.baseURL,
-				}
-				got, err := c.Do(tt.args.ctx, tt.args.v)
+				got, err := renderDiagram(tt.args.ctx, tt.args.httpClient, tt.args.v)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("Do() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("renderDiagram() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("Do() got = %v, want %v", got, tt.want)
+					t.Errorf("renderDiagram() got = %v, want %v", got, tt.want)
 				}
 			},
 		)
