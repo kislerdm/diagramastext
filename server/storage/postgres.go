@@ -24,21 +24,18 @@ func (c pgClient) WritePrompt(ctx context.Context, v UserInput) error {
 	if v.UserID == "" {
 		return errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageSerialization,
 			Message: "user_id is required",
 		}
 	}
 	if v.RequestID == "" {
 		return errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageSerialization,
 			Message: "request_id is required",
 		}
 	}
 	if v.Prompt == "" {
 		return errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageSerialization,
 			Message: "prompt is required",
 		}
 	}
@@ -56,7 +53,6 @@ func (c pgClient) WritePrompt(ctx context.Context, v UserInput) error {
 	); err != nil {
 		return errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageSerialization,
 			Message: err.Error(),
 		}
 	}
@@ -70,21 +66,18 @@ func (c pgClient) WriteModelPrediction(ctx context.Context, v ModelOutput) error
 	if v.UserID == "" {
 		return errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageSerialization,
 			Message: "user_id is required",
 		}
 	}
 	if v.RequestID == "" {
 		return errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageSerialization,
 			Message: "request_id is required",
 		}
 	}
 	if v.Response == "" {
 		return errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageSerialization,
 			Message: "response is required",
 		}
 	}
@@ -101,7 +94,6 @@ func (c pgClient) WriteModelPrediction(ctx context.Context, v ModelOutput) error
 	); err != nil {
 		return errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageSerialization,
 			Message: err.Error(),
 		}
 	}
@@ -130,7 +122,6 @@ func NewPgClient(ctx context.Context, host, dbname, user, password string) (Clie
 	if host == "" {
 		return nil, errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageInit,
 			Message: "host must be provided",
 		}
 	}
@@ -138,7 +129,6 @@ func NewPgClient(ctx context.Context, host, dbname, user, password string) (Clie
 	if dbname == "" {
 		return nil, errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageInit,
 			Message: "dbname must be provided",
 		}
 	}
@@ -146,7 +136,6 @@ func NewPgClient(ctx context.Context, host, dbname, user, password string) (Clie
 	if user == "" {
 		return nil, errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageInit,
 			Message: "user must be provided",
 		}
 	}
@@ -166,7 +155,6 @@ func NewPgClient(ctx context.Context, host, dbname, user, password string) (Clie
 	if err != nil {
 		return nil, errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageInit,
 			Message: err.Error(),
 		}
 	}
@@ -178,7 +166,6 @@ func NewPgClient(ctx context.Context, host, dbname, user, password string) (Clie
 	if err := db.PingContext(ctx); err != nil {
 		return nil, errors.Error{
 			Service: errors.ServiceStorage,
-			Stage:   errors.StageConnection,
 			Message: err.Error(),
 		}
 	}

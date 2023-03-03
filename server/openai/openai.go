@@ -1,4 +1,4 @@
-package modelinference
+package openai
 
 import (
 	"bytes"
@@ -14,6 +14,23 @@ import (
 
 	errs "github.com/kislerdm/diagramastext/server/errors"
 )
+
+// HttpClient http base client.
+type HttpClient interface {
+	Do(req *http.Request) (resp *http.Response, err error)
+}
+
+// Request model inference request.
+type Request struct {
+	BestOf uint8
+	Prompt string
+	Model  string
+}
+
+// Client interface defining the client to infer a model to convert user's prompt to a serialised data structure.
+type Client interface {
+	Do(ctx context.Context, req Request) ([]byte, error)
+}
 
 /*
 	Defines client to communicate to OpenAI over http
@@ -54,8 +71,8 @@ type clientOpenAI struct {
 	baseURL      string
 }
 
-// NewOpenAIClient initiates the client to communicate with the plantuml server.
-func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Client, error) {
+// NewClient initiates the client to communicate with the plantuml server.
+func NewClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Client, error) {
 	c := clientOpenAI{
 		httpClient:   nil,
 		token:        cfg.Token,
@@ -81,7 +98,6 @@ func NewOpenAIClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Cl
 	if err := resolveConfigurations(&c); err != nil {
 		return nil, errs.Error{
 			Service: errs.ServiceOpenAI,
-			Stage:   errs.StageInit,
 			Message: err.Error(),
 		}
 	}
@@ -152,9 +168,14 @@ func (c *clientOpenAI) Do(ctx context.Context, req Request) ([]byte, error) {
 	}
 
 	payload := c.payload
+
 	payload.Prompt = req.Prompt
 	if req.BestOf > 0 {
 		payload.BestOf = req.BestOf
+	}
+
+	if req.Model != "" {
+		payload.Model = req.Model
 	}
 
 	respBytes, err := c.requestHandler(ctx, payload)
@@ -199,7 +220,6 @@ func (c *clientOpenAI) decodeResponse(ctx context.Context, respBytes []byte) ([]
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return nil, errs.Error{
 			Service: errs.ServiceOpenAI,
-			Stage:   errs.StageDeserialization,
 			Message: err.Error(),
 		}
 	}
@@ -207,7 +227,6 @@ func (c *clientOpenAI) decodeResponse(ctx context.Context, respBytes []byte) ([]
 	if len(resp.Choices) == 0 {
 		return nil, errs.Error{
 			Service: errs.ServiceOpenAI,
-			Stage:   errs.StageDeserialization,
 			Message: "openAI could not convert the input prompt",
 		}
 	}
@@ -235,7 +254,6 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	if err != nil {
 		return nil, errs.Error{
 			Service: errs.ServiceOpenAI,
-			Stage:   errs.StageSerialization,
 			Message: err.Error(),
 		}
 	}
@@ -248,7 +266,6 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	if err != nil {
 		return nil, errs.Error{
 			Service: errs.ServiceOpenAI,
-			Stage:   errs.StageRequest,
 			Message: err.Error(),
 		}
 	}
@@ -256,7 +273,6 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	if resp.StatusCode > 209 {
 		o := errs.Error{
 			Service:                   errs.ServiceOpenAI,
-			Stage:                     errs.StageResponse,
 			Message:                   "error status code: " + strconv.Itoa(resp.StatusCode),
 			ServiceResponseStatusCode: resp.StatusCode,
 		}
@@ -276,7 +292,6 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	if err != nil {
 		return nil, errs.Error{
 			Service: errs.ServiceOpenAI,
-			Stage:   errs.StageDeserialization,
 			Message: err.Error(),
 		}
 	}

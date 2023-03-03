@@ -25,7 +25,7 @@ type ModelOutput struct {
 	Timestamp time.Time
 }
 
-// Client defines the pgClient to communicate to the storage to persist modelinference logic transactions.
+// Client defines the pgClient to communicate to the storage to persist openai logic transactions.
 type Client interface {
 	// WritePrompt writes user's input prompt.
 	WritePrompt(ctx context.Context, v UserInput) error

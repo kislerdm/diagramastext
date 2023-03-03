@@ -150,7 +150,6 @@ func Test_client_WritePrompt(t *testing.T) {
 			},
 			wantErr: errors.Error{
 				Service: errors.ServiceStorage,
-				Stage:   errors.StageSerialization,
 				Message: `relation "` + tableWritePrompt + `" does not exist (SQLSTATE 42P01)`,
 			},
 		},
@@ -169,7 +168,6 @@ func Test_client_WritePrompt(t *testing.T) {
 			},
 			wantErr: errors.Error{
 				Service: errors.ServiceStorage,
-				Stage:   errors.StageSerialization,
 				Message: "user_id is required",
 			},
 		},
@@ -188,7 +186,6 @@ func Test_client_WritePrompt(t *testing.T) {
 			},
 			wantErr: errors.Error{
 				Service: errors.ServiceStorage,
-				Stage:   errors.StageSerialization,
 				Message: "request_id is required",
 			},
 		},
@@ -207,7 +204,6 @@ func Test_client_WritePrompt(t *testing.T) {
 			},
 			wantErr: errors.Error{
 				Service: errors.ServiceStorage,
-				Stage:   errors.StageSerialization,
 				Message: "prompt is required",
 			},
 		},
@@ -269,7 +265,6 @@ func Test_client_WriteModelPrediction(t *testing.T) {
 			},
 			wantErr: errors.Error{
 				Service: errors.ServiceStorage,
-				Stage:   errors.StageSerialization,
 				Message: "user_id is required",
 			},
 		},
@@ -288,7 +283,6 @@ func Test_client_WriteModelPrediction(t *testing.T) {
 			},
 			wantErr: errors.Error{
 				Service: errors.ServiceStorage,
-				Stage:   errors.StageSerialization,
 				Message: "request_id is required",
 			},
 		},
@@ -307,7 +301,6 @@ func Test_client_WriteModelPrediction(t *testing.T) {
 			},
 			wantErr: errors.Error{
 				Service: errors.ServiceStorage,
-				Stage:   errors.StageSerialization,
 				Message: "response is required",
 			},
 		},

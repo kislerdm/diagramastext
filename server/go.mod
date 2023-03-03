@@ -6,11 +6,12 @@ go 1.19
 require github.com/lib/pq v1.10.7
 
 // secretsmanager
-require github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.18.5
-
 require (
 	github.com/aws/aws-sdk-go-v2 v1.17.5
 	github.com/aws/aws-sdk-go-v2/config v1.18.15
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.18.5
+	github.com/aws/smithy-go v1.13.5
+	golang.org/x/text v0.7.0
 )
 
 require (
@@ -23,6 +24,4 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.12.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.14.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.18.5 // indirect
-	github.com/aws/smithy-go v1.13.5 // indirect
-	golang.org/x/text v0.7.0 // indirect
 )

@@ -4,11 +4,35 @@
 
 The codebase orchestrates transformations of the user's inquiry.
 
-## Design
+## Local Development
 
-### C4 Containers
+### Requirements
 
-TBD
+- go 1.19
+- gnuMake
+- docker
+- awscli
+- sed
+
+### Commands
+
+Run to setup the local test env:
+
+```commandline
+docker run -d -p 4566:4566 -e SERVICES=secretsmanager localstack/localstack:1.4
+aws --endpoint-url http://localhost:4566 --region us-east-2 secretsmanager create-secret --name "tests" > /dev/null 2>&1
+
+aws --endpoint-url http://localhost:4566 --region us-east-2 secretsmanager put-secret-value --secret-id "tests" \
+    --secret-string "{\"openai_api_key\":\"sk-xxx\",\"\"}" > /dev/null $1
+
+export ACCESS_CREDENTIALS_ARN=$(aws --endpoint-url http://localhost:4566 --region us-east-2 secretsmanager list-secrets --filter Key="name",Values="tests" --query 'SecretList[0].ARN' | sed 's/"//g')
+```
+
+Run to perform unittests of all modules:
+
+```commandline
+make tests
+```
 
 ## References
 

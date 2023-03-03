@@ -9,18 +9,21 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/kislerdm/diagramastext/server"
+	"github.com/kislerdm/diagramastext/server/c4container"
 	errs "github.com/kislerdm/diagramastext/server/errors"
 )
 
 func main() {
-	client, err := server.NewC4DiagramHandler(context.Background(), os.Getenv("ACCESS_CREDENTIALS_ARN"))
+	cfg, err := server.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer func() { _ = client.Stop(context.Background()) }()
+	client, err := c4container.NewFromConfig(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	var corsHeaders corsHeaders
 	if v := os.Getenv("CORS_HEADERS"); v != "" {
@@ -54,13 +57,21 @@ func (h corsHeaders) setHeaders(resp events.APIGatewayProxyResponse) events.APIG
 	return resp
 }
 
-func handler(client server.Handler, corsHeaders corsHeaders) func(
+type request struct {
+	Prompt string `json:"prompt"`
+}
+
+type response struct {
+	SVG string `json:"svg"`
+}
+
+func handler(client server.Client, corsHeaders corsHeaders) func(
 	ctx context.Context, req events.APIGatewayProxyRequest,
 ) (events.APIGatewayProxyResponse, error) {
 	return func(
 		ctx context.Context, req events.APIGatewayProxyRequest,
 	) (events.APIGatewayProxyResponse, error) {
-		var input server.Request
+		var input request
 		if err := json.Unmarshal([]byte(req.Body), &input); err != nil {
 			return corsHeaders.setHeaders(
 				events.APIGatewayProxyResponse{
@@ -70,17 +81,19 @@ func handler(client server.Handler, corsHeaders corsHeaders) func(
 			), err
 		}
 
-		callID := server.CallID{
-			RequestID: readRequestID(ctx),
-			UserID:    readUserID(req.Headers),
+		inquiry := server.Request{
+			Prompt:                 input.Prompt,
+			UserID:                 readUserID(req.Headers),
+			IsRegisteredUser:       isRegisteredUser(req.Headers),
+			OptOutFromSavingPrompt: isOptOutFromSavingPrompt(req.Headers),
 		}
 
-		diagram, err := client.GenerateSVG(ctx, input.Prompt, callID)
+		diagram, err := client.TextToDiagram(ctx, inquiry)
 		if err != nil {
 			return corsHeaders.setHeaders(parseClientError(err)), err
 		}
 
-		output, _ := json.Marshal(server.ResponseSVG{SVG: string(diagram)})
+		output, _ := json.Marshal(response{SVG: string(diagram)})
 
 		return corsHeaders.setHeaders(
 			events.APIGatewayProxyResponse{
@@ -91,12 +104,17 @@ func handler(client server.Handler, corsHeaders corsHeaders) func(
 	}
 }
 
-func readRequestID(ctx context.Context) string {
-	c, _ := lambdacontext.FromContext(ctx)
-	return c.AwsRequestID
+func isOptOutFromSavingPrompt(headers map[string]string) bool {
+	// FIXME: extract registration from JWT when authN is implemented
+	return false
 }
 
-func readUserID(h map[string]string) string {
+func isRegisteredUser(headers map[string]string) bool {
+	// FIXME: extract registration from JWT when authN is implemented
+	return false
+}
+
+func readUserID(headers map[string]string) string {
 	// FIXME: extract UserID from the headers when authN is implemented
 	return "NA"
 }
