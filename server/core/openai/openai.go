@@ -215,7 +215,7 @@ func (c *clientOpenAI) setHeader(req *http.Request) {
 	}
 }
 
-func (c *clientOpenAI) decodeResponse(ctx context.Context, respBytes []byte) ([]byte, error) {
+func (c *clientOpenAI) decodeResponse(_ context.Context, respBytes []byte) ([]byte, error) {
 	var resp openAIResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return nil, errs.Error{
