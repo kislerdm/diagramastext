@@ -1,0 +1,113 @@
+name: "TF:Monitoring"
+
+on:
+  push:
+    paths:
+      - "monitoring"
+  pull_request:
+    paths:
+      - "monitoring"
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read  # This is required for actions/checkout
+  pull-requests: write
+
+jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: "monitoring"
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Configure AWS Credentials Action For GitHub Actions
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
+          role-duration-seconds: 900
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v2.0.3
+      - name: Terraform init
+        id: init
+        run: terraform init
+      - name: Terraform validate
+        id: validate
+        run: terraform validate
+      - name: Terraform plan
+        id: plan
+        run: terraform plan -lock-timeout=120s -no-color -out /tmp/terraform.tfplan
+        continue-on-error: true
+      - uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Prepare format of the comment
+            const resultValidate = `${{ steps.validate.outputs.exitcode }}` === '0' ? `${{ steps.validate.outputs.stdout }}` : `${{ steps.validate.outputs.stderr }}`;
+            const resultPlan = `${{ steps.plan.outputs.exitcode }}` === '0' ? `${{ steps.plan.outputs.stdout }}` : `${{ steps.plan.outputs.stderr }}`;
+            
+            const output = `#### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            <details><summary>Validation Output</summary>
+            
+            \`\`\`\n
+            ${resultValidate}
+            \`\`\`
+            
+            </details>
+            
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+            
+            <details><summary>Show Plan</summary>
+            
+            \`\`\`\n
+            ${resultPlan}
+            \`\`\`
+            
+            </details>
+            
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
+            
+            // Publish comment
+            github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+            })
+      - name: Status check
+        run: |
+          if [[ ! ${{ steps.validate.outputs.exitcode }} -eq 0 ]]; then echo "failed validation"; exit 1; fi
+          if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
+
+  apply:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: "production:monitoring"
+    defaults:
+      run:
+        working-directory: "monitoring"
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Configure AWS Credentials Action For GitHub Actions
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
+          role-duration-seconds: 900
+      - name: Setup Terraform CLI
+        uses: hashicorp/setup-terraform@v2.0.3
+      - name: Provision
+        run: |
+          terraform init
+          terraform plan
+          terraform apply -auto-approve

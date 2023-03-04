@@ -12,7 +12,10 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/kislerdm/diagramastext/server/core"
+	"github.com/kislerdm/diagramastext/server/core/c4container"
+	"github.com/kislerdm/diagramastext/server/core/configuration"
 	errs "github.com/kislerdm/diagramastext/server/core/errors"
+	"github.com/kislerdm/diagramastext/server/core/openai"
 )
 
 func randomString(length int) string {
@@ -269,4 +272,33 @@ func mustMarshal(v interface{}) []byte {
 		panic(err)
 	}
 	return o
+}
+
+func Benchmark_handler(b *testing.B) {
+	v := `{"Access-Control-Allow-Headers":"Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token","Access-Control-Allow-Methods":"POST,OPTIONS","Access-Control-Allow-Origin":"https://diagramastext.dev"}`
+	var corsHeaders corsHeaders
+	_ = json.Unmarshal([]byte(v), &corsHeaders)
+
+	cfg := configuration.Config{
+		ModelInferenceConfig: openai.ConfigOpenAI{
+			MaxTokens: 200,
+			Token:     "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",
+		},
+	}
+
+	c, err := core.NewModelInferenceClientFromConfig(cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	h := handler(c4container.Handler, c, corsHeaders)
+
+	req := events.APIGatewayProxyRequest{
+		HTTPMethod: "POST",
+		Body:       `{"prompt": "c4 diagram of java service publishing to sqs"}`,
+	}
+
+	for i := 0; i < b.N; i++ {
+		_, _ = h(context.TODO(), req)
+	}
 }

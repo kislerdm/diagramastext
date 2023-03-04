@@ -2,57 +2,94 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"log"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/aws/smithy-go/rand"
-	"github.com/kislerdm/diagramastext/server/core/openai"
-	"github.com/kislerdm/diagramastext/server/core/storage"
 )
+
+// UserProfile requesting user's profile.
+type UserProfile struct {
+	UserID                 string
+	IsRegistered           bool
+	OptOutFromSavingPrompt bool
+}
+
+// Handler functional entrypoint to render the text prompt to a diagram.
+type Handler func(
+	ctx context.Context, inquery Inquiry, clientInference ClientModelInference, clientStorage ClientStorage,
+) (
+	[]byte, error,
+)
+
+// MockClientModelInference mock of the model inference client.
+type MockClientModelInference struct {
+	Prediction []byte
+	Err        error
+}
+
+func (m MockClientModelInference) Do(_ context.Context, prompt, model string) ([]byte, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return m.Prediction, nil
+}
+
+// ClientModelInference the logic to infer the model and predict a diagram graph.
+type ClientModelInference interface {
+	Do(ctx context.Context, prompt, model string) ([]byte, error)
+}
+
+// ClientStorage the client to persist user's prompt and the model's predictions.
+type ClientStorage interface {
+	// WritePrompt writes user's input prompt.
+	WritePrompt(ctx context.Context, requestID string, prompt string, userID string) error
+
+	// WriteModelPrediction writes model's prediction result used to generate diagram.
+	WriteModelPrediction(ctx context.Context, requestID string, result string, userID string) error
+
+	// Close closes the connection.
+	Close(ctx context.Context) error
+}
+
+// MockClientStorage mock of the storage client.
+type MockClientStorage struct {
+	Err error
+}
+
+func (m MockClientStorage) WritePrompt(_ context.Context, _ string, _ string, _ string) error {
+	return m.Err
+}
+
+func (m MockClientStorage) WriteModelPrediction(_ context.Context, _ string, _ string, _ string) error {
+	return m.Err
+}
+
+func (m MockClientStorage) Close(_ context.Context) error {
+	return m.Err
+}
+
+// Inquiry model inference inquiry object.
+type Inquiry struct {
+	// Request API request.
+	*Request
+
+	// Model the model ID to infer.
+	*UserProfile
+}
 
 const (
 	promptLengthMin = 3
 
 	promptLengthMaxBase       = 100
 	promptLengthMaxRegistered = 300
-
-	bestOfBase       = 2
-	bestOfRegistered = 3
 )
 
-func validatePromptLength(prompt string, max int) error {
-	if len(prompt) < promptLengthMin || len(prompt) > max {
-		return errors.New(
-			"prompt length must be between " + strconv.Itoa(promptLengthMin) + " and " +
-				strconv.Itoa(max) + " characters",
-		)
-	}
-	return nil
-}
-
-// Request invocation request object.
-type Request struct {
-	Prompt                 string
-	UserID                 string
-	IsRegisteredUser       bool
-	OptOutFromSavingPrompt bool
-}
-
-func (r Request) getBestOf() uint8 {
-	if r.IsRegisteredUser {
-		return bestOfRegistered
-	}
-	return bestOfBase
-}
-
-// ValidatePrompt validate the request.
-func (r Request) validatePrompt() error {
+// ValidatePrompt validates the request.
+func (r Inquiry) ValidatePrompt() error {
 	prompt := strings.ReplaceAll(r.Prompt, "\n", "")
-	if r.IsRegisteredUser {
+	if r.IsRegistered {
 		return validatePromptRegisteredUser(prompt)
 	}
 	return validatePromptBaseUser(prompt)
@@ -66,78 +103,14 @@ func validatePromptRegisteredUser(prompt string) error {
 	return validatePromptLength(prompt, promptLengthMaxRegistered)
 }
 
-type Inquiry struct {
-	Request
-
-	Model             string
-	PrefixTransformFn func(string) string
-}
-
-// ModelInferenceClient the logic to infer the model and predict a diagram graph.
-type ModelInferenceClient interface {
-	Do(ctx context.Context, req Inquiry) ([]byte, error)
-}
-
-type client struct {
-	clientModel   openai.Client
-	clientStorage storage.Client
-}
-
-func (h client) Do(ctx context.Context, req Inquiry) ([]byte, error) {
-	if err := req.validatePrompt(); err != nil {
-		return nil, err
+func validatePromptLength(prompt string, max int) error {
+	if len(prompt) < promptLengthMin || len(prompt) > max {
+		return errors.New(
+			"prompt length must be between " + strconv.Itoa(promptLengthMin) + " and " +
+				strconv.Itoa(max) + " characters",
+		)
 	}
-
-	cID := storage.CallID{
-		RequestID: generateRequestID(),
-		UserID:    req.UserID,
-	}
-
-	// FIXME: decide on execution path when db write fails
-	if h.clientStorage != nil && !req.OptOutFromSavingPrompt {
-		if err := h.clientStorage.WritePrompt(
-			ctx, storage.UserInput{
-				CallID:    cID,
-				Prompt:    req.Prompt,
-				Timestamp: time.Now().UTC(),
-			},
-		); err != nil {
-			log.Print(err)
-		}
-	}
-
-	prompt := req.Prompt
-	if req.PrefixTransformFn != nil {
-		prompt = req.PrefixTransformFn(prompt)
-	}
-
-	graphPrediction, err := h.clientModel.Do(
-		ctx, openai.Request{
-			BestOf: req.getBestOf(),
-			Prompt: prompt,
-			Model:  req.Model,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// FIXME: decide on execution path when db write fails
-	if h.clientStorage != nil && !req.OptOutFromSavingPrompt {
-		if err := h.clientStorage.WriteModelPrediction(
-			ctx, storage.ModelOutput{
-				CallID:    cID,
-				Response:  string(graphPrediction),
-				Timestamp: time.Now().UTC(),
-			},
-		); err != nil {
-			if v, err := json.Marshal(graphPrediction); err != nil {
-				log.Printf("response: %s", string(v))
-			}
-		}
-	}
-
-	return graphPrediction, err
+	return nil
 }
 
 func generateRequestID() string {
@@ -145,28 +118,13 @@ func generateRequestID() string {
 	return o
 }
 
-// NewModelInferenceClientFromConfig initialises the client to infer the model.
-func NewModelInferenceClientFromConfig(cfg Config) (ModelInferenceClient, error) {
-	clientOpenAI, err := openai.NewClient(cfg.ModelInferenceConfig)
-	if err != nil {
-		return nil, err
+// StorePrediction persists the user's prompt and prediction results.
+func StorePrediction(
+	ctx context.Context, clientStorage ClientStorage, userID string, prompt string, graphPrediction string,
+) {
+	requestID := generateRequestID()
+	// FIXME: combine both transactions into a single atomic transaction.
+	if err := clientStorage.WritePrompt(ctx, requestID, prompt, userID); err == nil {
+		_ = clientStorage.WriteModelPrediction(ctx, requestID, graphPrediction, userID)
 	}
-
-	clientStorage, err := storage.NewPgClient(
-		context.Background(), cfg.StorageConfig.DBHost, cfg.StorageConfig.DBName, cfg.StorageConfig.DBUser,
-		cfg.StorageConfig.DBPassword,
-	)
-	if err != nil {
-		log.Print(err.Error())
-	}
-
-	return &client{
-		clientModel:   clientOpenAI,
-		clientStorage: clientStorage,
-	}, nil
 }
-
-// DiagramRenderingHandler functional entrypoint to render the text prompt to a diagram.
-type DiagramRenderingHandler func(ctx context.Context, inferenceClient ModelInferenceClient, req Request) (
-	[]byte, error,
-)

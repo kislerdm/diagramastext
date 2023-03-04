@@ -7,12 +7,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kislerdm/diagramastext/server/core"
+	"github.com/kislerdm/diagramastext/server/core/configuration"
 	"github.com/kislerdm/diagramastext/server/core/openai"
 )
 
 func Benchmark_call(b *testing.B) {
-	cfg, err := core.LoadDefaultConfig(context.Background())
+	cfg, err := configuration.LoadDefaultConfig(context.Background())
 	if err != nil {
 		b.Fatal(err)
 	}

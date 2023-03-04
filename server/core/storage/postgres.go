@@ -3,56 +3,126 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
-	"github.com/kislerdm/diagramastext/server/core/errors"
-
+	errs "github.com/kislerdm/diagramastext/server/core/errors"
 	_ "github.com/lib/pq"
 )
 
+// PgConfig configuration of the postgres client.
+type PgConfig struct {
+	DBHost          string `json:"db_host"`
+	DBName          string `json:"db_name"`
+	DBUser          string `json:"db_user"`
+	DBPassword      string `json:"db_password"`
+	TablePrompt     string `json:"table_prompt,omitempty"`
+	TablePrediction string `json:"table_prediction,omitempty"`
+}
+
+func (cfg PgConfig) Validate() error {
+	if cfg.DBHost == "" {
+		return errors.New("host must be provided")
+	}
+	if cfg.DBName == "" {
+		return errors.New("dbname must be provided")
+	}
+	if cfg.DBUser == "" {
+		return errors.New("user must be provided")
+	}
+	if cfg.TablePrompt == "" {
+		return errors.New("table to store prompt must be provided")
+	}
+	if cfg.TablePrediction == "" {
+		return errors.New("table to store prediction must be provided")
+	}
+	return nil
+}
+
+// NewPgClient initiates the postgres pgClient.
+func NewPgClient(ctx context.Context, cfg PgConfig) (
+	Client, error,
+) {
+	if cfg.DBHost == "mock" {
+		return pgClient{
+			c:                         mockDbClient{},
+			tableWritePrompt:          cfg.TablePrompt,
+			tableWriteModelPrediction: cfg.TablePrediction,
+		}, nil
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, errs.Error{
+			Service: errs.ServiceStorage,
+			Message: err.Error(),
+		}
+	}
+
+	connStr := "user=" + cfg.DBUser +
+		" dbname=" + cfg.DBName +
+		" host=" + cfg.DBHost +
+		" sslmode=verify-full"
+
+	if cfg.DBPassword != "" {
+		connStr += " password=" + cfg.DBPassword
+	}
+
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, errs.Error{
+			Service: errs.ServiceStorage,
+			Message: err.Error(),
+		}
+	}
+
+	if err := db.PingContext(ctx); err != nil {
+		return nil, errs.Error{
+			Service: errs.ServiceStorage,
+			Message: err.Error(),
+		}
+	}
+
+	return pgClient{
+		c:                         db,
+		tableWritePrompt:          cfg.TablePrompt,
+		tableWriteModelPrediction: cfg.TablePrediction,
+	}, nil
+}
+
 type pgClient struct {
-	c dbClient
+	c                         dbClient
+	tableWritePrompt          string
+	tableWriteModelPrediction string
 }
 
 func (c pgClient) Close(ctx context.Context) error {
 	return c.c.Close()
 }
 
-const tableWritePrompt = "user_prompt"
-
-func (c pgClient) WritePrompt(ctx context.Context, v UserInput) error {
-	if v.UserID == "" {
-		return errors.Error{
-			Service: errors.ServiceStorage,
-			Message: "user_id is required",
-		}
-	}
-	if v.RequestID == "" {
-		return errors.Error{
-			Service: errors.ServiceStorage,
+func (c pgClient) WritePrompt(ctx context.Context, requestID, prompt, userID string) error {
+	if requestID == "" {
+		return errs.Error{
+			Service: errs.ServiceStorage,
 			Message: "request_id is required",
 		}
 	}
-	if v.Prompt == "" {
-		return errors.Error{
-			Service: errors.ServiceStorage,
+	if prompt == "" {
+		return errs.Error{
+			Service: errs.ServiceStorage,
 			Message: "prompt is required",
 		}
 	}
-	if v.Timestamp.Second() <= 0 {
-		v.Timestamp = time.Now().UTC()
-	}
 
 	if _, err := c.c.ExecContext(
-		ctx, `INSERT INTO `+tableWritePrompt+
+		ctx, `INSERT INTO `+c.tableWritePrompt+
 			` (request_id, user_id, prompt, timestamp) VALUES ($1, $2, $3, $4)`,
-		v.RequestID,
-		v.UserID,
-		v.Prompt,
-		v.Timestamp,
+		requestID,
+		userID,
+		prompt,
+		time.Now().UTC(),
 	); err != nil {
-		return errors.Error{
-			Service: errors.ServiceStorage,
+		return errs.Error{
+			Service: errs.ServiceStorage,
 			Message: err.Error(),
 		}
 	}
@@ -60,40 +130,29 @@ func (c pgClient) WritePrompt(ctx context.Context, v UserInput) error {
 	return nil
 }
 
-const tableWriteModelPrediction = "openai_response"
-
-func (c pgClient) WriteModelPrediction(ctx context.Context, v ModelOutput) error {
-	if v.UserID == "" {
-		return errors.Error{
-			Service: errors.ServiceStorage,
-			Message: "user_id is required",
-		}
-	}
-	if v.RequestID == "" {
-		return errors.Error{
-			Service: errors.ServiceStorage,
+func (c pgClient) WriteModelPrediction(ctx context.Context, requestID, result, userID string) error {
+	if requestID == "" {
+		return errs.Error{
+			Service: errs.ServiceStorage,
 			Message: "request_id is required",
 		}
 	}
-	if v.Response == "" {
-		return errors.Error{
-			Service: errors.ServiceStorage,
+	if result == "" {
+		return errs.Error{
+			Service: errs.ServiceStorage,
 			Message: "response is required",
 		}
 	}
-	if v.Timestamp.Second() <= 0 {
-		v.Timestamp = time.Now().UTC()
-	}
 	if _, err := c.c.ExecContext(
-		ctx, `INSERT INTO `+tableWriteModelPrediction+
+		ctx, `INSERT INTO `+c.tableWriteModelPrediction+
 			` (request_id, user_id, response, timestamp) VALUES ($1, $2, $3, $4)`,
-		v.RequestID,
-		v.UserID,
-		v.Response,
-		v.Timestamp,
+		requestID,
+		userID,
+		result,
+		time.Now().UTC(),
 	); err != nil {
-		return errors.Error{
-			Service: errors.ServiceStorage,
+		return errs.Error{
+			Service: errs.ServiceStorage,
 			Message: err.Error(),
 		}
 	}
@@ -109,68 +168,12 @@ func (m mockDbClient) Close() error {
 	return m.err
 }
 
-func (m mockDbClient) PingContext(ctx context.Context) error {
+func (m mockDbClient) PingContext(_ context.Context) error {
 	return m.err
 }
 
-func (m mockDbClient) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+func (m mockDbClient) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
 	return nil, m.err
-}
-
-// NewPgClient initiates the postgres pgClient.
-func NewPgClient(ctx context.Context, host, dbname, user, password string) (Client, error) {
-	if host == "" {
-		return nil, errors.Error{
-			Service: errors.ServiceStorage,
-			Message: "host must be provided",
-		}
-	}
-
-	if dbname == "" {
-		return nil, errors.Error{
-			Service: errors.ServiceStorage,
-			Message: "dbname must be provided",
-		}
-	}
-
-	if user == "" {
-		return nil, errors.Error{
-			Service: errors.ServiceStorage,
-			Message: "user must be provided",
-		}
-	}
-
-	connStr := "user=" + user +
-		" dbname=" + dbname +
-		" host=" + host +
-		" sslmode=verify-full"
-
-	if password != "" {
-		connStr += " password=" + password
-	}
-
-	var db dbClient
-
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, errors.Error{
-			Service: errors.ServiceStorage,
-			Message: err.Error(),
-		}
-	}
-
-	if host == "mock" {
-		db = mockDbClient{}
-	}
-
-	if err := db.PingContext(ctx); err != nil {
-		return nil, errors.Error{
-			Service: errors.ServiceStorage,
-			Message: err.Error(),
-		}
-	}
-
-	return pgClient{c: db}, nil
 }
 
 type dbClient interface {

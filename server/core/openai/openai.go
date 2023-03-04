@@ -12,24 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kislerdm/diagramastext/server/core"
 	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 // HttpClient http base client.
 type HttpClient interface {
 	Do(req *http.Request) (resp *http.Response, err error)
-}
-
-// Request model inference request.
-type Request struct {
-	BestOf uint8
-	Prompt string
-	Model  string
-}
-
-// Client interface defining the client to infer a model to convert user's prompt to a serialised data structure.
-type Client interface {
-	Do(ctx context.Context, req Request) ([]byte, error)
 }
 
 /*
@@ -49,6 +38,17 @@ type ConfigOpenAI struct {
 
 	// https://platform.openai.com/docs/api-reference/requesting-organization
 	Organization string
+
+	HttpClient HttpClient
+}
+
+func (cfg ConfigOpenAI) Validate() error {
+	if cfg.Token == "" {
+		return errors.New(
+			"'Token' must be specified, see: https://platform.openai.com/docs/api-reference/authentication",
+		)
+	}
+	return nil
 }
 
 type openAIRequest struct {
@@ -71,10 +71,31 @@ type clientOpenAI struct {
 	baseURL      string
 }
 
+const (
+	baseURLOpenAI        = "https://api.openai.com/v1/"
+	defaultTimeoutOpenAI = 3 * time.Minute
+	defaultModelOpenAI   = "code-davinci-002"
+	defaultMaxTokens     = 200
+	defaultTemperature   = 0.2
+	defaultTopP          = 1
+	defaultBestOf        = 2
+)
+
 // NewClient initiates the client to communicate with the plantuml server.
-func NewClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Client, error) {
+func NewClient(cfg ConfigOpenAI) (core.ClientModelInference, error) {
+	if cfg.Token == "mock" {
+		return core.MockClientModelInference{}, nil
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, errs.Error{
+			Service: errs.ServiceOpenAI,
+			Message: err.Error(),
+		}
+	}
+
 	c := clientOpenAI{
-		httpClient:   nil,
+		httpClient:   cfg.HttpClient,
 		token:        cfg.Token,
 		organization: cfg.Organization,
 		payload: openAIRequest{
@@ -91,41 +112,16 @@ func NewClient(cfg ConfigOpenAI, optFns ...func(client *clientOpenAI)) (Client, 
 		baseURL: baseURLOpenAI,
 	}
 
-	for _, fn := range optFns {
-		fn(&c)
-	}
-
-	if err := resolveConfigurations(&c); err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceOpenAI,
-			Message: err.Error(),
-		}
-	}
-
+	resolveConfigurations(&c)
 	resolveHTTPClientOpenAI(&c)
 
 	return &c, nil
 }
 
-// WithHTTPClientOpenAI overwrite the OpenAI HTTP client.
-func WithHTTPClientOpenAI(c HttpClient) func(o *clientOpenAI) {
-	return func(o *clientOpenAI) {
-		o.httpClient = c
-	}
-}
-
-func resolveConfigurations(c *clientOpenAI) error {
-	if c.token == "" {
-		return errors.New(
-			"'Token' must be specified, see: https://platform.openai.com/docs/api-reference/authentication",
-		)
-	}
-
-	if c.payload.MaxTokens <= 0 || c.payload.MaxTokens > 2048 {
+func resolveConfigurations(c *clientOpenAI) {
+	if c.payload.MaxTokens < 0 || c.payload.MaxTokens > 2048 {
 		c.payload.MaxTokens = defaultMaxTokens
 	}
-
-	return nil
 }
 
 func resolveHTTPClientOpenAI(c *clientOpenAI) {
@@ -133,16 +129,6 @@ func resolveHTTPClientOpenAI(c *clientOpenAI) {
 		c.httpClient = &http.Client{Timeout: defaultTimeoutOpenAI}
 	}
 }
-
-const (
-	baseURLOpenAI        = "https://api.openai.com/v1/"
-	defaultTimeoutOpenAI = 3 * time.Minute
-	defaultModelOpenAI   = "code-davinci-002"
-	defaultMaxTokens     = 200
-	defaultTemperature   = 0.2
-	defaultTopP          = 1
-	defaultBestOf        = 2
-)
 
 type openAIResponse struct {
 	ID      string `json:"id"`
@@ -162,20 +148,14 @@ type openAIResponse struct {
 	} `json:"usage"`
 }
 
-func (c *clientOpenAI) Do(ctx context.Context, req Request) ([]byte, error) {
-	if err := c.validatePrompt(req.Prompt); err != nil {
+func (c *clientOpenAI) Do(ctx context.Context, prompt, model string) ([]byte, error) {
+	if err := c.validatePrompt(prompt); err != nil {
 		return nil, err
 	}
 
 	payload := c.payload
-
-	payload.Prompt = req.Prompt
-	if req.BestOf > 0 {
-		payload.BestOf = req.BestOf
-	}
-
-	if req.Model != "" {
-		payload.Model = req.Model
+	if model != "" {
+		payload.Model = model
 	}
 
 	respBytes, err := c.requestHandler(ctx, payload)
@@ -213,6 +193,15 @@ func (c *clientOpenAI) setHeader(req *http.Request) {
 	if c.organization != "" {
 		req.Header.Add("Organization", c.organization)
 	}
+}
+
+type openAIErrorResponse struct {
+	Error *struct {
+		Code    *int    `json:"code,omitempty"`
+		Message string  `json:"message"`
+		Param   *string `json:"param,omitempty"`
+		Type    string  `json:"type"`
+	} `json:"error,omitempty"`
 }
 
 func (c *clientOpenAI) decodeResponse(_ context.Context, respBytes []byte) ([]byte, error) {
@@ -297,13 +286,4 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	}
 
 	return buf, nil
-}
-
-type openAIErrorResponse struct {
-	Error *struct {
-		Code    *int    `json:"code,omitempty"`
-		Message string  `json:"message"`
-		Param   *string `json:"param,omitempty"`
-		Type    string  `json:"type"`
-	} `json:"error,omitempty"`
 }
