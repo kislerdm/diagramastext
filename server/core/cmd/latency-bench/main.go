@@ -7,7 +7,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/kislerdm/diagramastext/server/core"
+	"github.com/kislerdm/diagramastext/server/core/configuration"
 	"github.com/kislerdm/diagramastext/server/core/openai"
 )
 
@@ -54,7 +54,7 @@ const prompt = `Given prompts and corresponding graphs as json define new graph 
 	"anna call bob" + "\n"
 
 func main() {
-	cfg, err := core.LoadDefaultConfig(context.Background())
+	cfg, err := configuration.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatalln(err)
 	}

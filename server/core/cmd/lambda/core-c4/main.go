@@ -11,11 +11,12 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/kislerdm/diagramastext/server/core"
 	"github.com/kislerdm/diagramastext/server/core/c4container"
+	"github.com/kislerdm/diagramastext/server/core/configuration"
 	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 func main() {
-	cfg, err := core.LoadDefaultConfig(context.Background())
+	cfg, err := configuration.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}

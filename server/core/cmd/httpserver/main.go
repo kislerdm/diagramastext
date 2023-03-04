@@ -14,6 +14,7 @@ import (
 
 	"github.com/kislerdm/diagramastext/server/core"
 	"github.com/kislerdm/diagramastext/server/core/c4container"
+	"github.com/kislerdm/diagramastext/server/core/configuration"
 	"github.com/kislerdm/diagramastext/server/core/utils"
 )
 
@@ -100,7 +101,7 @@ func readUserID(headers http.Header) string {
 }
 
 func main() {
-	cfg, err := core.LoadDefaultConfig(context.Background())
+	cfg, err := configuration.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatalln(err)
 	}

@@ -18,7 +18,7 @@ func randomString(length int) string {
 	return string(b)
 }
 
-func Test_validatePrompt(t *testing.T) {
+func Test_validatePromptLength(t *testing.T) {
 	type args struct {
 		prompt string
 		max    int
