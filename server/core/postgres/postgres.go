@@ -1,4 +1,4 @@
-package storage
+package postgres
 
 import (
 	"context"
@@ -6,12 +6,13 @@ import (
 	"errors"
 	"time"
 
+	"github.com/kislerdm/diagramastext/server/core/contract"
 	errs "github.com/kislerdm/diagramastext/server/core/errors"
 	_ "github.com/lib/pq"
 )
 
-// PgConfig configuration of the postgres client.
-type PgConfig struct {
+// Config configuration of the postgres client.
+type Config struct {
 	DBHost          string `json:"db_host"`
 	DBName          string `json:"db_name"`
 	DBUser          string `json:"db_user"`
@@ -20,7 +21,7 @@ type PgConfig struct {
 	TablePrediction string `json:"table_prediction,omitempty"`
 }
 
-func (cfg PgConfig) Validate() error {
+func (cfg Config) Validate() error {
 	if cfg.DBHost == "" {
 		return errors.New("host must be provided")
 	}
@@ -39,9 +40,9 @@ func (cfg PgConfig) Validate() error {
 	return nil
 }
 
-// NewPgClient initiates the postgres pgClient.
-func NewPgClient(ctx context.Context, cfg PgConfig) (
-	Client, error,
+// NewClient initiates the postgres pgClient.
+func NewClient(ctx context.Context, cfg Config) (
+	contract.ClientStorage, error,
 ) {
 	if cfg.DBHost == "mock" {
 		return pgClient{
@@ -82,7 +83,7 @@ func NewPgClient(ctx context.Context, cfg PgConfig) (
 		}
 	}
 
-	return pgClient{
+	return &pgClient{
 		c:                         db,
 		tableWritePrompt:          cfg.TablePrompt,
 		tableWriteModelPrediction: cfg.TablePrediction,

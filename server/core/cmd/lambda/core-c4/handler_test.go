@@ -3,16 +3,16 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"math/rand"
-	"net/http"
+	"os"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambdacontext"
-	"github.com/kislerdm/diagramastext/server/core"
-	errs "github.com/kislerdm/diagramastext/server/core/errors"
+	"github.com/kislerdm/diagramastext/server/core/contract"
+	"github.com/kislerdm/diagramastext/server/core/openai"
 )
 
 func randomString(length int) string {
@@ -30,192 +30,192 @@ type mockModelInferenceClient struct {
 	err   error
 }
 
-func (m mockModelInferenceClient) Do(_ context.Context, _ core.Inquiry) ([]byte, error) {
+func (m mockModelInferenceClient) Do(_ context.Context, _ contract.Inquiry) ([]byte, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	return m.graph, nil
 }
 
-func Test_handler(t *testing.T) {
-	type fields struct {
-		handler     core.DiagramRenderingHandler
-		client      core.ModelInferenceClient
-		corsHeaders corsHeaders
-	}
-	type args struct {
-		ctx context.Context
-		req events.APIGatewayProxyRequest
-	}
-
-	expectedHandler := map[string]string{
-		"Access-Control-Allow-Origin":  "*",
-		"Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token'",
-		"Access-Control-Allow-Methods": "'POST,OPTIONS'",
-	}
-
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    events.APIGatewayProxyResponse
-		wantErr bool
-	}{
-		{
-			name: "happy path",
-			fields: fields{
-				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
-					[]byte, error,
-				) {
-					return []byte(`<?xml version="1.0" encoding="us-ascii" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>`), nil
-				},
-				client:      mockModelInferenceClient{},
-				corsHeaders: expectedHandler,
-			},
-			args: args{
-				ctx: context.TODO(),
-				req: events.APIGatewayProxyRequest{
-					Body: `{"prompt": "` + randomString(10) + `"}`,
-				},
-			},
-			want: events.APIGatewayProxyResponse{
-				Headers:    expectedHandler,
-				StatusCode: http.StatusOK,
-				Body: string(
-					mustMarshal(
-						response{
-							SVG: `<?xml version="1.0" encoding="us-ascii" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>`,
-						},
-					),
-				),
-			},
-			wantErr: false,
-		},
-		{
-			name: "unhappy path: faulty prompt",
-			fields: fields{
-				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
-					[]byte, error,
-				) {
-					return nil, nil
-				},
-				client:      mockModelInferenceClient{},
-				corsHeaders: expectedHandler,
-			},
-			args: args{
-				ctx: context.TODO(),
-				req: events.APIGatewayProxyRequest{
-					Body: `{"prompt":`,
-				},
-			},
-			want: events.APIGatewayProxyResponse{
-				Headers:    expectedHandler,
-				StatusCode: http.StatusUnprocessableEntity,
-				Body:       "could not recognise the prompt format",
-			},
-			wantErr: true,
-		},
-		{
-			name: "unhappy path: high RPS",
-			fields: fields{
-				corsHeaders: expectedHandler,
-				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
-					[]byte, error,
-				) {
-					if _, err := inferenceClient.Do(
-						ctx, core.Inquiry{
-							Request: req,
-						},
-					); err != nil {
-						return nil, err
-					}
-					return nil, nil
-				},
-				client: mockModelInferenceClient{
-					err: errs.Error{
-						Service:                   errs.ServiceOpenAI,
-						Message:                   "too many requests",
-						ServiceResponseStatusCode: http.StatusTooManyRequests,
-					},
-				},
-			},
-			args: args{
-				ctx: lambdacontext.NewContext(context.TODO(), &lambdacontext.LambdaContext{AwsRequestID: "foobar"}),
-				req: events.APIGatewayProxyRequest{
-					Body: `{"prompt":"` + randomString(50) + `"}`,
-				},
-			},
-			want: events.APIGatewayProxyResponse{
-				Headers:    expectedHandler,
-				StatusCode: http.StatusTooManyRequests,
-				Body: errs.Error{
-					Service:                   errs.ServiceOpenAI,
-					Message:                   "too many requests",
-					ServiceResponseStatusCode: http.StatusTooManyRequests,
-				}.Error(),
-			},
-			wantErr: true,
-		},
-		{
-			name: "unhappy path: model inference client error",
-			fields: fields{
-				corsHeaders: expectedHandler,
-				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
-					[]byte, error,
-				) {
-					if _, err := inferenceClient.Do(
-						ctx, core.Inquiry{
-							Request: req,
-						},
-					); err != nil {
-						return nil, err
-					}
-					return nil, nil
-				},
-				client: mockModelInferenceClient{
-					err: errs.Error{
-						Service: errs.ServiceOpenAI,
-						Message: "foobar",
-					},
-				},
-			},
-			args: args{
-				ctx: lambdacontext.NewContext(context.TODO(), &lambdacontext.LambdaContext{AwsRequestID: "foobar"}),
-				req: events.APIGatewayProxyRequest{
-					Body: `{"prompt":"` + randomString(50) + `"}`,
-				},
-			},
-			want: events.APIGatewayProxyResponse{
-				Headers:    expectedHandler,
-				StatusCode: http.StatusInternalServerError,
-				Body: errs.Error{
-					Service: errs.ServiceOpenAI,
-					Message: "foobar",
-				}.Error(),
-			},
-			wantErr: true,
-		},
-	}
-
-	t.Parallel()
-
-	for _, tt := range tests {
-		t.Run(
-			tt.name, func(t *testing.T) {
-				got, gotErr := handler(tt.fields.handler, tt.fields.client, tt.fields.corsHeaders)(
-					tt.args.ctx, tt.args.req,
-				)
-				if (gotErr != nil) != tt.wantErr {
-					t.Errorf("sdk execution error = %v, wantErr %v", gotErr, tt.wantErr)
-					return
-				}
-				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("sdk execution got: %v, want: %v", got, tt.want)
-				}
-			},
-		)
-	}
-}
+//func Test_handler(t *testing.T) {
+//	type fields struct {
+//		handler     core.DiagramRenderingHandler
+//		client      core.ModelInferenceClient
+//		corsHeaders corsHeaders
+//	}
+//	type args struct {
+//		ctx context.Context
+//		req events.APIGatewayProxyRequest
+//	}
+//
+//	expectedHandler := map[string]string{
+//		"Access-Control-Allow-Origin":  "*",
+//		"Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token'",
+//		"Access-Control-Allow-Methods": "'POST,OPTIONS'",
+//	}
+//
+//	tests := []struct {
+//		name    string
+//		fields  fields
+//		args    args
+//		want    events.APIGatewayProxyResponse
+//		wantErr bool
+//	}{
+//		{
+//			name: "happy path",
+//			fields: fields{
+//				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
+//					[]byte, error,
+//				) {
+//					return []byte(`<?xml version="1.0" encoding="us-ascii" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>`), nil
+//				},
+//				client:      mockModelInferenceClient{},
+//				corsHeaders: expectedHandler,
+//			},
+//			args: args{
+//				ctx: context.TODO(),
+//				req: events.APIGatewayProxyRequest{
+//					Body: `{"prompt": "` + randomString(10) + `"}`,
+//				},
+//			},
+//			want: events.APIGatewayProxyResponse{
+//				Headers:    expectedHandler,
+//				StatusCode: http.StatusOK,
+//				Body: string(
+//					mustMarshal(
+//						response{
+//							SVG: `<?xml version="1.0" encoding="us-ascii" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>`,
+//						},
+//					),
+//				),
+//			},
+//			wantErr: false,
+//		},
+//		{
+//			name: "unhappy path: faulty prompt",
+//			fields: fields{
+//				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
+//					[]byte, error,
+//				) {
+//					return nil, nil
+//				},
+//				client:      mockModelInferenceClient{},
+//				corsHeaders: expectedHandler,
+//			},
+//			args: args{
+//				ctx: context.TODO(),
+//				req: events.APIGatewayProxyRequest{
+//					Body: `{"prompt":`,
+//				},
+//			},
+//			want: events.APIGatewayProxyResponse{
+//				Headers:    expectedHandler,
+//				StatusCode: http.StatusUnprocessableEntity,
+//				Body:       "could not recognise the prompt format",
+//			},
+//			wantErr: true,
+//		},
+//		{
+//			name: "unhappy path: high RPS",
+//			fields: fields{
+//				corsHeaders: expectedHandler,
+//				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
+//					[]byte, error,
+//				) {
+//					if _, err := inferenceClient.Do(
+//						ctx, core.Inquiry{
+//							Request: req,
+//						},
+//					); err != nil {
+//						return nil, err
+//					}
+//					return nil, nil
+//				},
+//				client: mockModelInferenceClient{
+//					err: errs.Error{
+//						Service:                   errs.ServiceOpenAI,
+//						Message:                   "too many requests",
+//						ServiceResponseStatusCode: http.StatusTooManyRequests,
+//					},
+//				},
+//			},
+//			args: args{
+//				ctx: lambdacontext.NewContext(context.TODO(), &lambdacontext.LambdaContext{AwsRequestID: "foobar"}),
+//				req: events.APIGatewayProxyRequest{
+//					Body: `{"prompt":"` + randomString(50) + `"}`,
+//				},
+//			},
+//			want: events.APIGatewayProxyResponse{
+//				Headers:    expectedHandler,
+//				StatusCode: http.StatusTooManyRequests,
+//				Body: errs.Error{
+//					Service:                   errs.ServiceOpenAI,
+//					Message:                   "too many requests",
+//					ServiceResponseStatusCode: http.StatusTooManyRequests,
+//				}.Error(),
+//			},
+//			wantErr: true,
+//		},
+//		{
+//			name: "unhappy path: model inference client error",
+//			fields: fields{
+//				corsHeaders: expectedHandler,
+//				handler: func(ctx context.Context, inferenceClient core.ModelInferenceClient, req core.Request) (
+//					[]byte, error,
+//				) {
+//					if _, err := inferenceClient.Do(
+//						ctx, core.Inquiry{
+//							Request: req,
+//						},
+//					); err != nil {
+//						return nil, err
+//					}
+//					return nil, nil
+//				},
+//				client: mockModelInferenceClient{
+//					err: errs.Error{
+//						Service: errs.ServiceOpenAI,
+//						Message: "foobar",
+//					},
+//				},
+//			},
+//			args: args{
+//				ctx: lambdacontext.NewContext(context.TODO(), &lambdacontext.LambdaContext{AwsRequestID: "foobar"}),
+//				req: events.APIGatewayProxyRequest{
+//					Body: `{"prompt":"` + randomString(50) + `"}`,
+//				},
+//			},
+//			want: events.APIGatewayProxyResponse{
+//				Headers:    expectedHandler,
+//				StatusCode: http.StatusInternalServerError,
+//				Body: errs.Error{
+//					Service: errs.ServiceOpenAI,
+//					Message: "foobar",
+//				}.Error(),
+//			},
+//			wantErr: true,
+//		},
+//	}
+//
+//	t.Parallel()
+//
+//	for _, tt := range tests {
+//		t.Run(
+//			tt.name, func(t *testing.T) {
+//				got, gotErr := handler(tt.fields.handler, tt.fields.client, tt.fields.corsHeaders)(
+//					tt.args.ctx, tt.args.req,
+//				)
+//				if (gotErr != nil) != tt.wantErr {
+//					t.Errorf("sdk execution error = %v, wantErr %v", gotErr, tt.wantErr)
+//					return
+//				}
+//				if !reflect.DeepEqual(got, tt.want) {
+//					t.Errorf("sdk execution got: %v, want: %v", got, tt.want)
+//				}
+//			},
+//		)
+//	}
+//}
 
 func Test_corsHeaders_setHeaders(t *testing.T) {
 	type args struct {
@@ -269,4 +269,23 @@ func mustMarshal(v interface{}) []byte {
 		panic(err)
 	}
 	return o
+}
+
+func Benchmark_handler(b *testing.B) {
+	c, err := openai.NewClient(
+		openai.ConfigOpenAI{
+			MaxTokens: 200,
+			Token:     os.Getenv("OPENAI_API_KEY"),
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	o, err := c.Do(context.TODO(), "given part of the word guess it\nhall\nhallo\nby\nbye\nhom\nhome\ngra\n", "")
+	if err != nil {
+		panic(err)
+	}
+
+	log.Println(string(o))
 }

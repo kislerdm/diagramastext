@@ -2,26 +2,12 @@ package secretsmanager
 
 import (
 	"context"
-	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
-
-type mockAWSSecretsmanagerClient struct {
-	output *secretsmanager.GetSecretValueOutput
-}
-
-func (m mockAWSSecretsmanagerClient) GetSecretValue(
-	ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options),
-) (*secretsmanager.GetSecretValueOutput, error) {
-	if m.output == nil {
-		return nil, errors.New("no secret found")
-	}
-	return m.output, nil
-}
 
 func TestAWSSecretManager_ReadLatestSecret(t *testing.T) {
 	type fields struct {
@@ -47,8 +33,8 @@ func TestAWSSecretManager_ReadLatestSecret(t *testing.T) {
 		{
 			name: "happy path",
 			fields: fields{
-				Client: mockAWSSecretsmanagerClient{
-					output: &secretsmanager.GetSecretValueOutput{
+				Client: MockAWSSecretsmanagerClient{
+					Output: &secretsmanager.GetSecretValueOutput{
 						SecretString: aws.String(`{"foo":"bar"}`),
 					},
 				},
@@ -64,7 +50,7 @@ func TestAWSSecretManager_ReadLatestSecret(t *testing.T) {
 		{
 			name: "unhappy path: no secret found",
 			fields: fields{
-				Client: mockAWSSecretsmanagerClient{},
+				Client: MockAWSSecretsmanagerClient{},
 			},
 			args: args{
 				ctx:    context.TODO(),
@@ -77,8 +63,8 @@ func TestAWSSecretManager_ReadLatestSecret(t *testing.T) {
 		{
 			name: "unhappy path: deserialization error",
 			fields: fields{
-				mockAWSSecretsmanagerClient{
-					output: &secretsmanager.GetSecretValueOutput{
+				MockAWSSecretsmanagerClient{
+					Output: &secretsmanager.GetSecretValueOutput{
 						SecretString: aws.String(`foo`),
 					},
 				},
@@ -95,7 +81,7 @@ func TestAWSSecretManager_ReadLatestSecret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				c := AWSSecretManager{
+				c := client{
 					tt.fields.Client,
 				}
 				if err := c.ReadLatestSecret(tt.args.ctx, tt.args.uri, tt.args.output); (err != nil) != tt.wantErr {

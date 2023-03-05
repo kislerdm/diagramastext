@@ -7,20 +7,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kislerdm/diagramastext/server/core"
-	"github.com/kislerdm/diagramastext/server/core/utils"
+	"github.com/kislerdm/diagramastext/server/core/contract"
 )
 
-// Graph defines the diagram graph.
-type Graph struct {
+// graph defines the diagram graph.
+type graph struct {
 	Title  string  `json:"title,omitempty"`
 	Footer string  `json:"footer,omitempty"`
-	Nodes  []*Node `json:"nodes"`
-	Links  []*Link `json:"links,omitempty"`
+	Nodes  []*node `json:"nodes"`
+	Links  []*link `json:"links,omitempty"`
 }
 
-// Node diagram's definition node.
-type Node struct {
+// node diagram's definition node.
+type node struct {
 	ID         string `json:"id"`
 	Label      string `json:"label,omitempty"`
 	Group      string `json:"group,omitempty"`
@@ -30,8 +29,8 @@ type Node struct {
 	IsDatabase bool   `json:"is_database,omitempty"`
 }
 
-// Link diagram's definition link.
-type Link struct {
+// link diagram's definition link.
+type link struct {
 	From       string `json:"from"`
 	To         string `json:"to"`
 	Direction  string `json:"direction,omitempty"`
@@ -46,48 +45,44 @@ type HttpClient interface {
 
 const defaultTimeout = 1 * time.Minute
 
-var defaultHttpClient = http.Client{Timeout: defaultTimeout}
-
-// Handler generates the diagram.
-func Handler(ctx context.Context, clientCore core.ModelInferenceClient, req core.Request) ([]byte, error) {
-	graphPrediction, err := clientCore.Do(
-		ctx, core.Inquiry{
-			Request:           req,
-			Model:             defineModel(req),
-			PrefixTransformFn: addPromptRequestConditionC4Containers,
-		},
-	)
-	if err != nil {
-		return nil, err
+// NewHandler initialises the C4 Diagram's handler.
+func NewHandler(httpClient HttpClient) (contract.DiagramHandler, error) {
+	h := &handler{httpClient: httpClient}
+	if h.httpClient == nil {
+		h.httpClient = &http.Client{Timeout: defaultTimeout}
 	}
-
-	var graph Graph
-	if err := json.Unmarshal(graphPrediction, &graph); err != nil {
-		return nil, err
-	}
-
-	// REFACTOR: rework the client struct to be a function.
-	diagram, err := renderDiagram(ctx, &defaultHttpClient, graph)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := utils.ValidateSVG(diagram); err != nil {
-		return nil, err
-	}
-
-	return diagram, nil
+	return h, nil
 }
 
-func defineModel(req core.Request) string {
-	if req.IsRegisteredUser {
+type handler struct {
+	httpClient HttpClient
+}
+
+func (h handler) GetModelRequest(inquery contract.Inquiry) contract.DiagramGraphPredictionRequest {
+	return contract.DiagramGraphPredictionRequest{
+		Model:  defineModel(inquery.UserProfile),
+		Prompt: addPromptRequestCondition(inquery.Prompt),
+	}
+}
+
+func (h handler) RenderPredictionResultsDiagramSVG(ctx context.Context, prediction []byte) ([]byte, error) {
+	var graph graph
+	if err := json.Unmarshal(prediction, &graph); err != nil {
+		return nil, err
+	}
+
+	return renderDiagram(ctx, h.httpClient, graph)
+}
+
+func defineModel(user *contract.UserProfile) string {
+	if user.IsRegistered {
 		// FIXME: change for fine-tuned model after it's trained
 		return "code-davinci-002"
 	}
 	return "code-davinci-002"
 }
 
-func addPromptRequestConditionC4Containers(prompt string) string {
+func addPromptRequestCondition(prompt string) string {
 	// FIXME: revert back for test
 	// FIXME: replace with embed after understanding encoding diff:
 	// FIXME: we tried to replace with embedded files already, but openAI was returning 400
