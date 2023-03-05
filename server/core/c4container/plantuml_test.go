@@ -12,7 +12,7 @@ import (
 
 func Test_diagramGraph2plantUMLCode(t *testing.T) {
 	type args struct {
-		graph Graph
+		graph graph
 	}
 	tests := []struct {
 		name    string
@@ -23,8 +23,8 @@ func Test_diagramGraph2plantUMLCode(t *testing.T) {
 		{
 			name: "default graph",
 			args: args{
-				graph: Graph{
-					Nodes: []*Node{{ID: "0"}},
+				graph: graph{
+					Nodes: []*node{{ID: "0"}},
 				},
 			},
 			want: `@startuml
@@ -36,8 +36,8 @@ Container(0, "0")
 		{
 			name: "graph: custom footer",
 			args: args{
-				graph: Graph{
-					Nodes: []*Node{{ID: "0"}},
+				graph: graph{
+					Nodes: []*node{{ID: "0"}},
 					Footer: `  foobar
 "bazqux
 quxx"  `,
@@ -52,10 +52,10 @@ Container(0, "0")
 		{
 			name: "graph: custom footer and title",
 			args: args{
-				graph: Graph{
+				graph: graph{
 					Title:  "foo",
 					Footer: "bar",
-					Nodes:  []*Node{{ID: "0"}},
+					Nodes:  []*node{{ID: "0"}},
 				},
 			},
 			want: `@startuml
@@ -68,8 +68,8 @@ Container(0, "0")
 		{
 			name: "system0",
 			args: args{
-				graph: Graph{
-					Nodes: []*Node{{ID: "0", Group: "0"}},
+				graph: graph{
+					Nodes: []*node{{ID: "0", Group: "0"}},
 				},
 			},
 			want: `@startuml
@@ -83,9 +83,9 @@ Container(0, "0")
 		{
 			name: "three nodes: two in one system, two links",
 			args: args{
-				graph: Graph{
+				graph: graph{
 					Title: "C4 containers to illustrate a data movement",
-					Nodes: []*Node{
+					Nodes: []*node{
 						{
 							ID:         "0",
 							Label:      "producer",
@@ -107,7 +107,7 @@ Container(0, "0")
 							External:   true,
 						},
 					},
-					Links: []*Link{
+					Links: []*link{
 						{
 							From:       "0",
 							To:         "1",
@@ -220,7 +220,7 @@ func Test_linkDirection(t *testing.T) {
 
 func Test_diagramNode2UML(t *testing.T) {
 	type args struct {
-		n *Node
+		n *node
 	}
 	tests := []struct {
 		name    string
@@ -231,7 +231,7 @@ func Test_diagramNode2UML(t *testing.T) {
 		{
 			name: "ID only",
 			args: args{
-				n: &Node{
+				n: &node{
 					ID: "foo",
 				},
 			},
@@ -240,7 +240,7 @@ func Test_diagramNode2UML(t *testing.T) {
 		{
 			name: "ID only, db",
 			args: args{
-				n: &Node{
+				n: &node{
 					ID:         "foo",
 					IsDatabase: true,
 				},
@@ -250,7 +250,7 @@ func Test_diagramNode2UML(t *testing.T) {
 		{
 			name: "ID only, queue",
 			args: args{
-				n: &Node{
+				n: &node{
 					ID:      "foo",
 					IsQueue: true,
 				},
@@ -260,7 +260,7 @@ func Test_diagramNode2UML(t *testing.T) {
 		{
 			name: "ID only, queue+db",
 			args: args{
-				n: &Node{
+				n: &node{
 					ID:         "foo",
 					IsQueue:    true,
 					IsDatabase: true,
@@ -271,7 +271,7 @@ func Test_diagramNode2UML(t *testing.T) {
 		{
 			name: "ID only, ext",
 			args: args{
-				n: &Node{
+				n: &node{
 					ID:       "foo",
 					External: true,
 				},
@@ -281,7 +281,7 @@ func Test_diagramNode2UML(t *testing.T) {
 		{
 			name: "ID only, ext db",
 			args: args{
-				n: &Node{
+				n: &node{
 					ID:         "foo",
 					External:   true,
 					IsDatabase: true,
@@ -292,7 +292,7 @@ func Test_diagramNode2UML(t *testing.T) {
 		{
 			name: "openai logic example",
 			args: args{
-				n: &Node{
+				n: &node{
 					ID:    "0",
 					Label: "Core Logic",
 					Technology: `"Go Application"
@@ -303,7 +303,7 @@ foobar"`,
 		},
 		{
 			name:    "unhappy path",
-			args:    args{n: &Node{}},
+			args:    args{n: &node{}},
 			want:    "",
 			wantErr: true,
 		},
@@ -326,7 +326,7 @@ foobar"`,
 
 func Test_diagramLink2UML(t *testing.T) {
 	type args struct {
-		l *Link
+		l *link
 	}
 	tests := []struct {
 		name    string
@@ -337,7 +337,7 @@ func Test_diagramLink2UML(t *testing.T) {
 		{
 			name: "simple link",
 			args: args{
-				l: &Link{
+				l: &link{
 					From: "foo",
 					To:   "bar",
 				},
@@ -348,7 +348,7 @@ func Test_diagramLink2UML(t *testing.T) {
 		{
 			name: "link w. label",
 			args: args{
-				l: &Link{
+				l: &link{
 					From:  "foo",
 					To:    "bar",
 					Label: "baz",
@@ -360,7 +360,7 @@ func Test_diagramLink2UML(t *testing.T) {
 		{
 			name: "link w. label and technology",
 			args: args{
-				l: &Link{
+				l: &link{
 					From:       "foo",
 					To:         "bar",
 					Label:      "baz",
@@ -373,7 +373,7 @@ func Test_diagramLink2UML(t *testing.T) {
 		{
 			name: "link w. label and technology, direction: on the right",
 			args: args{
-				l: &Link{
+				l: &link{
 					From:       "foo",
 					To:         "bar",
 					Label:      "baz",
@@ -387,7 +387,7 @@ func Test_diagramLink2UML(t *testing.T) {
 		{
 			name: "unhappy path: no 'from'",
 			args: args{
-				l: &Link{
+				l: &link{
 					To: "bar",
 				},
 			},
@@ -397,7 +397,7 @@ func Test_diagramLink2UML(t *testing.T) {
 		{
 			name: "unhappy path: no 'to'",
 			args: args{
-				l: &Link{
+				l: &link{
 					From: "foo",
 				},
 			},
@@ -672,7 +672,7 @@ func Test_renderDiagram(t *testing.T) {
 	type args struct {
 		ctx        context.Context
 		httpClient HttpClient
-		v          Graph
+		v          graph
 	}
 	tests := []struct {
 		name    string
@@ -691,8 +691,8 @@ func Test_renderDiagram(t *testing.T) {
 					},
 					err: nil,
 				},
-				v: Graph{
-					Nodes: []*Node{
+				v: graph{
+					Nodes: []*node{
 						{
 							ID: "0",
 						},
@@ -706,7 +706,7 @@ func Test_renderDiagram(t *testing.T) {
 			name: "unhappy path: faulty graph",
 			args: args{
 				ctx: context.TODO(),
-				v:   Graph{},
+				v:   graph{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -718,8 +718,8 @@ func Test_renderDiagram(t *testing.T) {
 				httpClient: &mockHTTPClient{
 					err: errors.New("foobar"),
 				},
-				v: Graph{
-					Nodes: []*Node{
+				v: graph{
+					Nodes: []*node{
 						{
 							ID: "0",
 						},
@@ -738,8 +738,8 @@ func Test_renderDiagram(t *testing.T) {
 						StatusCode: http.StatusInternalServerError,
 					},
 				},
-				v: Graph{
-					Nodes: []*Node{
+				v: graph{
+					Nodes: []*node{
 						{
 							ID: "0",
 						},

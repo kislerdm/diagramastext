@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kislerdm/diagramastext/server/core"
+	"github.com/kislerdm/diagramastext/server/core/contract"
 )
 
 type client struct {
@@ -26,7 +26,7 @@ func mustReadBody(v io.ReadCloser) []byte {
 	return buf
 }
 
-func (c *client) Do(req *http.Request) (core.ClientHTTPResp, error) {
+func (c *client) Do(req *http.Request) (contract.ClientHTTPResp, error) {
 	c.backoffInit(req)
 
 	resp, err := c.httpClient.Do(req)
@@ -38,7 +38,7 @@ func (c *client) Do(req *http.Request) (core.ClientHTTPResp, error) {
 
 	c.backoffReset(req)
 
-	return core.ClientHTTPResp{
+	return contract.ClientHTTPResp{
 		Body:       mustReadBody(resp.Body),
 		StatusCode: resp.StatusCode,
 	}, err
@@ -84,7 +84,7 @@ type Config struct {
 	Backoff
 }
 
-func NewHTTPClient(cfg Config) core.ClientHTTP {
+func NewHTTPClient(cfg Config) contract.ClientHTTP {
 	resolveConfig(&cfg)
 	return &client{
 		httpClient: &http.Client{Timeout: cfg.Timeout},

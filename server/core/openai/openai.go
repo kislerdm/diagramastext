@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kislerdm/diagramastext/server/core"
+	"github.com/kislerdm/diagramastext/server/core/contract"
 	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
@@ -82,9 +82,9 @@ const (
 )
 
 // NewClient initiates the client to communicate with the plantuml server.
-func NewClient(cfg ConfigOpenAI) (core.ClientModelInference, error) {
+func NewClient(cfg ConfigOpenAI) (contract.ClientModelInference, error) {
 	if cfg.Token == "mock" {
-		return core.MockClientModelInference{}, nil
+		return contract.MockClientModelInference{}, nil
 	}
 
 	if err := cfg.Validate(); err != nil {

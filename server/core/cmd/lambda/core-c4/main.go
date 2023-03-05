@@ -9,19 +9,27 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	cloudConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/kislerdm/diagramastext/server/core"
 	"github.com/kislerdm/diagramastext/server/core/c4container"
-	"github.com/kislerdm/diagramastext/server/core/configuration"
-	errs "github.com/kislerdm/diagramastext/server/core/errors"
+	"github.com/kislerdm/diagramastext/server/core/contract"
+	"github.com/kislerdm/diagramastext/server/core/secretsmanager"
 )
 
 func main() {
-	cfg, err := configuration.LoadDefaultConfig(context.Background())
+	awsConfig, err := cloudConfig.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	clientModelInference, err := core.NewModelInferenceClientFromConfig(cfg)
+	clientSecretsmanager := secretsmanager.NewAWSSecretManagerFromConfig(awsConfig)
+
+	entrypoint, err := core.InitEntrypoint(context.Background(), clientSecretsmanager)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	c4handler, err := c4container.NewHandler(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,7 +41,7 @@ func main() {
 		}
 	}
 
-	lambda.Start(handler(c4container.Handler, clientModelInference, corsHeaders))
+	lambda.Start(handler(entrypoint, c4handler, corsHeaders))
 }
 
 type corsHeaders map[string]string
@@ -58,22 +66,17 @@ func (h corsHeaders) setHeaders(resp events.APIGatewayProxyResponse) events.APIG
 	return resp
 }
 
-type request struct {
-	Prompt string `json:"prompt"`
-}
-
-type response struct {
-	SVG string `json:"svg"`
-}
-
-func handler(handler core.DiagramRenderingHandler, client core.ModelInferenceClient, corsHeaders corsHeaders) func(
+func handler(
+	handler contract.Entrypoint, diagramHandler contract.DiagramHandler, corsHeaders corsHeaders,
+) func(
 	ctx context.Context, req events.APIGatewayProxyRequest,
 ) (events.APIGatewayProxyResponse, error) {
 	return func(
 		ctx context.Context, req events.APIGatewayProxyRequest,
 	) (events.APIGatewayProxyResponse, error) {
-		var input request
+		var input core.Request
 		if err := json.Unmarshal([]byte(req.Body), &input); err != nil {
+			log.Print(err)
 			return corsHeaders.setHeaders(
 				events.APIGatewayProxyResponse{
 					StatusCode: http.StatusUnprocessableEntity,
@@ -82,19 +85,27 @@ func handler(handler core.DiagramRenderingHandler, client core.ModelInferenceCli
 			), err
 		}
 
-		inquiry := core.Request{
-			Prompt:                 input.Prompt,
-			UserID:                 readUserID(req.Headers),
-			IsRegisteredUser:       isRegisteredUser(req.Headers),
-			OptOutFromSavingPrompt: isOptOutFromSavingPrompt(req.Headers),
+		inquiry := contract.Inquiry{
+			Request: &input,
+			UserProfile: &contract.UserProfile{
+				UserID:                 readUserID(req.Headers),
+				IsRegistered:           isRegisteredUser(req.Headers),
+				OptOutFromSavingPrompt: isOptOutFromSavingPrompt(req.Headers),
+			},
 		}
 
-		diagram, err := handler(ctx, client, inquiry)
+		diagram, err := handler(ctx, inquiry, diagramHandler)
 		if err != nil {
-			return corsHeaders.setHeaders(parseClientError(err)), err
+			log.Print(err)
+			return corsHeaders.setHeaders(
+				events.APIGatewayProxyResponse{
+					StatusCode: http.StatusInternalServerError,
+					Body:       "failed generating the diagram",
+				},
+			), err
 		}
 
-		output, _ := json.Marshal(response{SVG: string(diagram)})
+		output, _ := json.Marshal(core.Response{SVG: string(diagram)})
 
 		return corsHeaders.setHeaders(
 			events.APIGatewayProxyResponse{
@@ -118,17 +129,4 @@ func isRegisteredUser(headers map[string]string) bool {
 func readUserID(headers map[string]string) string {
 	// FIXME: extract UserID from the headers when authN is implemented
 	return "NA"
-}
-
-func parseClientError(err error) events.APIGatewayProxyResponse {
-	code := http.StatusInternalServerError
-
-	if e, ok := err.(errs.Error); ok && e.ServiceResponseStatusCode != 0 {
-		code = e.ServiceResponseStatusCode
-	}
-
-	return events.APIGatewayProxyResponse{
-		StatusCode: code,
-		Body:       err.Error(),
-	}
 }

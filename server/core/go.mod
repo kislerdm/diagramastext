@@ -2,7 +2,7 @@ module github.com/kislerdm/diagramastext/server/core
 
 go 1.19
 
-// storage
+// postgres
 require github.com/lib/pq v1.10.7
 
 // secretsmanager

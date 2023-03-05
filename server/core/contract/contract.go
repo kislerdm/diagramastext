@@ -1,4 +1,4 @@
-package core
+package contract
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/smithy-go/rand"
+	"github.com/kislerdm/diagramastext/server/core"
 )
 
 // UserProfile requesting user's profile.
@@ -17,12 +17,32 @@ type UserProfile struct {
 	OptOutFromSavingPrompt bool
 }
 
-// Handler functional entrypoint to render the text prompt to a diagram.
-type Handler func(
-	ctx context.Context, inquery Inquiry, clientInference ClientModelInference, clientStorage ClientStorage,
+type DiagramGraphPredictionRequest struct {
+	Model  string
+	Prompt string
+}
+
+// DiagramHandler handler the model inference request's attributes
+// and communicates with the diagram rendering backend.
+type DiagramHandler interface {
+	// GetModelRequest returns the model inference request's attributes to generate the diagram graph.
+	GetModelRequest(inquery Inquiry) DiagramGraphPredictionRequest
+
+	// RenderPredictionResultsDiagramSVG renders the diagram using the prediction results.
+	RenderPredictionResultsDiagramSVG(ctx context.Context, prediction []byte) ([]byte, error)
+}
+
+// Entrypoint functional entrypoint to render the text prompt to a diagram.
+type Entrypoint func(
+	ctx context.Context, inquery Inquiry, diagramImplementationHandler DiagramHandler,
 ) (
 	[]byte, error,
 )
+
+// ClientModelInference the logic to infer the model and predict a diagram graph.
+type ClientModelInference interface {
+	Do(ctx context.Context, prompt, model string) ([]byte, error)
+}
 
 // MockClientModelInference mock of the model inference client.
 type MockClientModelInference struct {
@@ -30,16 +50,11 @@ type MockClientModelInference struct {
 	Err        error
 }
 
-func (m MockClientModelInference) Do(_ context.Context, prompt, model string) ([]byte, error) {
+func (m MockClientModelInference) Do(_ context.Context, _, _ string) ([]byte, error) {
 	if m.Err != nil {
 		return nil, m.Err
 	}
 	return m.Prediction, nil
-}
-
-// ClientModelInference the logic to infer the model and predict a diagram graph.
-type ClientModelInference interface {
-	Do(ctx context.Context, prompt, model string) ([]byte, error)
 }
 
 // ClientStorage the client to persist user's prompt and the model's predictions.
@@ -54,16 +69,16 @@ type ClientStorage interface {
 	Close(ctx context.Context) error
 }
 
-// MockClientStorage mock of the storage client.
+// MockClientStorage mock of the postgres client.
 type MockClientStorage struct {
 	Err error
 }
 
-func (m MockClientStorage) WritePrompt(_ context.Context, _ string, _ string, _ string) error {
+func (m MockClientStorage) WritePrompt(_ context.Context, _, _, _ string) error {
 	return m.Err
 }
 
-func (m MockClientStorage) WriteModelPrediction(_ context.Context, _ string, _ string, _ string) error {
+func (m MockClientStorage) WriteModelPrediction(_ context.Context, _, _, _ string) error {
 	return m.Err
 }
 
@@ -74,7 +89,7 @@ func (m MockClientStorage) Close(_ context.Context) error {
 // Inquiry model inference inquiry object.
 type Inquiry struct {
 	// Request API request.
-	*Request
+	*core.Request
 
 	// Model the model ID to infer.
 	*UserProfile
@@ -114,22 +129,6 @@ func validatePromptLength(prompt string, max int) error {
 	return nil
 }
 
-func generateRequestID() string {
-	o, _ := rand.NewUUID(rand.Reader).GetUUID()
-	return o
-}
-
-// StorePrediction persists the user's prompt and prediction results.
-func StorePrediction(
-	ctx context.Context, clientStorage ClientStorage, userID string, prompt string, graphPrediction string,
-) {
-	requestID := generateRequestID()
-	// FIXME: combine both transactions into a single atomic transaction.
-	if err := clientStorage.WritePrompt(ctx, requestID, prompt, userID); err == nil {
-		_ = clientStorage.WriteModelPrediction(ctx, requestID, graphPrediction, userID)
-	}
-}
-
 // ClientHTTP http client.
 type ClientHTTP interface {
 	Do(req *http.Request) (resp ClientHTTPResp, err error)
@@ -138,4 +137,10 @@ type ClientHTTP interface {
 type ClientHTTPResp struct {
 	Body       []byte
 	StatusCode int
+}
+
+// ClientSecretsmanager client to communicate to the secretsmanager.
+type ClientSecretsmanager interface {
+	// ReadLatestSecret reads and deserializes the latest version of JSON-encoded secret.
+	ReadLatestSecret(ctx context.Context, uri string, output interface{}) error
 }

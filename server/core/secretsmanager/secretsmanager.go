@@ -7,15 +7,10 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/kislerdm/diagramastext/server/core/contract"
 )
 
-// Client secrets vault client.
-type Client interface {
-	// ReadLatestSecret reads and deserializes the latest version of JSON-encoded secret.
-	ReadLatestSecret(ctx context.Context, uri string, output interface{}) error
-}
-
-type AWSSecretManager struct {
+type client struct {
 	awsSecretsManager
 }
 
@@ -27,7 +22,7 @@ type awsSecretsManager interface {
 	)
 }
 
-func (c AWSSecretManager) ReadLatestSecret(ctx context.Context, uri string, output interface{}) error {
+func (c client) ReadLatestSecret(ctx context.Context, uri string, output interface{}) error {
 	v, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &uri})
 	if err != nil {
 		return err
@@ -41,8 +36,22 @@ func (c AWSSecretManager) ReadLatestSecret(ctx context.Context, uri string, outp
 }
 
 // NewAWSSecretManagerFromConfig initiates the AWS Secretsmanager.
-func NewAWSSecretManagerFromConfig(config aws.Config) Client {
-	return AWSSecretManager{
+func NewAWSSecretManagerFromConfig(config aws.Config) contract.ClientSecretsmanager {
+	return client{
 		secretsmanager.NewFromConfig(config),
 	}
+}
+
+// MockAWSSecretsmanagerClient mock of the AWS Secretsmanager's client.
+type MockAWSSecretsmanagerClient struct {
+	Output *secretsmanager.GetSecretValueOutput
+}
+
+func (m MockAWSSecretsmanagerClient) GetSecretValue(
+	_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options),
+) (*secretsmanager.GetSecretValueOutput, error) {
+	if m.Output == nil {
+		return nil, errors.New("no secret found")
+	}
+	return m.Output, nil
 }

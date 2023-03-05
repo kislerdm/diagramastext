@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"log"
 	"strconv"
 )
 
@@ -30,3 +31,20 @@ const (
 	ServiceAWSConfig      = "AWSConfig"
 	ServiceSecretsManager = "AWSSecretsmanager"
 )
+
+type Err struct {
+	w []byte
+}
+
+func (e *Err) Write(p []byte) (n int, err error) {
+	e.w = p
+	return len(p), nil
+}
+
+func (e *Err) Error() string {
+	return string(e.w)
+}
+
+func NewErrorHandler(msg string) *log.Logger {
+	return log.New(&Err{}, "", log.LstdFlags|log.LUTC|log.Llongfile)
+}
