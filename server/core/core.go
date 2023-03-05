@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -127,4 +128,14 @@ func StorePrediction(
 	if err := clientStorage.WritePrompt(ctx, requestID, prompt, userID); err == nil {
 		_ = clientStorage.WriteModelPrediction(ctx, requestID, graphPrediction, userID)
 	}
+}
+
+// ClientHTTP http client.
+type ClientHTTP interface {
+	Do(req *http.Request) (resp ClientHTTPResp, err error)
+}
+
+type ClientHTTPResp struct {
+	Body       []byte
+	StatusCode int
 }
