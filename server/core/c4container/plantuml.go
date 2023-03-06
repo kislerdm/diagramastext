@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/kislerdm/diagramastext/server/core/c4container/compression"
-	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 func renderDiagram(ctx context.Context, httpClient HttpClient, v graph) ([]byte, error) {
@@ -28,30 +27,18 @@ func renderDiagram(ctx context.Context, httpClient HttpClient, v graph) ([]byte,
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiePlantUML,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
 
 	if resp.StatusCode > 209 {
-		return nil,
-			errs.Error{
-				Service:                   errs.ServiePlantUML,
-				Message:                   "error status code: " + strconv.Itoa(resp.StatusCode),
-				ServiceResponseStatusCode: resp.StatusCode,
-			}
+		return nil, errors.New("error status code: " + strconv.Itoa(resp.StatusCode))
 	}
 
 	buf, err := io.ReadAll(resp.Body)
 	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiePlantUML,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
-
 	return buf, nil
 }
 
