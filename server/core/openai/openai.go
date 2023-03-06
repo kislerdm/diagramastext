@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/kislerdm/diagramastext/server/core/contract"
-	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 // HttpClient http base client.
@@ -88,10 +87,7 @@ func NewClient(cfg ConfigOpenAI) (contract.ClientModelInference, error) {
 	}
 
 	if err := cfg.Validate(); err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceOpenAI,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
 
 	c := clientOpenAI{
@@ -207,17 +203,11 @@ type openAIErrorResponse struct {
 func (c *clientOpenAI) decodeResponse(_ context.Context, respBytes []byte) ([]byte, error) {
 	var resp openAIResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceOpenAI,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
 
 	if len(resp.Choices) == 0 {
-		return nil, errs.Error{
-			Service: errs.ServiceOpenAI,
-			Message: "openAI could not convert the input prompt",
-		}
+		return nil, errors.New("openAI could not convert the input prompt")
 	}
 
 	s := cleanRawResponse(resp.Choices[0].Text)
@@ -241,49 +231,30 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 	var w bytes.Buffer
 	err := json.NewEncoder(&w).Encode(payload)
 	if err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceOpenAI,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"completions", &w)
-
 	c.setHeader(req)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceOpenAI,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
 
 	if resp.StatusCode > 209 {
-		o := errs.Error{
-			Service:                   errs.ServiceOpenAI,
-			Message:                   "error status code: " + strconv.Itoa(resp.StatusCode),
-			ServiceResponseStatusCode: resp.StatusCode,
-		}
-
 		var e openAIErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&e); err == nil {
 			if v := e.Error; v != nil {
-				o.Message = v.Message
+				return nil, errors.New(v.Message)
 			}
 		}
-
-		return nil, o
+		return nil, errors.New("error status code: " + strconv.Itoa(resp.StatusCode))
 	}
 
 	buf, err := io.ReadAll(resp.Body)
 	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceOpenAI,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
-
 	return buf, nil
 }
