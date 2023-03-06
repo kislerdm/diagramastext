@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/kislerdm/diagramastext/server/core/contract"
-	errs "github.com/kislerdm/diagramastext/server/core/errors"
 	_ "github.com/lib/pq"
 )
 
@@ -53,10 +52,7 @@ func NewClient(ctx context.Context, cfg Config) (
 	}
 
 	if err := cfg.Validate(); err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceStorage,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
 
 	connStr := "user=" + cfg.DBUser +
@@ -70,17 +66,11 @@ func NewClient(ctx context.Context, cfg Config) (
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceStorage,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
 
 	if err := db.PingContext(ctx); err != nil {
-		return nil, errs.Error{
-			Service: errs.ServiceStorage,
-			Message: err.Error(),
-		}
+		return nil, err
 	}
 
 	return &pgClient{
@@ -102,63 +92,38 @@ func (c pgClient) Close(ctx context.Context) error {
 
 func (c pgClient) WritePrompt(ctx context.Context, requestID, prompt, userID string) error {
 	if requestID == "" {
-		return errs.Error{
-			Service: errs.ServiceStorage,
-			Message: "request_id is required",
-		}
+		return errors.New("request_id is required")
 	}
 	if prompt == "" {
-		return errs.Error{
-			Service: errs.ServiceStorage,
-			Message: "prompt is required",
-		}
+		return errors.New("prompt is required")
 	}
-
-	if _, err := c.c.ExecContext(
+	_, err := c.c.ExecContext(
 		ctx, `INSERT INTO `+c.tableWritePrompt+
 			` (request_id, user_id, prompt, timestamp) VALUES ($1, $2, $3, $4)`,
 		requestID,
 		userID,
 		prompt,
 		time.Now().UTC(),
-	); err != nil {
-		return errs.Error{
-			Service: errs.ServiceStorage,
-			Message: err.Error(),
-		}
-	}
-
-	return nil
+	)
+	return err
 }
 
 func (c pgClient) WriteModelPrediction(ctx context.Context, requestID, result, userID string) error {
 	if requestID == "" {
-		return errs.Error{
-			Service: errs.ServiceStorage,
-			Message: "request_id is required",
-		}
+		return errors.New("request_id is required")
 	}
 	if result == "" {
-		return errs.Error{
-			Service: errs.ServiceStorage,
-			Message: "response is required",
-		}
+		return errors.New("response is required")
 	}
-	if _, err := c.c.ExecContext(
+	_, err := c.c.ExecContext(
 		ctx, `INSERT INTO `+c.tableWriteModelPrediction+
 			` (request_id, user_id, response, timestamp) VALUES ($1, $2, $3, $4)`,
 		requestID,
 		userID,
 		result,
 		time.Now().UTC(),
-	); err != nil {
-		return errs.Error{
-			Service: errs.ServiceStorage,
-			Message: err.Error(),
-		}
-	}
-
-	return nil
+	)
+	return err
 }
 
 type mockDbClient struct {
