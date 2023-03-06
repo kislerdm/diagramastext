@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/kislerdm/diagramastext/server/core"
 )
 
 // UserProfile requesting user's profile.
@@ -89,7 +87,7 @@ func (m MockClientStorage) Close(_ context.Context) error {
 // Inquiry model inference inquiry object.
 type Inquiry struct {
 	// Request API request.
-	*core.Request
+	*Request
 
 	// Model the model ID to infer.
 	*UserProfile

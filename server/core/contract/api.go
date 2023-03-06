@@ -1,4 +1,4 @@
-package core
+package contract
 
 // Request API request object.
 type Request struct {

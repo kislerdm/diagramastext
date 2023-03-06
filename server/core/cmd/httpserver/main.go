@@ -12,15 +12,61 @@ import (
 	"os"
 	"strconv"
 
+	cloudConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/kislerdm/diagramastext/server/core"
 	"github.com/kislerdm/diagramastext/server/core/c4container"
-	"github.com/kislerdm/diagramastext/server/core/configuration"
+	"github.com/kislerdm/diagramastext/server/core/contract"
+	"github.com/kislerdm/diagramastext/server/core/secretsmanager"
 	"github.com/kislerdm/diagramastext/server/core/utils"
 )
 
+var entrypoint contract.Entrypoint
+
+func init() {
+	awsConfig, err := cloudConfig.LoadDefaultConfig(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	clientSecretsmanager := secretsmanager.NewAWSSecretManagerFromConfig(awsConfig)
+
+	entrypoint, err = core.InitEntrypoint(context.Background(), clientSecretsmanager)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func main() {
+	c4handler, err := c4container.NewHandler(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	handler := httpHandler{
+		diagramRenderingHandler: map[string]contract.DiagramHandler{
+			"c4": c4handler,
+		},
+		reportErrorFn: func(err error) { log.Println(err) },
+	}
+
+	if v := os.Getenv("CORS_HEADERS"); v != "" {
+		if err := json.Unmarshal([]byte(v), &handler.corsHeaders); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	port := 9000
+	if v := utils.MustParseInt(os.Getenv("PORT")); v > 0 {
+		port = v
+	}
+
+	if err := http.ListenAndServe(":"+strconv.Itoa(port), handler); err != nil {
+		log.Println(err)
+	}
+}
+
 type httpHandler struct {
-	clientModelInference    core.ModelInferenceClient
-	diagramRenderingHandler core.DiagramRenderingHandler
+	diagramRenderingHandler map[string]contract.DiagramHandler
 	reportErrorFn           func(err error)
 	corsHeaders             corsHeaders
 }
@@ -34,49 +80,59 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, status int, er
 	_, _ = w.Write(body)
 }
 
-type request struct {
-	Prompt string `json:"prompt"`
-}
-
-type response struct {
-	SVG string `json:"svg"`
-}
-
 func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		h.response(w, nil, http.StatusOK, nil)
+	switch p := r.URL.Path; p {
+	case "status":
+		if r.Method == http.MethodGet {
+			h.response(w, nil, http.StatusOK, nil)
+			return
+		}
+		h.response(w, nil, http.StatusMethodNotAllowed, nil)
 		return
-	}
+	default:
+		renderingHandler, ok := h.diagramRenderingHandler[p]
+		if !ok {
+			h.response(w, nil, http.StatusNotFound, nil)
+			return
+		}
 
+		switch r.Method {
+		case http.MethodOptions:
+			h.response(w, nil, http.StatusOK, nil)
+			return
+		case http.MethodPost:
+			h.serve(context.Background(), w, r, renderingHandler)
+		}
+	}
+}
+
+func (h httpHandler) serve(
+	ctx context.Context, w http.ResponseWriter, r *http.Request, renderingHandler contract.DiagramHandler,
+) {
 	defer func() { _ = r.Body.Close() }()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.response(w, []byte("could not recognise the prompt format"), http.StatusUnprocessableEntity, err)
 		return
 	}
-	var input request
+	var input contract.Request
 	if err := json.Unmarshal(body, &input); err != nil {
 		h.response(w, []byte("could not recognise the prompt format"), http.StatusUnprocessableEntity, err)
 		return
 	}
 
-	// FIXME: add proper sink to preserve user's requests for model fine-tuning
-	log.Println(input.Prompt)
-
-	diagram, err := h.diagramRenderingHandler(
-		context.Background(), h.clientModelInference, core.Request{
-			Prompt:                 input.Prompt,
+	inquiry := contract.Inquiry{
+		Request: &input,
+		UserProfile: &contract.UserProfile{
 			UserID:                 readUserID(r.Header),
-			IsRegisteredUser:       isRegisteredUser(r.Header),
+			IsRegistered:           isRegisteredUser(r.Header),
 			OptOutFromSavingPrompt: isOptOutFromSavingPrompt(r.Header),
 		},
-	)
-	if err != nil {
-		h.response(w, []byte(err.Error()), http.StatusInternalServerError, err)
-		return
 	}
 
-	o, err := json.Marshal(response{SVG: string(diagram)})
+	diagram, err := entrypoint(ctx, inquiry, renderingHandler)
+
+	o, err := json.Marshal(contract.Response{SVG: string(diagram)})
 	if err != nil {
 		h.response(w, []byte(err.Error()), http.StatusInternalServerError, err)
 		return
@@ -98,37 +154,6 @@ func isRegisteredUser(headers http.Header) bool {
 func readUserID(headers http.Header) string {
 	// FIXME: extract UserID from the headers when authN is implemented
 	return "NA"
-}
-
-func main() {
-	cfg, err := configuration.LoadDefaultConfig(context.Background())
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	c, err := core.NewModelInferenceClientFromConfig(cfg)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	handler := httpHandler{
-		clientModelInference:    c,
-		diagramRenderingHandler: c4container.Handler,
-		reportErrorFn:           func(err error) { log.Println(err) },
-	}
-
-	if v := os.Getenv("CORS_HEADERS"); v != "" {
-		_ = json.Unmarshal([]byte(v), &handler.corsHeaders)
-	}
-
-	port := 9000
-	if v := utils.MustParseInt(os.Getenv("PORT")); v > 0 {
-		port = v
-	}
-
-	if err := http.ListenAndServe(":"+strconv.Itoa(port), handler); err != nil {
-		log.Println(err)
-	}
 }
 
 type corsHeaders map[string]string

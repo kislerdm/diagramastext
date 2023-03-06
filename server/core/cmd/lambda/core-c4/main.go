@@ -74,7 +74,7 @@ func handler(
 	return func(
 		ctx context.Context, req events.APIGatewayProxyRequest,
 	) (events.APIGatewayProxyResponse, error) {
-		var input core.Request
+		var input contract.Request
 		if err := json.Unmarshal([]byte(req.Body), &input); err != nil {
 			log.Print(err)
 			return corsHeaders.setHeaders(
@@ -105,7 +105,7 @@ func handler(
 			), err
 		}
 
-		output, _ := json.Marshal(core.Response{SVG: string(diagram)})
+		output, _ := json.Marshal(contract.Response{SVG: string(diagram)})
 
 		return corsHeaders.setHeaders(
 			events.APIGatewayProxyResponse{
