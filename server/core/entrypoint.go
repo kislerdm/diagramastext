@@ -69,10 +69,7 @@ func storePrediction(
 func initCoreClients(ctx context.Context, clientSecretsManager contract.ClientSecretsmanager) (
 	contract.ClientModelInference, contract.ClientStorage, error,
 ) {
-	cfg, err := loadDefaultConfig(ctx, clientSecretsManager)
-	if err != nil {
-		return nil, nil, err
-	}
+	cfg := loadDefaultConfig(ctx, clientSecretsManager)
 
 	// TODO: add custom http client with the retry-backoff mechanism.
 	clientModelInference, err := openai.NewClient(cfg.modelInferenceConfig)
@@ -106,7 +103,7 @@ const (
 	tableWriteModelPrediction = "openai_response"
 )
 
-func loadDefaultConfig(ctx context.Context, clientSecretsManager contract.ClientSecretsmanager) (*config, error) {
+func loadDefaultConfig(ctx context.Context, clientSecretsManager contract.ClientSecretsmanager) *config {
 	// defaults
 	cfg := config{
 		storageConfig: postgres.Config{
@@ -121,7 +118,7 @@ func loadDefaultConfig(ctx context.Context, clientSecretsManager contract.Client
 		loadFromSecretsManager(ctx, &cfg, secretARN, clientSecretsManager)
 	}
 
-	return &cfg, nil
+	return &cfg
 }
 
 func loadFromSecretsManager(
