@@ -13,7 +13,7 @@ type responseSVG struct {
 }
 
 func (r responseSVG) Serialize() ([]byte, error) {
-	return json.Marshal(r.SVG)
+	return json.Marshal(r)
 }
 
 // NewResultSVG create a response object with the SVG diagram.
