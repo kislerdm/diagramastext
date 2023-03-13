@@ -10,11 +10,15 @@ type User struct {
 type Input interface {
 	Validate() error
 	GetUser() User
+	GetPrompt() string
+	GetRequestID() string
 }
 
 type MockInput struct {
-	Err  error
-	User User
+	Err       error
+	Prompt    string
+	RequestID string
+	User      User
 }
 
 func (v MockInput) Validate() error {
@@ -23,4 +27,12 @@ func (v MockInput) Validate() error {
 
 func (v MockInput) GetUser() User {
 	return v.User
+}
+
+func (v MockInput) GetPrompt() string {
+	return v.Prompt
+}
+
+func (v MockInput) GetRequestID() string {
+	return v.RequestID
 }

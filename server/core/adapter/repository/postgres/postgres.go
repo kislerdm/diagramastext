@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/kislerdm/diagramastext/server/core/contract"
+	"github.com/kislerdm/diagramastext/server/core/port"
 	_ "github.com/lib/pq"
 )
 
@@ -31,20 +31,20 @@ func (cfg Config) Validate() error {
 		return errors.New("user must be provided")
 	}
 	if cfg.TablePrompt == "" {
-		return errors.New("table to store prompt must be provided")
+		return errors.New("table_prompt must be provided")
 	}
 	if cfg.TablePrediction == "" {
-		return errors.New("table to store prediction must be provided")
+		return errors.New("table_prediction must be provided")
 	}
 	return nil
 }
 
-// NewClient initiates the postgres pgClient.
-func NewClient(ctx context.Context, cfg Config) (
-	contract.ClientStorage, error,
+// NewRepositoryPostgres initiates the postgres client.
+func NewRepositoryPostgres(ctx context.Context, cfg Config) (
+	port.RepositoryPrediction, error,
 ) {
 	if cfg.DBHost == "mock" {
-		return pgClient{
+		return &client{
 			c:                         mockDbClient{},
 			tableWritePrompt:          cfg.TablePrompt,
 			tableWriteModelPrediction: cfg.TablePrediction,
@@ -73,54 +73,52 @@ func NewClient(ctx context.Context, cfg Config) (
 		return nil, err
 	}
 
-	return &pgClient{
-		c:                         db,
-		tableWritePrompt:          cfg.TablePrompt,
-		tableWriteModelPrediction: cfg.TablePrediction,
+	return &client{
+		c: db,
 	}, nil
 }
 
-type pgClient struct {
+type client struct {
 	c                         dbClient
 	tableWritePrompt          string
 	tableWriteModelPrediction string
 }
 
-func (c pgClient) Close(ctx context.Context) error {
+func (c client) Close(ctx context.Context) error {
 	return c.c.Close()
 }
 
-func (c pgClient) WritePrompt(ctx context.Context, requestID, prompt, userID string) error {
-	if requestID == "" {
+func (c client) WriteInputPrompt(ctx context.Context, input port.Input) error {
+	if input.GetRequestID() == "" {
 		return errors.New("request_id is required")
 	}
-	if prompt == "" {
+	if input.GetPrompt() == "" {
 		return errors.New("prompt is required")
 	}
 	_, err := c.c.ExecContext(
 		ctx, `INSERT INTO `+c.tableWritePrompt+
 			` (request_id, user_id, prompt, timestamp) VALUES ($1, $2, $3, $4)`,
-		requestID,
-		userID,
-		prompt,
+		input.GetRequestID(),
+		input.GetUser().ID,
+		input.GetPrompt(),
 		time.Now().UTC(),
 	)
 	return err
 }
 
-func (c pgClient) WriteModelPrediction(ctx context.Context, requestID, result, userID string) error {
-	if requestID == "" {
+func (c client) WriteModelResult(ctx context.Context, input port.Input, prediction string) error {
+	if input.GetRequestID() == "" {
 		return errors.New("request_id is required")
 	}
-	if result == "" {
+	if prediction == "" {
 		return errors.New("response is required")
 	}
 	_, err := c.c.ExecContext(
 		ctx, `INSERT INTO `+c.tableWriteModelPrediction+
 			` (request_id, user_id, response, timestamp) VALUES ($1, $2, $3, $4)`,
-		requestID,
-		userID,
-		result,
+		input.GetRequestID(),
+		input.GetUser().ID,
+		prediction,
 		time.Now().UTC(),
 	)
 	return err
