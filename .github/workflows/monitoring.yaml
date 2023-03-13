@@ -28,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Configure AWS Credentials Action For GitHub Actions
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-region: us-east-2
           role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
@@ -99,7 +99,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Configure AWS Credentials Action For GitHub Actions
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-region: us-east-2
           role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
