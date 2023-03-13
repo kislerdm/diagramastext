@@ -95,8 +95,9 @@ func Test_inquiry_Validate(t *testing.T) {
 
 func TestNewInquiryDriverHTTP(t *testing.T) {
 	type args struct {
-		body    io.Reader
-		headers http.Header
+		body      io.Reader
+		headers   http.Header
+		requestID string
 	}
 
 	validPrompt := randomString(promptLengthMaxBaseUser - 1)
@@ -110,11 +111,13 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 		{
 			name: "happy path",
 			args: args{
-				body: strings.NewReader(`{"prompt":"` + validPrompt + `"}`),
+				body:      strings.NewReader(`{"prompt":"` + validPrompt + `"}`),
+				requestID: "foo",
 			},
 			want: &inquiry{
-				Prompt: validPrompt,
-				User:   port.User{ID: "NA"},
+				Prompt:    validPrompt,
+				User:      port.User{ID: "NA"},
+				RequestID: "foo",
 			},
 			wantErr: false,
 		},
@@ -142,7 +145,7 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := NewInquiryDriverHTTP(tt.args.body, tt.args.headers)
+				got, err := NewInquiryDriverHTTP(tt.args.body, tt.args.headers, tt.args.requestID)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("NewInquiryDriverHTTP() error = %v, wantErr %v", err, tt.wantErr)
 					return

@@ -11,7 +11,7 @@ package postgres
 //	tests := []struct {
 //		name    string
 //		args    args
-//		want    Client
+//		want    client
 //		wantErr bool
 //	}{
 //		{
@@ -77,13 +77,13 @@ package postgres
 //	for _, tt := range tests {
 //		t.Run(
 //			tt.name, func(t *testing.T) {
-//				got, err := NewClient(tt.args.ctx, tt.args.host, tt.args.dbname, tt.args.user, tt.args.password)
+//				got, err := NewRepositoryPostgres(tt.args.ctx, tt.args.host, tt.args.dbname, tt.args.user, tt.args.password)
 //				if (err != nil) != tt.wantErr {
-//					t.Errorf("NewClient() error = %v, wantErr %v", err, tt.wantErr)
+//					t.Errorf("NewRepositoryPostgres() error = %v, wantErr %v", err, tt.wantErr)
 //					return
 //				}
 //				if !reflect.DeepEqual(got, tt.want) {
-//					t.Errorf("NewClient() got = %v, want %v", got, tt.want)
+//					t.Errorf("NewRepositoryPostgres() got = %v, want %v", got, tt.want)
 //				}
 //			},
 //		)

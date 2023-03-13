@@ -1,4 +1,4 @@
-package plantuml
+package adapter
 
 import "strings"
 
