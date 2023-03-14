@@ -19,3 +19,16 @@ func (m MockRepositoryPrediction) WriteInputPrompt(_ context.Context, _ Input) e
 func (m MockRepositoryPrediction) WriteModelResult(_ context.Context, _ Input, _ string) error {
 	return m.Err
 }
+
+// RepositorySecretsVault defines the interface to read secrets from the vault.
+type RepositorySecretsVault interface {
+	ReadLastVersion(ctx context.Context, uri string, output interface{}) error
+}
+
+type MockRepositorySecretsVault struct {
+	Err error
+}
+
+func (m MockRepositorySecretsVault) ReadLastVersion(_ context.Context, _ string, _ interface{}) error {
+	return m.Err
+}

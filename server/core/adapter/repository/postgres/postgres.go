@@ -83,7 +83,7 @@ type client struct {
 	tableWriteModelPrediction string
 }
 
-func (c client) Close(ctx context.Context) error {
+func (c client) Close(_ context.Context) error {
 	return c.c.Close()
 }
 

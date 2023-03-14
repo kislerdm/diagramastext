@@ -6,18 +6,6 @@ package contract
 //	"net/http"
 //)
 //
-//// UserProfile requesting user's profile.
-//type UserProfile struct {
-//	UserID                 string
-//	IsRegistered           bool
-//	OptOutFromSavingPrompt bool
-//}
-//
-//type DiagramGraphPredictionRequest struct {
-//	Model  string
-//	Prompt string
-//}
-//
 //// DiagramHandler handler the model inference request's attributes
 //// and communicates with the diagram rendering backend.
 //type DiagramHandler interface {
@@ -51,35 +39,6 @@ package contract
 //		return nil, m.Err
 //	}
 //	return m.Prediction, nil
-//}
-//
-//// ClientStorage the client to persist user's prompt and the model's predictions.
-//type ClientStorage interface {
-//	// WritePrompt writes user's input prompt.
-//	WritePrompt(ctx context.Context, requestID string, prompt string, userID string) error
-//
-//	// WriteModelPrediction writes model's prediction result used to generate diagram.
-//	WriteModelPrediction(ctx context.Context, requestID string, result string, userID string) error
-//
-//	// Close closes the connection.
-//	Close(ctx context.Context) error
-//}
-//
-//// MockClientStorage mock of the postgres client.
-//type MockClientStorage struct {
-//	Err error
-//}
-//
-//func (m MockClientStorage) WritePrompt(_ context.Context, _, _, _ string) error {
-//	return m.Err
-//}
-//
-//func (m MockClientStorage) WriteModelPrediction(_ context.Context, _, _, _ string) error {
-//	return m.Err
-//}
-//
-//func (m MockClientStorage) Close(_ context.Context) error {
-//	return m.Err
 //}
 //
 //// ClientHTTP http client.

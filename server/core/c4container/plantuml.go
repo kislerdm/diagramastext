@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kislerdm/diagramastext/server/core/c4container/compression"
+	compression2 "github.com/kislerdm/diagramastext/server/core/domain/c4container/adapter/compression"
 )
 
 func renderDiagram(ctx context.Context, httpClient HttpClient, v graph) ([]byte, error) {
@@ -237,9 +237,9 @@ func plantUMLRequestPath(s string) (string, error) {
 }
 
 func compress(v []byte) ([]byte, error) {
-	var options = compression.DefaultOptions()
+	var options = compression2.DefaultOptions()
 	var w bytes.Buffer
-	if err := compression.Compress(&options, compression.FORMAT_DEFLATE, v, &w); err != nil {
+	if err := compression2.Compress(&options, compression2.FORMAT_DEFLATE, v, &w); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil

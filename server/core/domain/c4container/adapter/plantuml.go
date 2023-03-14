@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/kislerdm/diagramastext/server/core/c4container/compression"
+	"github.com/kislerdm/diagramastext/server/core/domain/c4container/adapter/compression"
 	"github.com/kislerdm/diagramastext/server/core/domain/c4container/port"
 )
 
