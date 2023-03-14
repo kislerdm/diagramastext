@@ -43,14 +43,6 @@ func (cfg Config) Validate() error {
 func NewRepositoryPostgres(ctx context.Context, cfg Config) (
 	port.RepositoryPrediction, error,
 ) {
-	if cfg.DBHost == "mock" {
-		return &client{
-			c:                         mockDbClient{},
-			tableWritePrompt:          cfg.TablePrompt,
-			tableWriteModelPrediction: cfg.TablePrediction,
-		}, nil
-	}
-
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -64,9 +56,14 @@ func NewRepositoryPostgres(ctx context.Context, cfg Config) (
 		connStr += " password=" + cfg.DBPassword
 	}
 
+	var db dbClient
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
+	}
+
+	if cfg.DBHost == "mock" {
+		db = mockDbClient{}
 	}
 
 	if err := db.PingContext(ctx); err != nil {
@@ -74,7 +71,9 @@ func NewRepositoryPostgres(ctx context.Context, cfg Config) (
 	}
 
 	return &client{
-		c: db,
+		c:                         db,
+		tableWritePrompt:          cfg.TablePrompt,
+		tableWriteModelPrediction: cfg.TablePrediction,
 	}, nil
 }
 
