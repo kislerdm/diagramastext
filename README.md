@@ -92,10 +92,12 @@ Thank you! 🙏
 - CI:
     - GitHub Actions
 - Infra:
-    - AWS:
-        - IAM
-        - Lambda
-        - API Gateway
+    - GCP
+      - IAM
+      - SecretsManager
+      - CloudRun
+      - IdentityPlatform
+    - AWS (infra deprecated)
     - GitHub Pages
     - [Neon](https://neon.tech/)
     - Cloudflare
