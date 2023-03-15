@@ -25,11 +25,21 @@ locals {
     "pyvinci@gmail.com",
     "diego.hordi@gmail.com",
   ]
+  editors = [
+    "medvedevtimofei@gmail.com",
+  ]
 }
 
 resource "google_project_iam_member" "developer" {
   project  = google_project.this.project_id
   role     = google_project_iam_custom_role.developer.id
   for_each = toset(local.developers)
+  member   = "user:${each.key}"
+}
+
+resource "google_project_iam_member" "editor" {
+  project  = google_project.this.project_id
+  role     = "roles/editor"
+  for_each = toset(local.editors)
   member   = "user:${each.key}"
 }
