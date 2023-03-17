@@ -9,10 +9,14 @@ import (
 	"github.com/kislerdm/diagramastext/server/core/port"
 )
 
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // NewHTTPClient initialises the HTTP Client.
 func NewHTTPClient(cfg HTTPClientConfig) port.HTTPClient {
 	resolveConfig(&cfg)
-	return &client{
+	return &httpclient{
 		httpClient: &http.Client{Timeout: cfg.Timeout},
 		backoff: Backoff{
 			MaxIterations:             cfg.MaxIterations,
@@ -25,45 +29,52 @@ func NewHTTPClient(cfg HTTPClientConfig) port.HTTPClient {
 }
 
 const (
-	defaultMaxIterations             = 2
 	defaultTimeout                   = 2 * time.Minute
 	defaultBackoffTimeMinMillisecond = 100
 	defaultBackoffTimeMaxMillisecond = 500
 )
 
 func resolveConfig(cfg *HTTPClientConfig) {
-	if cfg.MaxIterations < 0 {
-		cfg.MaxIterations = defaultMaxIterations
-	}
 	if cfg.Timeout < 0 {
 		cfg.Timeout = defaultTimeout
 	}
-	if cfg.BackoffTimeMinMillisecond < 0 {
+	if cfg.BackoffTimeMinMillisecond <= 0 {
 		cfg.BackoffTimeMinMillisecond = defaultBackoffTimeMinMillisecond
 	}
-	if cfg.BackoffTimeMaxMillisecond < 0 {
+	if cfg.BackoffTimeMaxMillisecond <= 0 {
 		cfg.BackoffTimeMaxMillisecond = defaultBackoffTimeMaxMillisecond
+	}
+	if cfg.BackoffTimeMaxMillisecond < cfg.BackoffTimeMinMillisecond {
+		tmp := cfg.BackoffTimeMaxMillisecond
+		cfg.BackoffTimeMaxMillisecond = cfg.BackoffTimeMinMillisecond
+		cfg.BackoffTimeMinMillisecond = tmp
 	}
 }
 
-type client struct {
-	httpClient     *http.Client
+type httpclient struct {
+	httpClient     httpClient
 	backoff        Backoff
 	backoffCounter map[*http.Request]uint8
 	mu             *sync.RWMutex
 }
 
-func (c *client) Do(req *http.Request) (*port.HTTPResponse, error) {
-	c.backoffInit(req)
+func (c *httpclient) Do(req *http.Request) (*port.HTTPResponse, error) {
+	var (
+		resp *http.Response
+		err  error
+	)
 
-	resp, err := c.httpClient.Do(req)
-
-	if err != nil || resp.StatusCode > 209 {
-		c.backoffDelay(req)
-		return c.Do(req)
+	for !c.maxIterations(req) {
+		resp, err = c.httpClient.Do(req)
+		c.requestCounterUp(req)
+		if err != nil || resp.StatusCode > 209 {
+			c.backoffDelay(req)
+		} else {
+			break
+		}
 	}
 
-	c.backoffReset(req)
+	c.requestCounterReset(req)
 
 	return &port.HTTPResponse{
 		Body:       resp.Body,
@@ -71,33 +82,38 @@ func (c *client) Do(req *http.Request) (*port.HTTPResponse, error) {
 	}, err
 }
 
-func (c *client) generateRandomDelay() time.Duration {
+func (c *httpclient) generateRandomDelay() time.Duration {
 	rand.Seed(time.Now().UnixNano())
 	cnt := rand.Intn(c.backoff.BackoffTimeMaxMillisecond-c.backoff.BackoffTimeMinMillisecond+1) + c.backoff.BackoffTimeMaxMillisecond
 	return time.Duration(cnt) * time.Millisecond
 }
 
-func (c *client) backoffInit(req *http.Request) {
+func (c *httpclient) requestCounterUp(req *http.Request) {
 	c.mu.Lock()
 	_, ok := c.backoffCounter[req]
 	if !ok {
 		c.backoffCounter[req] = 0
 	}
-	c.mu.Unlock()
-
-}
-
-func (c *client) backoffDelay(req *http.Request) {
-	time.Sleep(c.generateRandomDelay())
-	c.mu.Lock()
 	c.backoffCounter[req]++
 	c.mu.Unlock()
+
 }
 
-func (c *client) backoffReset(req *http.Request) {
+func (c *httpclient) backoffDelay(req *http.Request) {
+	time.Sleep(c.generateRandomDelay())
+}
+
+func (c *httpclient) requestCounterReset(req *http.Request) {
 	c.mu.Lock()
 	delete(c.backoffCounter, req)
 	c.mu.Unlock()
+}
+
+func (c *httpclient) maxIterations(req *http.Request) bool {
+	c.mu.RLock()
+	cnt := c.backoffCounter[req]
+	c.mu.RUnlock()
+	return cnt >= c.backoff.MaxIterations
 }
 
 type Backoff struct {
