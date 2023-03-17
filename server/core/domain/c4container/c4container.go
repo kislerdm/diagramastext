@@ -34,11 +34,11 @@ type container struct {
 
 // rel containers relations.
 type rel struct {
-	From        string `json:"from"`
-	To          string `json:"to"`
-	Direction   string `json:"direction,omitempty"`
-	Technology  string `json:"technology,omitempty"`
-	Description string `json:"description,omitempty"`
+	From       string `json:"from"`
+	To         string `json:"to"`
+	Label      string `json:"label,omitempty"`
+	Direction  string `json:"direction,omitempty"`
+	Technology string `json:"technology,omitempty"`
 }
 
 // NewC4ContainersHandler initialises the handler to generate C4 containers diagram.
