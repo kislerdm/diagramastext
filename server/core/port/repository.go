@@ -4,8 +4,9 @@ import "context"
 
 // RepositoryPrediction defines the interface to store prediction input (prompt) and model result.
 type RepositoryPrediction interface {
-	WriteInputPrompt(ctx context.Context, input Input) error
-	WriteModelResult(ctx context.Context, input Input, prediction string) error
+	WriteInputPrompt(ctx context.Context, requestID, userID, prompt string) error
+	WriteModelResult(ctx context.Context, requestID, userID, prediction string) error
+	Close(ctx context.Context) error
 }
 
 type MockRepositoryPrediction struct {
@@ -17,6 +18,10 @@ func (m MockRepositoryPrediction) WriteInputPrompt(_ context.Context, _ Input) e
 }
 
 func (m MockRepositoryPrediction) WriteModelResult(_ context.Context, _ Input, _ string) error {
+	return m.Err
+}
+
+func (m MockRepositoryPrediction) Close(_ context.Context) error {
 	return m.Err
 }
 

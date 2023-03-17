@@ -1,4 +1,4 @@
-package adapter
+package c4container
 
 import "strings"
 

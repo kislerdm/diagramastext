@@ -1,20 +1,54 @@
-package adapter
+package c4container
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"io"
+	"net/http"
+	"strconv"
 	"strings"
 
-	"github.com/kislerdm/diagramastext/server/core/domain/c4container/adapter/compression"
-	"github.com/kislerdm/diagramastext/server/core/domain/c4container/port"
+	compression2 "github.com/kislerdm/diagramastext/server/core/domain/c4container/compression"
+	"github.com/kislerdm/diagramastext/server/core/port"
 )
 
-func C4ContainersGraphPlantUMLRequestMapper(v *port.C4ContainersGraph) (string, error) {
+func renderDiagram(ctx context.Context, httpClient port.HTTPClient, v *c4ContainersGraph) ([]byte, error) {
 	c4ContainersDSL, err := marshal(v)
+
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return plantUMLRequest(c4ContainersDSL)
+
+	requestRoute, err := plantUMLRequest(c4ContainersDSL)
+	if err != nil {
+		return nil, err
+	}
+
+	return callPlantUML(ctx, httpClient, requestRoute)
+}
+
+func callPlantUML(ctx context.Context, httpClient port.HTTPClient, route string) ([]byte, error) {
+	const baseURL = "https://www.plantuml.com/plantuml/"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"svg/"+route, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		if err == nil {
+			err = errors.New("the response is not ok, status code: " + strconv.Itoa(resp.StatusCode))
+		}
+		return nil, err
+	}
+
+	return io.ReadAll(resp.Body)
 }
 
 func writeStrings(w bytes.Buffer, s ...string) error {
@@ -26,7 +60,7 @@ func writeStrings(w bytes.Buffer, s ...string) error {
 	return nil
 }
 
-func marshal(c *port.C4ContainersGraph) ([]byte, error) {
+func marshal(c *c4ContainersGraph) ([]byte, error) {
 	if len(c.Containers) == 0 {
 		return nil, errors.New("no containers found")
 	}
@@ -74,7 +108,7 @@ func marshal(c *port.C4ContainersGraph) ([]byte, error) {
 	return o.Bytes(), nil
 }
 
-func dslRelation(o bytes.Buffer, l *port.Rel) error {
+func dslRelation(o bytes.Buffer, l *rel) error {
 	panic("todo")
 }
 
@@ -97,8 +131,8 @@ func dslSystems(o bytes.Buffer, groups map[string][]string) string {
 	panic("todo")
 }
 
-func dslContainerType(o bytes.Buffer, n *port.Container) error {
-	tag := "Container"
+func dslContainerType(o bytes.Buffer, n *container) error {
+	tag := "container"
 	if n.IsUser {
 		tag = "User"
 	}
@@ -131,7 +165,7 @@ func dslContainerType(o bytes.Buffer, n *port.Container) error {
 	return nil
 }
 
-func dslContainer(n *port.Container) (string, error) {
+func dslContainer(n *container) (string, error) {
 	if n.ID == "" {
 		return "", errors.New("container must be identified: 'id' attribute")
 	}
@@ -211,9 +245,9 @@ func plantUMLRequest(v []byte) (string, error) {
 }
 
 func compress(v []byte) ([]byte, error) {
-	var options = compression.DefaultOptions()
+	var options = compression2.DefaultOptions()
 	var w bytes.Buffer
-	if err := compression.Compress(&options, compression.FORMAT_DEFLATE, v, &w); err != nil {
+	if err := compression2.Compress(&options, compression2.FORMAT_DEFLATE, v, &w); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil

@@ -5,50 +5,11 @@ package c4container
 
 import (
 	"bytes"
-	"context"
 	"errors"
-	"io"
-	"net/http"
-	"strconv"
 	"strings"
 
-	compression2 "github.com/kislerdm/diagramastext/server/core/domain/c4container/adapter/compression"
+	"github.com/kislerdm/diagramastext/server/core/domain/c4container/compression"
 )
-
-func renderDiagram(ctx context.Context, httpClient HttpClient, v graph) ([]byte, error) {
-	const baseURL = "https://www.plantuml.com/plantuml/"
-
-	encodedDiagramString, err := convertToPlantUMLFormat(v)
-	if err != nil {
-		return nil, err
-	}
-
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"svg/"+encodedDiagramString, nil)
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode > 209 {
-		return nil, errors.New("error status code: " + strconv.Itoa(resp.StatusCode))
-	}
-
-	buf, err := io.ReadAll(resp.Body)
-	defer func() { _ = resp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-	return buf, nil
-}
-
-func convertToPlantUMLFormat(v graph) (string, error) {
-	code, err := defineDiagramPlantUMLDSL(v)
-	if err != nil {
-		return "", err
-	}
-	return plantUMLRequestPath(code)
-}
 
 // defineDiagramPlantUMLDSL function to "transpile" the diagram definition graph to plantUML code as string.
 func defineDiagramPlantUMLDSL(graph graph) (string, error) {
@@ -237,9 +198,9 @@ func plantUMLRequestPath(s string) (string, error) {
 }
 
 func compress(v []byte) ([]byte, error) {
-	var options = compression2.DefaultOptions()
+	var options = compression.DefaultOptions()
 	var w bytes.Buffer
-	if err := compression2.Compress(&options, compression2.FORMAT_DEFLATE, v, &w); err != nil {
+	if err := compression.Compress(&options, compression.FORMAT_DEFLATE, v, &w); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil

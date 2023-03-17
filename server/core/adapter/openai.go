@@ -1,4 +1,4 @@
-package openai
+package adapter
 
 import (
 	"bytes"
@@ -12,13 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kislerdm/diagramastext/server/core/contract"
+	"github.com/kislerdm/diagramastext/server/core/port"
 )
-
-// HttpClient http base client.
-type HttpClient interface {
-	Do(req *http.Request) (resp *http.Response, err error)
-}
 
 /*
 	Defines client to communicate to OpenAI over http
@@ -34,11 +29,6 @@ type ConfigOpenAI struct {
 
 	// https://platform.openai.com/docs/api-reference/authentication
 	Token string
-
-	// https://platform.openai.com/docs/api-reference/requesting-organization
-	Organization string
-
-	HttpClient HttpClient
 }
 
 func (cfg ConfigOpenAI) Validate() error {
@@ -48,6 +38,60 @@ func (cfg ConfigOpenAI) Validate() error {
 		)
 	}
 	return nil
+}
+
+type clientOpenAI struct {
+	httpClient port.HTTPClient
+	token      string
+	baseURL    string
+	maxTokens  int
+}
+
+const (
+	baseURLOpenAI        = "https://api.openai.com/v1/"
+	defaultTimeoutOpenAI = 3 * time.Minute
+	defaultMaxTokens     = 200
+	defaultTemperature   = 0.2
+	defaultTopP          = 1
+)
+
+var defaultHttpClient = NewHTTPClient(
+	HTTPClientConfig{
+		Timeout: defaultTimeoutOpenAI,
+		Backoff: Backoff{
+			MaxIterations:             2,
+			BackoffTimeMinMillisecond: 50,
+			BackoffTimeMaxMillisecond: 300,
+		},
+	},
+)
+
+// NewOpenAIClient initiates the OpenAI client.
+func NewOpenAIClient(cfg ConfigOpenAI) (port.ModelInference, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	if cfg.Token == "mock" {
+		return port.MockModelInference{}, nil
+	}
+
+	c := clientOpenAI{
+		token:      cfg.Token,
+		maxTokens:  cfg.MaxTokens,
+		baseURL:    baseURLOpenAI,
+		httpClient: defaultHttpClient,
+	}
+
+	resolveConfigurations(&c)
+
+	return &c, nil
+}
+
+func resolveConfigurations(c *clientOpenAI) {
+	if c.maxTokens <= 0 || c.maxTokens > 2048 {
+		c.maxTokens = defaultMaxTokens
+	}
 }
 
 type openAIRequest struct {
@@ -60,70 +104,6 @@ type openAIRequest struct {
 	FrequencyPenalty float32  `json:"frequency_penalty"`
 	PresencePenalty  float32  `json:"presence_penalty"`
 	BestOf           uint8    `json:"best_of"`
-}
-
-type clientOpenAI struct {
-	httpClient   HttpClient
-	payload      openAIRequest
-	token        string
-	organization string
-	baseURL      string
-}
-
-const (
-	baseURLOpenAI        = "https://api.openai.com/v1/"
-	defaultTimeoutOpenAI = 3 * time.Minute
-	defaultModelOpenAI   = "code-davinci-002"
-	defaultMaxTokens     = 200
-	defaultTemperature   = 0.2
-	defaultTopP          = 1
-	defaultBestOf        = 2
-)
-
-// NewClient initiates the client to communicate with the plantuml server.
-func NewClient(cfg ConfigOpenAI) (contract.ClientModelInference, error) {
-	if cfg.Token == "mock" {
-		return contract.MockClientModelInference{}, nil
-	}
-
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-
-	c := clientOpenAI{
-		httpClient:   cfg.HttpClient,
-		token:        cfg.Token,
-		organization: cfg.Organization,
-		payload: openAIRequest{
-			Model:            defaultModelOpenAI,
-			Prompt:           "",
-			Stop:             []string{"\n"},
-			MaxTokens:        cfg.MaxTokens,
-			TopP:             defaultTopP,
-			Temperature:      defaultTemperature,
-			FrequencyPenalty: 0,
-			PresencePenalty:  0,
-			BestOf:           defaultBestOf,
-		},
-		baseURL: baseURLOpenAI,
-	}
-
-	resolveConfigurations(&c)
-	resolveHTTPClientOpenAI(&c)
-
-	return &c, nil
-}
-
-func resolveConfigurations(c *clientOpenAI) {
-	if c.payload.MaxTokens < 0 || c.payload.MaxTokens > 2048 {
-		c.payload.MaxTokens = defaultMaxTokens
-	}
-}
-
-func resolveHTTPClientOpenAI(c *clientOpenAI) {
-	if c.httpClient == nil {
-		c.httpClient = &http.Client{Timeout: defaultTimeoutOpenAI}
-	}
 }
 
 type openAIResponse struct {
@@ -144,14 +124,21 @@ type openAIResponse struct {
 	} `json:"usage"`
 }
 
-func (c *clientOpenAI) Do(ctx context.Context, prompt, model string) ([]byte, error) {
-	if err := c.validatePrompt(prompt); err != nil {
+func (c clientOpenAI) Do(ctx context.Context, cfg port.ModelInferenceConfig) ([]byte, error) {
+	if err := c.validatePrompt(cfg.Model, cfg.Prompt); err != nil {
 		return nil, err
 	}
 
-	payload := c.payload
-	if model != "" {
-		payload.Model = model
+	payload := openAIRequest{
+		Model:            cfg.Model,
+		Prompt:           cfg.Prompt,
+		Stop:             []string{"\n"},
+		MaxTokens:        c.maxTokens,
+		TopP:             defaultTopP,
+		Temperature:      defaultTemperature,
+		FrequencyPenalty: 0,
+		PresencePenalty:  0,
+		BestOf:           cfg.BestOf,
 	}
 
 	respBytes, err := c.requestHandler(ctx, payload)
@@ -159,11 +146,11 @@ func (c *clientOpenAI) Do(ctx context.Context, prompt, model string) ([]byte, er
 		return nil, err
 	}
 
-	return c.decodeResponse(ctx, respBytes)
+	return decodeResponse(respBytes)
 }
 
-func (c *clientOpenAI) modelContextMaxTokes() int {
-	switch c.payload.Model {
+func modelContextMaxTokes(model string) int {
+	switch model {
 	case "code-davinci-002":
 		return 8000
 	case "code-cushman-001":
@@ -173,8 +160,8 @@ func (c *clientOpenAI) modelContextMaxTokes() int {
 	}
 }
 
-func (c *clientOpenAI) validatePrompt(prompt string) error {
-	if len(prompt)+c.payload.MaxTokens > c.modelContextMaxTokes() {
+func (c clientOpenAI) validatePrompt(model, prompt string) error {
+	if len(prompt)+c.maxTokens > modelContextMaxTokes(model) {
 		return errors.New(
 			"prompt exceeds the model's context length." +
 				"see: https://platform.openai.com/docs/api-reference/completions/create#completions/create-max_tokens",
@@ -183,12 +170,9 @@ func (c *clientOpenAI) validatePrompt(prompt string) error {
 	return nil
 }
 
-func (c *clientOpenAI) setHeader(req *http.Request) {
+func (c clientOpenAI) setHeader(req *http.Request) {
 	req.Header.Add("Authorization", "Bearer "+c.token)
 	req.Header.Add("Content-Type", "application/json")
-	if c.organization != "" {
-		req.Header.Add("Organization", c.organization)
-	}
 }
 
 type openAIErrorResponse struct {
@@ -200,34 +184,7 @@ type openAIErrorResponse struct {
 	} `json:"error,omitempty"`
 }
 
-func (c *clientOpenAI) decodeResponse(_ context.Context, respBytes []byte) ([]byte, error) {
-	var resp openAIResponse
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return nil, err
-	}
-
-	if len(resp.Choices) == 0 {
-		return nil, errors.New("openAI could not convert the input prompt")
-	}
-
-	s := cleanRawResponse(resp.Choices[0].Text)
-
-	return []byte(s), nil
-}
-
-func cleanRawResponse(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.TrimSuffix(s, ",")
-	if s[:1] != "{" {
-		s = "{" + s
-	}
-	if s[len(s)-1:] != "}" {
-		s += "}"
-	}
-	return s
-}
-
-func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest) ([]byte, error) {
+func (c clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest) ([]byte, error) {
 	var w bytes.Buffer
 	err := json.NewEncoder(&w).Encode(payload)
 	if err != nil {
@@ -236,6 +193,7 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"completions", &w)
 	c.setHeader(req)
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -257,4 +215,31 @@ func (c *clientOpenAI) requestHandler(ctx context.Context, payload openAIRequest
 		return nil, err
 	}
 	return buf, nil
+}
+
+func decodeResponse(respBytes []byte) ([]byte, error) {
+	var resp openAIResponse
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		return nil, err
+	}
+
+	if len(resp.Choices) == 0 {
+		return nil, errors.New("unsuccessful prediction")
+	}
+
+	s := cleanRawResponse(resp.Choices[0].Text)
+
+	return []byte(s), nil
+}
+
+func cleanRawResponse(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, ",")
+	if s[:1] != "{" {
+		s = "{" + s
+	}
+	if s[len(s)-1:] != "}" {
+		s += "}"
+	}
+	return s
 }

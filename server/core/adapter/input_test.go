@@ -25,7 +25,7 @@ func randomString(length int) string {
 func Test_inquiry_Validate(t *testing.T) {
 	type fields struct {
 		Prompt string
-		User   port.User
+		User   *port.User
 	}
 	tests := []struct {
 		name    string
@@ -36,6 +36,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "base user: happy path",
 			fields: fields{
 				Prompt: randomString(promptLengthMaxBaseUser - 1),
+				User:   &port.User{},
 			},
 			wantErr: false,
 		},
@@ -43,6 +44,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "base user: unhappy path - too long",
 			fields: fields{
 				Prompt: randomString(promptLengthMaxBaseUser + 1),
+				User:   &port.User{},
 			},
 			wantErr: true,
 		},
@@ -50,6 +52,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "base user: unhappy path - too short",
 			fields: fields{
 				Prompt: randomString(promptLengthMin - 1),
+				User:   &port.User{},
 			},
 			wantErr: true,
 		},
@@ -57,7 +60,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "registered user: happy path",
 			fields: fields{
 				Prompt: randomString(promptLengthMaxRegisteredUser - 1),
-				User:   port.User{IsRegistered: true},
+				User:   &port.User{IsRegistered: true},
 			},
 			wantErr: false,
 		},
@@ -65,7 +68,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "registered user: unhappy path -  too long",
 			fields: fields{
 				Prompt: randomString(promptLengthMaxRegisteredUser + 1),
-				User:   port.User{IsRegistered: true},
+				User:   &port.User{IsRegistered: true},
 			},
 			wantErr: true,
 		},
@@ -73,7 +76,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "registered user: unhappy path -  too short",
 			fields: fields{
 				Prompt: randomString(promptLengthMin - 1),
-				User:   port.User{IsRegistered: true},
+				User:   &port.User{IsRegistered: true},
 			},
 			wantErr: true,
 		},
@@ -95,9 +98,8 @@ func Test_inquiry_Validate(t *testing.T) {
 
 func TestNewInquiryDriverHTTP(t *testing.T) {
 	type args struct {
-		body      io.Reader
-		headers   http.Header
-		requestID string
+		body    io.Reader
+		headers http.Header
 	}
 
 	validPrompt := randomString(promptLengthMaxBaseUser - 1)
@@ -111,13 +113,11 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 		{
 			name: "happy path",
 			args: args{
-				body:      strings.NewReader(`{"prompt":"` + validPrompt + `"}`),
-				requestID: "foo",
+				body: strings.NewReader(`{"prompt":"` + validPrompt + `"}`),
 			},
 			want: &inquiry{
-				Prompt:    validPrompt,
-				User:      port.User{ID: "NA"},
-				RequestID: "foo",
+				Prompt: validPrompt,
+				User:   &port.User{ID: "NA"},
 			},
 			wantErr: false,
 		},
@@ -145,13 +145,20 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := NewInquiryDriverHTTP(tt.args.body, tt.args.headers, tt.args.requestID)
+				got, err := NewInputDriverHTTP(tt.args.body, tt.args.headers)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("NewInquiryDriverHTTP() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("NewInputDriverHTTP() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
-				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("NewInquiryDriverHTTP() got = %v, want %v", got, tt.want)
+
+				if err == nil {
+					if !reflect.DeepEqual(got.GetUser(), tt.want.GetUser()) {
+						t.Errorf("NewInputDriverHTTP() unexpected user: got = %v, want %v", got, tt.want)
+					}
+
+					if !reflect.DeepEqual(got.GetPrompt(), tt.want.GetPrompt()) {
+						t.Errorf("NewInputDriverHTTP() unexpected prompt: got = %v, want %v", got, tt.want)
+					}
 				}
 			},
 		)

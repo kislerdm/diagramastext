@@ -1,9 +1,10 @@
 package utils
 
-import "github.com/aws/smithy-go/rand"
+import (
+	"github.com/google/uuid"
+)
 
 // NewUUID generated UUID as a string.
 func NewUUID() string {
-	o, _ := rand.NewUUID(rand.Reader).GetUUID()
-	return o
+	return uuid.New().String()
 }

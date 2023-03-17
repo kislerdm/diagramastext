@@ -9,14 +9,13 @@ import (
 	secretsmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"github.com/googleapis/gax-go/v2"
-	"google.golang.org/api/option"
 )
 
-// NewSecretmanager initialises the GCP gcpsecretsmanager Client.
-func NewSecretmanager(ctx context.Context, opts ...option.ClientOption) (
+// NewSecretmanager initialises the GCP secretsmanager Client.
+func NewSecretmanager(ctx context.Context) (
 	*Client, error,
 ) {
-	c, err := secretsmanager.NewClient(ctx, opts...)
+	c, err := secretsmanager.NewClient(ctx)
 	if err != nil {
 		return nil, err
 	}

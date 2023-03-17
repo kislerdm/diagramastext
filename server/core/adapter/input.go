@@ -15,7 +15,7 @@ import (
 type inquiry struct {
 	Prompt    string
 	RequestID string
-	User      port.User
+	User      *port.User
 }
 
 const (
@@ -32,7 +32,7 @@ func (v inquiry) GetRequestID() string {
 	return v.RequestID
 }
 
-func (v inquiry) GetUser() port.User {
+func (v inquiry) GetUser() *port.User {
 	return v.User
 }
 
@@ -54,8 +54,8 @@ func validatePromptLength(prompt string, max int) error {
 	return nil
 }
 
-// NewInquiryDriverHTTP creates the inquiry to be processed using the input from a http request.
-func NewInquiryDriverHTTP(body io.Reader, headers http.Header, requestID string) (port.Input, error) {
+// NewInputDriverHTTP creates the inquiry to be processed using the input from a http request.
+func NewInputDriverHTTP(body io.Reader, headers http.Header) (port.Input, error) {
 	var req struct {
 		Prompt string `json:"prompt"`
 	}
@@ -66,7 +66,7 @@ func NewInquiryDriverHTTP(body io.Reader, headers http.Header, requestID string)
 	o := &inquiry{
 		Prompt:    req.Prompt,
 		User:      userProfileFromHTTPHeaders(headers),
-		RequestID: getRequestID(requestID),
+		RequestID: utils.NewUUID(),
 	}
 
 	if err := o.Validate(); err != nil {
@@ -76,14 +76,7 @@ func NewInquiryDriverHTTP(body io.Reader, headers http.Header, requestID string)
 	return o, nil
 }
 
-func getRequestID(s string) string {
-	if s == "" {
-		return utils.NewUUID()
-	}
-	return s
-}
-
-func userProfileFromHTTPHeaders(headers http.Header) port.User {
+func userProfileFromHTTPHeaders(headers http.Header) *port.User {
 	// FIXME: change when the auth layer is implemented
-	return port.User{ID: "NA"}
+	return &port.User{ID: "NA"}
 }
