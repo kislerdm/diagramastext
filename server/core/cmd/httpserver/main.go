@@ -12,7 +12,6 @@ import (
 	"strconv"
 
 	"github.com/kislerdm/diagramastext/server/core/adapter"
-	"github.com/kislerdm/diagramastext/server/core/config"
 	"github.com/kislerdm/diagramastext/server/core/domain/c4container"
 	"github.com/kislerdm/diagramastext/server/core/pkg/gcpsecretsmanager"
 	"github.com/kislerdm/diagramastext/server/core/pkg/postgres"
@@ -33,7 +32,7 @@ func init() {
 		log.Fatal(err)
 	}
 
-	cfg := config.LoadDefaultConfig(context.Background(), secretsmanagerClient)
+	cfg := LoadDefaultConfig(context.Background(), secretsmanagerClient)
 
 	modelInferenceClient, err = adapter.NewOpenAIClient(
 		adapter.ConfigOpenAI{
