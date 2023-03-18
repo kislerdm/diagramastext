@@ -5,13 +5,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/kislerdm/diagramastext/server/core/port"
+	"github.com/kislerdm/diagramastext/server/core/diagram"
 )
 
 func Test_loadDefaultConfig(t *testing.T) {
 	type args struct {
 		ctx                  context.Context
-		clientSecretsManager port.RepositorySecretsVault
+		clientSecretsManager diagram.RepositorySecretsVault
 	}
 	tests := []struct {
 		name    string
@@ -23,7 +23,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 			name: "load from secretsmanager",
 			args: args{
 				ctx: context.TODO(),
-				clientSecretsManager: port.MockRepositorySecretsVault{
+				clientSecretsManager: diagram.MockRepositorySecretsVault{
 					V: []byte(`{
 "db_host": "localhost",
 "db_name": "postgres",
@@ -54,7 +54,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 			name: "load from secretsmanager, tables from env variables",
 			args: args{
 				ctx: context.TODO(),
-				clientSecretsManager: port.MockRepositorySecretsVault{
+				clientSecretsManager: diagram.MockRepositorySecretsVault{
 					V: []byte(`{
 "db_host": "localhost",
 "db_name": "postgres",

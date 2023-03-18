@@ -16,7 +16,7 @@ func TestNew(t *testing.T) {
 	expectedLastElementsOfPath := "errors/errors_test.go"
 	expectedLoC := "13"
 	p := strings.Split(err.Error(), "/")
-	if strings.Join(p[len(p)-2:], "/") != expectedLastElementsOfPath+":"+expectedLoC+": "+errorMessage+"\n" {
+	if strings.Join(p[len(p)-2:], "/") != expectedLastElementsOfPath+":"+expectedLoC+": "+errorMessage {
 		t.Fatalf("wrong error message")
 	}
 }

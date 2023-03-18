@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/kislerdm/diagramastext/server/core/port"
-	"github.com/kislerdm/diagramastext/server/core/utils"
+	"github.com/kislerdm/diagramastext/server/core/diagram"
+	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
 const (
@@ -37,7 +37,7 @@ type Config struct {
 	ModelInferenceConfig       modelInferenceConfig
 }
 
-func LoadDefaultConfig(ctx context.Context, clientSecretsManager port.RepositorySecretsVault) *Config {
+func LoadDefaultConfig(ctx context.Context, clientSecretsManager diagram.RepositorySecretsVault) *Config {
 	// defaults
 	cfg := Config{
 		RepositoryPredictionConfig: repositoryPredictionConfig{
@@ -56,7 +56,7 @@ func LoadDefaultConfig(ctx context.Context, clientSecretsManager port.Repository
 }
 
 func loadFromSecretsManager(
-	ctx context.Context, cfg *Config, secretURI string, client port.RepositorySecretsVault,
+	ctx context.Context, cfg *Config, secretURI string, client diagram.RepositorySecretsVault,
 ) {
 	var s secret
 	if err := client.ReadLastVersion(ctx, secretURI, &s); err == nil {

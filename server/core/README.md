@@ -62,7 +62,7 @@ resource "aws_api_gateway_base_path_mapping" "this" {
 }
 output "gw_domain_name" {
   value       = aws_api_gateway_domain_name.this.cloudfront_domain_name
-  description = "API GW domain name required to configure custom DNS, e.g. Cloudflaire"
+  description = "API GW diagram name required to configure custom DNS, e.g. Cloudflaire"
 }
 ```
 6. Use output `gw_domain_name` to configure CNAME record in Cloudflaire. See the illustration below.

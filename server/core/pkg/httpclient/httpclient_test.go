@@ -1,4 +1,4 @@
-package adapter
+package httpclient
 
 import (
 	"io"
@@ -7,30 +7,28 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/kislerdm/diagramastext/server/core/port"
 )
 
 func TestNewHTTPClient(t *testing.T) {
 	type args struct {
-		cfg HTTPClientConfig
+		cfg Config
 	}
 	tests := []struct {
 		name string
 		args args
-		want port.HTTPClient
+		want *HTTPClient
 	}{
 		{
 			name: "happy path: default",
 			args: args{
-				cfg: HTTPClientConfig{
+				cfg: Config{
 					Timeout: -1,
 					Backoff: Backoff{
 						MaxIterations: 1,
 					},
 				},
 			},
-			want: &httpclient{
+			want: &HTTPClient{
 				httpClient: &http.Client{Timeout: defaultTimeout},
 				backoff: Backoff{
 					MaxIterations:             1,
@@ -44,7 +42,7 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "no backoff",
 			args: args{
-				cfg: HTTPClientConfig{
+				cfg: Config{
 					Timeout: -1,
 					Backoff: Backoff{
 						MaxIterations:             0,
@@ -53,7 +51,7 @@ func TestNewHTTPClient(t *testing.T) {
 					},
 				},
 			},
-			want: &httpclient{
+			want: &HTTPClient{
 				httpClient: &http.Client{Timeout: defaultTimeout},
 				backoff: Backoff{
 					MaxIterations:             0,
@@ -67,7 +65,7 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "flip min and max backoff",
 			args: args{
-				cfg: HTTPClientConfig{
+				cfg: Config{
 					Timeout: -1,
 					Backoff: Backoff{
 						MaxIterations:             1,
@@ -76,7 +74,7 @@ func TestNewHTTPClient(t *testing.T) {
 					},
 				},
 			},
-			want: &httpclient{
+			want: &HTTPClient{
 				httpClient: &http.Client{Timeout: defaultTimeout},
 				backoff: Backoff{
 					MaxIterations:             1,
@@ -128,7 +126,7 @@ func Test_client_Do(t *testing.T) {
 				},
 			}
 
-			c := httpclient{
+			c := HTTPClient{
 				httpClient: &cl,
 				backoff: Backoff{
 					MaxIterations:             maxIterations,
@@ -147,7 +145,7 @@ func Test_client_Do(t *testing.T) {
 				t.Errorf("unexpected error")
 			}
 			if !reflect.DeepEqual(
-				resp, &port.HTTPResponse{
+				resp, &http.Response{
 					StatusCode: http.StatusTooManyRequests,
 					Body:       io.NopCloser(strings.NewReader(`foobar`)),
 				},
@@ -171,7 +169,7 @@ func Test_client_Do(t *testing.T) {
 				},
 			}
 
-			c := httpclient{
+			c := HTTPClient{
 				httpClient: &cl,
 				backoff: Backoff{
 					MaxIterations:             2,
@@ -190,7 +188,7 @@ func Test_client_Do(t *testing.T) {
 				t.Errorf("unexpected error")
 			}
 			if !reflect.DeepEqual(
-				resp, &port.HTTPResponse{
+				resp, &http.Response{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`foobar`)),
 				},

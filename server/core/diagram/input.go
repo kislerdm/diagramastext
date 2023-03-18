@@ -1,4 +1,4 @@
-package adapter
+package diagram
 
 import (
 	"encoding/json"
@@ -8,14 +8,50 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kislerdm/diagramastext/server/core/port"
-	"github.com/kislerdm/diagramastext/server/core/utils"
+	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
+
+type User struct {
+	ID                     string
+	IsRegistered           bool
+	OptOutFromSavingPrompt bool
+}
+
+// Input defines the entrypoint interface.
+type Input interface {
+	Validate() error
+	GetUser() *User
+	GetPrompt() string
+	GetRequestID() string
+}
+
+type MockInput struct {
+	Err       error
+	Prompt    string
+	RequestID string
+	User      *User
+}
+
+func (v MockInput) Validate() error {
+	return v.Err
+}
+
+func (v MockInput) GetUser() *User {
+	return v.User
+}
+
+func (v MockInput) GetPrompt() string {
+	return v.Prompt
+}
+
+func (v MockInput) GetRequestID() string {
+	return v.RequestID
+}
 
 type inquiry struct {
 	Prompt    string
 	RequestID string
-	User      *port.User
+	User      *User
 }
 
 const (
@@ -32,7 +68,7 @@ func (v inquiry) GetRequestID() string {
 	return v.RequestID
 }
 
-func (v inquiry) GetUser() *port.User {
+func (v inquiry) GetUser() *User {
 	return v.User
 }
 
@@ -55,7 +91,7 @@ func validatePromptLength(prompt string, max int) error {
 }
 
 // NewInputDriverHTTP creates the inquiry to be processed using the input from a http request.
-func NewInputDriverHTTP(body io.Reader, headers http.Header) (port.Input, error) {
+func NewInputDriverHTTP(body io.Reader, headers http.Header) (Input, error) {
 	var req struct {
 		Prompt string `json:"prompt"`
 	}
@@ -76,7 +112,7 @@ func NewInputDriverHTTP(body io.Reader, headers http.Header) (port.Input, error)
 	return o, nil
 }
 
-func userProfileFromHTTPHeaders(headers http.Header) *port.User {
+func userProfileFromHTTPHeaders(headers http.Header) *User {
 	// FIXME: change when the auth layer is implemented
-	return &port.User{ID: "NA"}
+	return &User{ID: "NA"}
 }

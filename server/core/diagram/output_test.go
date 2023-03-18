@@ -1,10 +1,8 @@
-package adapter
+package diagram
 
 import (
 	"reflect"
 	"testing"
-
-	"github.com/kislerdm/diagramastext/server/core/port"
 )
 
 func TestNewResultSVG(t *testing.T) {
@@ -14,7 +12,7 @@ func TestNewResultSVG(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    port.Output
+		want    Output
 		wantErr bool
 	}{
 		{

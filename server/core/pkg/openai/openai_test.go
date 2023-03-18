@@ -1,17 +1,27 @@
-package adapter
+package openai
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"math/rand"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/kislerdm/diagramastext/server/core/port"
+	"time"
 )
+
+func randomString(length int) string {
+	const charset = "abcdef"
+	var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	var b = make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
+}
 
 const mockToken = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
@@ -20,7 +30,7 @@ func Test_clientOpenAI_setHeader(t *testing.T) {
 	t.Run(
 		"auth headers, no organization specified", func(t *testing.T) {
 			// GIVEN
-			c := clientOpenAI{
+			c := Client{
 				token: mockToken,
 			}
 			req := http.Request{
@@ -44,7 +54,7 @@ func Test_clientOpenAI_setHeader(t *testing.T) {
 	t.Run(
 		"auth headers, organization specified", func(t *testing.T) {
 			// GIVEN
-			c := clientOpenAI{
+			c := Client{
 				token: mockToken,
 			}
 			req := http.Request{
@@ -167,21 +177,21 @@ func Test_clientOpenAI_decodeResponse(t *testing.T) {
 
 func TestNewOpenAIClient(t *testing.T) {
 	type args struct {
-		cfg ConfigOpenAI
+		cfg Config
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    port.ModelInference
+		want    *Client
 		wantErr bool
 	}{
 		{
 			name: "happy path",
 			args: args{
-				cfg: ConfigOpenAI{Token: mockToken, MaxTokens: 100},
+				cfg: Config{Token: mockToken, MaxTokens: 100, HTTPClient: http.DefaultClient},
 			},
-			want: &clientOpenAI{
-				httpClient: defaultHttpClient,
+			want: &Client{
+				httpClient: http.DefaultClient,
 				token:      mockToken,
 				baseURL:    baseURLOpenAI,
 				maxTokens:  100,
@@ -191,10 +201,10 @@ func TestNewOpenAIClient(t *testing.T) {
 		{
 			name: "happy path: fixed max tokens",
 			args: args{
-				cfg: ConfigOpenAI{Token: mockToken, MaxTokens: -100},
+				cfg: Config{Token: mockToken, MaxTokens: -100, HTTPClient: http.DefaultClient},
 			},
-			want: &clientOpenAI{
-				httpClient: defaultHttpClient,
+			want: &Client{
+				httpClient: http.DefaultClient,
 				token:      mockToken,
 				baseURL:    baseURLOpenAI,
 				maxTokens:  defaultMaxTokens,
@@ -202,17 +212,17 @@ func TestNewOpenAIClient(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "happy path: mock client",
+			name: "unhappy path: invalid config, no token",
 			args: args{
-				cfg: ConfigOpenAI{Token: "mock"},
+				cfg: Config{HTTPClient: http.DefaultClient},
 			},
-			want:    port.MockModelInference{},
-			wantErr: false,
+			want:    nil,
+			wantErr: true,
 		},
 		{
-			name: "unhappy path: invalid config",
+			name: "unhappy path: invalid config, no http client",
 			args: args{
-				cfg: ConfigOpenAI{},
+				cfg: Config{Token: mockToken},
 			},
 			want:    nil,
 			wantErr: true,
@@ -234,16 +244,30 @@ func TestNewOpenAIClient(t *testing.T) {
 	}
 }
 
+type mockHTTPClient struct {
+	V   *http.Response
+	Err error
+}
+
+func (m mockHTTPClient) Do(_ *http.Request) (*http.Response, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return m.V, nil
+}
+
 func Test_clientOpenAI_Do(t *testing.T) {
 	type fields struct {
-		httpClient port.HTTPClient
+		httpClient HTTPClient
 		token      string
 		baseURL    string
 		maxTokens  int
 	}
 	type args struct {
-		ctx context.Context
-		cfg port.ModelInferenceConfig
+		ctx    context.Context
+		prompt string
+		model  string
+		bestOf uint8
 	}
 	tests := []struct {
 		name    string
@@ -255,8 +279,8 @@ func Test_clientOpenAI_Do(t *testing.T) {
 		{
 			name: "happy path",
 			fields: fields{
-				httpClient: port.MockHTTPClient{
-					V: &port.HTTPResponse{
+				httpClient: mockHTTPClient{
+					V: &http.Response{
 						Body: io.NopCloser(
 							strings.NewReader(
 								`{"id":"0","model":"code-davinci-002","choices":[{"text":"{\"nodes\":[{\"id\":\"0\"}]}"}]}`,
@@ -269,12 +293,10 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				maxTokens: 100,
 			},
 			args: args{
-				ctx: context.TODO(),
-				cfg: port.ModelInferenceConfig{
-					Prompt: "foobar",
-					Model:  "code-davinci-002",
-					BestOf: 2,
-				},
+				ctx:    context.TODO(),
+				prompt: "foobar",
+				model:  "code-davinci-002",
+				bestOf: 2,
 			},
 			want:    []byte(`{"nodes":[{"id":"0"}]}`),
 			wantErr: false,
@@ -285,11 +307,9 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				maxTokens: 10,
 			},
 			args: args{
-				context.TODO(),
-				port.ModelInferenceConfig{
-					Prompt: randomString(10000),
-					Model:  "foobar",
-				},
+				ctx:    context.TODO(),
+				prompt: randomString(10000),
+				model:  "foobar",
 			},
 			want:    nil,
 			wantErr: true,
@@ -297,8 +317,8 @@ func Test_clientOpenAI_Do(t *testing.T) {
 		{
 			name: "unhappy path: high rate",
 			fields: fields{
-				httpClient: port.MockHTTPClient{
-					V: &port.HTTPResponse{
+				httpClient: mockHTTPClient{
+					V: &http.Response{
 						Body: io.NopCloser(
 							strings.NewReader(
 								`{"error":{"code":429,"message":"foobar"}}`,
@@ -311,10 +331,8 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				maxTokens: 10,
 			},
 			args: args{
-				ctx: context.TODO(),
-				cfg: port.ModelInferenceConfig{
-					Prompt: "foobar",
-				},
+				ctx:    context.TODO(),
+				prompt: "foobar",
 			},
 			want:    nil,
 			wantErr: true,
@@ -326,13 +344,13 @@ func Test_clientOpenAI_Do(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				c := clientOpenAI{
+				c := Client{
 					httpClient: tt.fields.httpClient,
 					token:      tt.fields.token,
 					baseURL:    tt.fields.baseURL,
 					maxTokens:  tt.fields.maxTokens,
 				}
-				got, err := c.Do(tt.args.ctx, tt.args.cfg)
+				got, err := c.Do(tt.args.ctx, tt.args.prompt, tt.args.model, tt.args.bestOf)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Do() error = %v, wantErr %v", err, tt.wantErr)
 					return

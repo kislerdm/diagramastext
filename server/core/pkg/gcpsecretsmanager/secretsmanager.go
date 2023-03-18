@@ -22,7 +22,7 @@ func NewSecretmanager(ctx context.Context) (
 	return &Client{c}, nil
 }
 
-// Client gcpsecretsmanager client.
+// Client GCP secretsmanager client.
 type Client struct {
 	c gcpSecretsmanagerClient
 }

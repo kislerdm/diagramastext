@@ -1,6 +1,8 @@
 package utils
 
-import "strconv"
+import (
+	"strconv"
+)
 
 func MustParseInt(s string) int {
 	o, _ := strconv.Atoi(s)

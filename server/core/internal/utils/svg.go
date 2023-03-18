@@ -116,10 +116,6 @@ func (s svg) validSVGGeometry() error {
 	return nil
 }
 
-type svgGeometries interface {
-	rect | text | path | line | polygon
-}
-
 func countValidSVGElements[v svgGeometry](geom []v) int {
 	var cnt int
 	for _, g := range geom {
@@ -131,6 +127,8 @@ func countValidSVGElements[v svgGeometry](geom []v) int {
 }
 
 type svgGeometry interface {
+	polygon | text | line | rect | path
+
 	IsValid() bool
 }
 

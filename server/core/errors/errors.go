@@ -1,7 +1,9 @@
 package errors
 
 import (
+	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -27,16 +29,23 @@ func New(s string) error {
 		file = "???"
 		line = 0
 	}
+	file = cutPrefix(file)
 	std.mu.Lock()
 
 	std.buf = std.buf[:0]
 	setBuffer(&std.buf, file, line)
 	std.buf = append(std.buf, s...)
-	if len(s) == 0 || s[len(s)-1] != '\n' {
-		std.buf = append(std.buf, '\n')
-	}
 
 	return std
+}
+
+func cutPrefix(s string) string {
+	_, prefix, _, ok := runtime.Caller(0)
+	if !ok {
+		return s
+	}
+	prefix = strings.TrimSuffix(prefix, "errors/errors.go")
+	return strings.TrimPrefix(s, prefix)
 }
 
 func setBuffer(buf *[]byte, file string, line int) {
@@ -60,4 +69,8 @@ func itoa(buf *[]byte, i int) {
 	// i < 10
 	b[bp] = byte('0' + i)
 	*buf = append(*buf, b[bp:]...)
+}
+
+func IsError(e error, text string) bool {
+	return reflect.DeepEqual(&err{buf: []byte(text)}, e)
 }

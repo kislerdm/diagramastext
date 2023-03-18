@@ -1,9 +1,13 @@
-package port
+package diagram
 
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 )
+
+// DiagramHandler handler to generate a diagram given the input.
+type DiagramHandler func(ctx context.Context, input Input) (Output, error)
 
 // RepositoryPrediction defines the interface to store prediction input (prompt) and model result.
 type RepositoryPrediction interface {
@@ -43,4 +47,38 @@ func (m MockRepositorySecretsVault) ReadLastVersion(_ context.Context, _ string,
 		return m.Err
 	}
 	return json.Unmarshal(m.V, o)
+}
+
+// ModelInference interface to communicate with the model.
+type ModelInference interface {
+	Do(ctx context.Context, prompt string, model string, bestOf uint8) ([]byte, error)
+}
+
+type MockModelInference struct {
+	V   []byte
+	Err error
+}
+
+func (m MockModelInference) Do(_ context.Context, _, _ string, _ uint8) ([]byte, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return m.V, nil
+}
+
+// HTTPClient client to communicate over http.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+type MockHTTPClient struct {
+	V   *http.Response
+	Err error
+}
+
+func (m MockHTTPClient) Do(_ *http.Request) (*http.Response, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return m.V, nil
 }

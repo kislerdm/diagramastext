@@ -3,17 +3,18 @@ package c4container
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/kislerdm/diagramastext/server/core/domain/c4container/compression"
-	"github.com/kislerdm/diagramastext/server/core/port"
+	"github.com/kislerdm/diagramastext/server/core/errors"
+
+	"github.com/kislerdm/diagramastext/server/core/diagram"
+	"github.com/kislerdm/diagramastext/server/core/diagram/c4container/compression"
 )
 
-func renderDiagram(ctx context.Context, httpClient port.HTTPClient, v *c4ContainersGraph) ([]byte, error) {
+func renderDiagram(ctx context.Context, httpClient diagram.HTTPClient, v *c4ContainersGraph) ([]byte, error) {
 	c4ContainersDSL, err := marshal(v)
 	if err != nil {
 		return nil, err
@@ -27,24 +28,24 @@ func renderDiagram(ctx context.Context, httpClient port.HTTPClient, v *c4Contain
 	return callPlantUML(ctx, httpClient, requestRoute)
 }
 
-func callPlantUML(ctx context.Context, httpClient port.HTTPClient, route string) ([]byte, error) {
+func callPlantUML(ctx context.Context, httpClient diagram.HTTPClient, route string) ([]byte, error) {
 	const baseURL = "https://www.plantuml.com/plantuml/"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"svg/"+route, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(err.Error())
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(err.Error())
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		if err == nil {
-			err = errors.New("the response is not ok, status code: " + strconv.Itoa(resp.StatusCode))
+			return nil, errors.New("the response is not ok, status code: " + strconv.Itoa(resp.StatusCode))
 		}
-		return nil, err
+		return nil, errors.New(err.Error())
 	}
 
 	defer func() { _ = resp.Body.Close() }()
@@ -244,7 +245,7 @@ func compress(v []byte) ([]byte, error) {
 	var options = compression.DefaultOptions()
 	var w bytes.Buffer
 	if err := compression.Compress(&options, compression.FORMAT_DEFLATE, v, &w); err != nil {
-		return nil, err
+		return nil, errors.New(err.Error())
 	}
 	return w.Bytes(), nil
 }
@@ -306,4 +307,10 @@ func encode6bit(e byte) byte {
 	default:
 		return '?'
 	}
+}
+
+func stringCleaner(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	return s
 }

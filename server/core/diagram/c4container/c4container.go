@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"time"
 
-	"github.com/kislerdm/diagramastext/server/core/adapter"
-	"github.com/kislerdm/diagramastext/server/core/port"
+	"github.com/kislerdm/diagramastext/server/core/diagram"
+	"github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 // c4ContainersGraph defines the containers and relations for C4 container diagram's graph.
@@ -43,33 +42,24 @@ type rel struct {
 
 // NewC4ContainersHandler initialises the handler to generate C4 containers diagram.
 func NewC4ContainersHandler(
-	clientModelInference port.ModelInference, clientRepositoryPrediction port.RepositoryPrediction,
-	httpClient port.HTTPClient,
-) port.DiagramHandler {
-	if httpClient == nil {
-		httpClient = adapter.NewHTTPClient(
-			adapter.HTTPClientConfig{
-				Timeout: 30 * time.Second,
-				Backoff: adapter.Backoff{
-					MaxIterations:             2,
-					BackoffTimeMinMillisecond: 50,
-					BackoffTimeMaxMillisecond: 200,
-				},
-			},
-		)
+	clientModelInference diagram.ModelInference, clientRepositoryPrediction diagram.RepositoryPrediction,
+	httpClient diagram.HTTPClient,
+) (diagram.DiagramHandler, error) {
+	if clientModelInference == nil {
+		return nil, errors.New("model inference client must be provided")
 	}
-	return func(ctx context.Context, input port.Input) (port.Output, error) {
+	if httpClient == nil {
+		return nil, errors.New("http client must be provided")
+	}
+	return func(ctx context.Context, input diagram.Input) (diagram.Output, error) {
 		if err := input.Validate(); err != nil {
 			return nil, err
 		}
 
-		modelConfig := port.ModelInferenceConfig{
-			Prompt: addPromptRequestCondition(input.GetPrompt()),
-			Model:  defineModel(input.GetUser()),
-			BestOf: defineBestOf(input.GetUser()),
-		}
-
-		diagramPrediction, err := clientModelInference.Do(ctx, modelConfig)
+		diagramPrediction, err := clientModelInference.Do(
+			ctx, addPromptRequestCondition(input.GetPrompt()), defineModel(input.GetUser()),
+			defineBestOf(input.GetUser()),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -92,18 +82,18 @@ func NewC4ContainersHandler(
 			return nil, err
 		}
 
-		return adapter.NewResultSVG(diagramPostRendering)
-	}
+		return diagram.NewResultSVG(diagramPostRendering)
+	}, nil
 }
 
-func defineBestOf(user *port.User) uint8 {
+func defineBestOf(user *diagram.User) uint8 {
 	if user.IsRegistered {
 		return 3
 	}
 	return 2
 }
 
-func defineModel(user *port.User) string {
+func defineModel(user *diagram.User) string {
 	if user.IsRegistered {
 		// FIXME: change for fine-tuned model after it's trained
 		return "code-davinci-002"

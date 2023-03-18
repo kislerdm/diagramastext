@@ -1,4 +1,4 @@
-package adapter
+package diagram
 
 import (
 	"io"
@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/kislerdm/diagramastext/server/core/port"
 )
 
 func randomString(length int) string {
@@ -25,7 +23,7 @@ func randomString(length int) string {
 func Test_inquiry_Validate(t *testing.T) {
 	type fields struct {
 		Prompt string
-		User   *port.User
+		User   *User
 	}
 	tests := []struct {
 		name    string
@@ -36,7 +34,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "base user: happy path",
 			fields: fields{
 				Prompt: randomString(promptLengthMaxBaseUser - 1),
-				User:   &port.User{},
+				User:   &User{},
 			},
 			wantErr: false,
 		},
@@ -44,7 +42,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "base user: unhappy path - too long",
 			fields: fields{
 				Prompt: randomString(promptLengthMaxBaseUser + 1),
-				User:   &port.User{},
+				User:   &User{},
 			},
 			wantErr: true,
 		},
@@ -52,7 +50,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "base user: unhappy path - too short",
 			fields: fields{
 				Prompt: randomString(promptLengthMin - 1),
-				User:   &port.User{},
+				User:   &User{},
 			},
 			wantErr: true,
 		},
@@ -60,7 +58,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "registered user: happy path",
 			fields: fields{
 				Prompt: randomString(promptLengthMaxRegisteredUser - 1),
-				User:   &port.User{IsRegistered: true},
+				User:   &User{IsRegistered: true},
 			},
 			wantErr: false,
 		},
@@ -68,7 +66,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "registered user: unhappy path -  too long",
 			fields: fields{
 				Prompt: randomString(promptLengthMaxRegisteredUser + 1),
-				User:   &port.User{IsRegistered: true},
+				User:   &User{IsRegistered: true},
 			},
 			wantErr: true,
 		},
@@ -76,7 +74,7 @@ func Test_inquiry_Validate(t *testing.T) {
 			name: "registered user: unhappy path -  too short",
 			fields: fields{
 				Prompt: randomString(promptLengthMin - 1),
-				User:   &port.User{IsRegistered: true},
+				User:   &User{IsRegistered: true},
 			},
 			wantErr: true,
 		},
@@ -107,7 +105,7 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    port.Input
+		want    Input
 		wantErr bool
 	}{
 		{
@@ -117,7 +115,7 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 			},
 			want: &inquiry{
 				Prompt: validPrompt,
-				User:   &port.User{ID: "NA"},
+				User:   &User{ID: "NA"},
 			},
 			wantErr: false,
 		},

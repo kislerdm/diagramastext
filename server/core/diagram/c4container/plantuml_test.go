@@ -3,14 +3,15 @@ package c4container
 import (
 	"bytes"
 	"context"
-	"errors"
+	errs "errors"
 	"io"
 	"net/http"
 	"reflect"
 	"strconv"
 	"testing"
 
-	"github.com/kislerdm/diagramastext/server/core/port"
+	"github.com/kislerdm/diagramastext/server/core/diagram"
+	"github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 func Test_compress(t *testing.T) {
@@ -451,8 +452,8 @@ func Test_renderDiagramHappyPath(t *testing.T) {
 			// GIVEN
 			want := []byte(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="351px" preserveAspectRatio="none" style="width:258px;height:351px;background:#FFFFFF;" version="1.1" viewBox="0 0 258 351" width="258px" zoomAndPan="magnify"><defs/><g><!--entity 0--><g id="elem_0"><rect fill="#08427B" height="86.625" rx="2.5" ry="2.5" style="stroke:#073B6F;stroke-width:0.5;" width="68" x="97" y="7"/><image height="48" width="48" x="107" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAACD0lEQVR4Xu2YoU4EMRCGT+4j8Ai8AhaH4QHgAUjQuFMECUgMIUgwJAgMhgQsAYUiJCiQIBBY+EITsjfTdme6V24v4c8vyGbb+ZjOtN0bNcvjQXmkH83WvYBWto6PLm6v7p7uH1/w2fXD+PBycX1Pv2l3IdDm/vn7x+dXQiAubRzoURa7gRZWd0iGRIiJbOnhnfYBQZNJjNbuyY2eJG8fkDE3bbG4ep6MHUAsgYxmE3nVs6VsBWJSGccsOlFPmLIViMzLOB7pCVO2AtHJMohH7Fh6zqitQK7m0rJvAVYgGcEpe//PLdDz65sM4pF9N7ICcXDKIB5Nv6j7tD0NoSdM2QrU9Gg0ewE1LqBhHR3BBdvj2vapnidjHxD/q6vd7Pvhr31AwcY8eXMTXAKECZZJFXuEq27aLgQK5uLMohCenGGuGewOxSjBvYBqeG6B+Nqiblggdjnc+ZXDy+FNFpFzw76O3UBAROuXh6FoiAcf5g9eTvUgzy0nWg6I8cXHRUpg5bOVBCo+KDpFajOf23GgPme7RSQ+lacIENUgJ6gg1k6HjgOlqnLqip4tEuhv0hNEMXUD0clyXE3p6pZA0S2nnvTlXwLJEZWlb7cTQH1+USgTN4VhAenm/wea1OCAOmqo6fE1WCb9WSKBah+rbUWPWAmE2Rvk0ApiB45eOyNAzU8xcTvj8KvkKEoOaIYeHNA3ZuygAvFMUO0AAAAASUVORK5CYII=" y="17"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="45" x="108.5" y="79.8516">Anna</text></g><!--entity 1--><g id="elem_1"><rect fill="#08427B" height="86.625" rx="2.5" ry="2.5" style="stroke:#073B6F;stroke-width:0.5;" width="68" x="97" y="169"/><image height="48" width="48" x="107" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAACD0lEQVR4Xu2YoU4EMRCGT+4j8Ai8AhaH4QHgAUjQuFMECUgMIUgwJAgMhgQsAYUiJCiQIBBY+EITsjfTdme6V24v4c8vyGbb+ZjOtN0bNcvjQXmkH83WvYBWto6PLm6v7p7uH1/w2fXD+PBycX1Pv2l3IdDm/vn7x+dXQiAubRzoURa7gRZWd0iGRIiJbOnhnfYBQZNJjNbuyY2eJG8fkDE3bbG4ep6MHUAsgYxmE3nVs6VsBWJSGccsOlFPmLIViMzLOB7pCVO2AtHJMohH7Fh6zqitQK7m0rJvAVYgGcEpe//PLdDz65sM4pF9N7ICcXDKIB5Nv6j7tD0NoSdM2QrU9Gg0ewE1LqBhHR3BBdvj2vapnidjHxD/q6vd7Pvhr31AwcY8eXMTXAKECZZJFXuEq27aLgQK5uLMohCenGGuGewOxSjBvYBqeG6B+Nqiblggdjnc+ZXDy+FNFpFzw76O3UBAROuXh6FoiAcf5g9eTvUgzy0nWg6I8cXHRUpg5bOVBCo+KDpFajOf23GgPme7RSQ+lacIENUgJ6gg1k6HjgOlqnLqip4tEuhv0hNEMXUD0clyXE3p6pZA0S2nnvTlXwLJEZWlb7cTQH1+USgTN4VhAenm/wea1OCAOmqo6fE1WCb9WSKBah+rbUWPWAmE2Rvk0ApiB45eOyNAzU8xcTvj8KvkKEoOaIYeHNA3ZuygAvFMUO0AAAAASUVORK5CYII=" y="179"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="35" x="113.5" y="241.8516">Bob</text></g><!--link 0 to 1--><g id="link_0_1"><path d="M131,94.377 C131,114.815 131,139.407 131,160.7686 " fill="none" id="0-to-1" style="stroke:#666666;stroke-width:1.0;"/><polygon fill="#666666" points="131,168.7822,134,160.7822,128,160.7822,131,168.7822" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="34" x="132" y="136.1387">Calls</text></g><rect fill="none" height="16.2969" style="stroke:none;stroke-width:1.0;" width="94" x="78" y="279.625"/><text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold" lengthAdjust="spacing" textLength="57" x="78" y="292.6201">Legend</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="135" y="292.6201">&nbsp;</text><rect fill="#08427B" height="16.2969" style="stroke:none;stroke-width:1.0;" width="94" x="78" y="295.9219"/><text fill="#073B6F" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="8" x="82" y="308.917">▯</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="90" y="308.917">&nbsp;</text><image height="12" width="12" x="94" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAjUlEQVR4XmPgcKpGRtGNy/0qFqIJMiBz/iMB7IpOXXuErGjK2mNYFH3/+RtZ0d6zd7Aoim9ZiaxIN64fiyIg6liyH6IivnUlsjhCkWpkt1nqZAjbLnuGbFAbuiJki+AA6EqEoq3HbqDLw0DLwr1QRegySODW49dQRb///EWXhIFT1x4j3GSYNBErgsgCADsg9+PJKhUuAAAAAElFTkSuQmCC" y="300.2188"/><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="50" x="114" y="308.917">person</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="168" y="308.917">&nbsp;</text><line style="stroke:none;stroke-width:1.0;" x1="78" x2="172" y1="279.625" y2="279.625"/><line style="stroke:none;stroke-width:1.0;" x1="78" x2="172" y1="295.9219" y2="295.9219"/><line style="stroke:none;stroke-width:1.0;" x1="78" x2="172" y1="312.2188" y2="312.2188"/><line style="stroke:none;stroke-width:1.0;" x1="78" x2="78" y1="279.625" y2="312.2188"/><line style="stroke:none;stroke-width:1.0;" x1="172" x2="172" y1="279.625" y2="312.2188"/><text fill="#888888" font-family="sans-serif" font-size="10" lengthAdjust="spacing" textLength="250" x="0" y="341.501">generated by diagramastext.dev - 2023-03-18</text><!--SRC=[DSj1Yy8m48RXkxyYMn1RC8t2dhnf5JrOLrp4eqoRiGRIf2HJNV-zKs7d-BppVHbNsrwZk1DrSQ5KW6VU6BhtLHynrDuHEifhtwhEWgE-jJAIjgPInRSy3dGkzwg5I1YOhWKlm3WCUSU_evlt74JI81CGQb6zX3RG1FXi_YZN-11IZ3NNTFBYasKfjPvaoUY88NgNpgOYMJe7IVOlSvQLhnXEQ8S-G07MHgRVtS_bkjziDuTrchq1]--></g></svg>`)
 
-			httpClient := port.MockHTTPClient{
-				V: &port.HTTPResponse{
+			httpClient := diagram.MockHTTPClient{
+				V: &http.Response{
 					Body:       io.NopCloser(bytes.NewReader(want)),
 					StatusCode: http.StatusOK,
 				},
@@ -499,13 +500,13 @@ func Test_renderDiagramHappyPath(t *testing.T) {
 func Test_renderDiagramUnhappyPath(t *testing.T) {
 	type args struct {
 		ctx        context.Context
-		httpClient port.HTTPClient
+		httpClient diagram.HTTPClient
 		v          *c4ContainersGraph
 	}
 	tests := []struct {
-		name string
-		args args
-		want error
+		name        string
+		args        args
+		wantErrText string
 	}{
 		{
 			name: "no nodes",
@@ -513,40 +514,40 @@ func Test_renderDiagramUnhappyPath(t *testing.T) {
 				ctx: context.TODO(),
 				v:   &c4ContainersGraph{},
 			},
-			want: errors.New("no containers found"),
+			wantErrText: "diagram/c4container/plantuml.go:64: no containers found",
 		},
 		{
 			name: "http call error",
 			args: args{
 				ctx: context.TODO(),
-				httpClient: port.MockHTTPClient{
-					Err: errors.New("foobar"),
+				httpClient: diagram.MockHTTPClient{
+					Err: errs.New("foobar"),
 				},
 				v: &c4ContainersGraph{Containers: []*container{{ID: "0"}}},
 			},
-			want: errors.New("foobar"),
+			wantErrText: "diagram/c4container/plantuml.go:41: foobar",
 		},
 		{
 			name: "http response not OK",
 			args: args{
 				ctx: context.TODO(),
-				httpClient: port.MockHTTPClient{
-					V: &port.HTTPResponse{
+				httpClient: diagram.MockHTTPClient{
+					V: &http.Response{
 						StatusCode: http.StatusTooManyRequests,
 					},
 				},
 				v: &c4ContainersGraph{Containers: []*container{{ID: "0"}}},
 			},
-			want: errors.New("the response is not ok, status code: " + strconv.Itoa(http.StatusTooManyRequests)),
+			wantErrText: "diagram/c4container/plantuml.go:46: the response is not ok, status code: " + strconv.Itoa(http.StatusTooManyRequests),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				if _, err := renderDiagram(tt.args.ctx, tt.args.httpClient, tt.args.v); !reflect.DeepEqual(
-					err, tt.want,
+				if _, err := renderDiagram(tt.args.ctx, tt.args.httpClient, tt.args.v); !errors.IsError(
+					err, tt.wantErrText,
 				) {
-					t.Errorf("renderDiagram() error = %v, want %v", err, tt.want)
+					t.Errorf("renderDiagram() error = %v, want = %s", err, tt.wantErrText)
 					return
 				}
 			},
