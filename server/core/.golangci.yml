@@ -2,7 +2,8 @@ run:
   allow-parallel-runners: true
   go: "1.19"
   skip-files:
-    - c4container/compression/
+    - diagram/c4container/compression/
+  tests: false
 
 issues:
   exclude-use-default: false

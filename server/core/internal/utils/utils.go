@@ -10,6 +10,6 @@ func MustParseInt(s string) int {
 }
 
 func MustParseFloat32(s string) float32 {
-	o, _ := strconv.ParseFloat(s, 10)
+	o, _ := strconv.ParseFloat(s, 32)
 	return float32(o)
 }

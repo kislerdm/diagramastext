@@ -1,7 +1,6 @@
 package httphandler
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
@@ -77,7 +76,7 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			generatedDiagram, err := renderingHandler(context.Background(), input)
+			generatedDiagram, err := renderingHandler(r.Context(), input)
 			if err != nil {
 				h.response(w, []byte("internal error"), http.StatusInternalServerError, err)
 				return
