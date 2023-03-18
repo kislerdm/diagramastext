@@ -1,6 +1,9 @@
 package port
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // RepositoryPrediction defines the interface to store prediction input (prompt) and model result.
 type RepositoryPrediction interface {
@@ -31,9 +34,13 @@ type RepositorySecretsVault interface {
 }
 
 type MockRepositorySecretsVault struct {
+	V   []byte
 	Err error
 }
 
-func (m MockRepositorySecretsVault) ReadLastVersion(_ context.Context, _ string, _ interface{}) error {
-	return m.Err
+func (m MockRepositorySecretsVault) ReadLastVersion(_ context.Context, _ string, o interface{}) error {
+	if m.Err != nil {
+		return m.Err
+	}
+	return json.Unmarshal(m.V, o)
 }

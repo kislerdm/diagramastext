@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"context"
@@ -71,12 +71,16 @@ func loadFromSecretsManager(
 func loadEnvVarConfig(cfg *Config) {
 	cfg.ModelInferenceConfig.Token = os.Getenv("MODEL_API_KEY")
 	cfg.ModelInferenceConfig.MaxTokens = utils.MustParseInt(os.Getenv("MODEL_MAX_TOKENS"))
-	cfg.RepositoryPredictionConfig = repositoryPredictionConfig{
-		DBHost:          os.Getenv("DB_HOST"),
-		DBName:          os.Getenv("DB_DBNAME"),
-		DBUser:          os.Getenv("DB_USER"),
-		DBPassword:      os.Getenv("DB_PASSWORD"),
-		TablePrompt:     os.Getenv("TABLE_PROMPT"),
-		TablePrediction: os.Getenv("TABLE_PREDICTION"),
+	cfg.RepositoryPredictionConfig.DBHost = os.Getenv("DB_HOST")
+	cfg.RepositoryPredictionConfig.DBName = os.Getenv("DB_DBNAME")
+	cfg.RepositoryPredictionConfig.DBUser = os.Getenv("DB_USER")
+	cfg.RepositoryPredictionConfig.DBPassword = os.Getenv("DB_PASSWORD")
+
+	if v := os.Getenv("TABLE_PROMPT"); v != "" {
+		cfg.RepositoryPredictionConfig.TablePrompt = v
+	}
+
+	if v := os.Getenv("TABLE_PREDICTION"); v != "" {
+		cfg.RepositoryPredictionConfig.TablePrediction = v
 	}
 }
