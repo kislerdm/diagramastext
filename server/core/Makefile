@@ -24,8 +24,12 @@ LS_PKGS := $(dir $(wildcard $(PWD)/pkg/*/go.mod))
 
 tests: .test-core .test-packages ## Run tests of the core module.
 
-compile: ## Compiles httpserver
+ARCH := `uname -m`
+OS := `uname | tr '[:upper:]' '[:lower:]'`
+
+compile: ## Compiles httpserver.
 	@ test -d bin || mkdir -p bin && \
 		cd cmd/httpserver && \
 		go mod tidy && \
-			CGO_ENABLED=0 go build -o ../../bin/httpserver -ldflags="-s -w" .
+			CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -o ../../bin/httpserver -ldflags="-s -w" .
+
