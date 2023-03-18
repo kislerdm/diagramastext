@@ -9,13 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	compression2 "github.com/kislerdm/diagramastext/server/core/domain/c4container/compression"
+	"github.com/kislerdm/diagramastext/server/core/domain/c4container/compression"
 	"github.com/kislerdm/diagramastext/server/core/port"
 )
 
 func renderDiagram(ctx context.Context, httpClient port.HTTPClient, v *c4ContainersGraph) ([]byte, error) {
 	c4ContainersDSL, err := marshal(v)
-
 	if err != nil {
 		return nil, err
 	}
@@ -48,16 +47,15 @@ func callPlantUML(ctx context.Context, httpClient port.HTTPClient, route string)
 		return nil, err
 	}
 
+	defer func() { _ = resp.Body.Close() }()
+
 	return io.ReadAll(resp.Body)
 }
 
-func writeStrings(w *bytes.Buffer, s ...string) error {
+func writeStrings(w *bytes.Buffer, s ...string) {
 	for _, el := range s {
-		if _, err := w.WriteString(el); err != nil {
-			return err
-		}
+		_, _ = w.WriteString(el)
 	}
-	return nil
 }
 
 func marshal(c *c4ContainersGraph) ([]byte, error) {
@@ -66,84 +64,68 @@ func marshal(c *c4ContainersGraph) ([]byte, error) {
 	}
 
 	var o bytes.Buffer
-	if err := writeStrings(
+	writeStrings(
 		&o,
 		`@startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml`,
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml`, "\n",
 		dslFooter(c.Footer), dslTitle(c.Title),
-	); err != nil {
-		return nil, err
-	}
+	)
 
 	groups := map[string][]string{}
 	for _, n := range c.Containers {
-		containerStr, err := dslContainer(n)
-		if err != nil {
-			return nil, err
+		if n.ID == "" {
+			return nil, errors.New("container must be identified: 'id' attribute")
 		}
 
 		if _, ok := groups[n.System]; !ok {
 			groups[n.System] = []string{}
 		}
-		groups[n.System] = append(groups[n.System], containerStr)
+		groups[n.System] = append(groups[n.System], dslContainer(n))
 	}
 
-	if err := dslSystems(&o, groups); err != nil {
-		return nil, err
-	}
+	dslSystems(&o, groups)
 
-	if err := writeStrings(&o, "\n"); err != nil {
-		return nil, err
-	}
+	writeStrings(&o, "\n")
 
 	for _, l := range c.Rels {
-		if err := dslRelation(&o, l); err != nil {
-			return nil, err
+		if l.From == "" || l.To == "" {
+			return nil, errors.New("relation must specify the end nodes: 'from' and 'to' attributes")
 		}
-		if err := writeStrings(&o, "\n"); err != nil {
-			return nil, err
-		}
+
+		dslRelation(&o, l)
+		writeStrings(&o, "\n")
 	}
 
-	if err := writeStrings(&o, "@enduml"); err != nil {
-		return nil, err
-	}
+	writeStrings(&o, dslLegend(c.WithLegend), "@enduml")
 
 	return o.Bytes(), nil
 }
 
-func dslRelation(o *bytes.Buffer, l *rel) error {
-	if l.From == "" || l.To == "" {
-		return errors.New("relation must specify the end nodes: 'from' and 'to' attributes")
+func dslLegend(withLegend bool) string {
+	if withLegend {
+		return "SHOW_LEGEND()\n"
 	}
+	return ""
+}
 
-	if err := writeStrings(o, "Rel"); err != nil {
-		return err
-	}
+func dslRelation(o *bytes.Buffer, l *rel) {
+	writeStrings(o, "Rel")
 
 	if d := relationDirection(l.Direction); d != "" {
-		if err := writeStrings(o, "_", d); err != nil {
-			return err
-		}
+		writeStrings(o, "_", d)
 	}
 
-	if err := writeStrings(o, "(", l.From, ",", l.To); err != nil {
-		return err
-	}
+	writeStrings(o, "(", l.From, ", ", l.To)
 
 	if l.Label != "" {
-		if err := writeStrings(o, `, "`, stringCleaner(l.Label), `"`); err != nil {
-			return err
-		}
+		writeStrings(o, `, "`, stringCleaner(l.Label), `"`)
 	}
 
 	if l.Technology != "" {
-		if err := writeStrings(o, `, "`, stringCleaner(l.Technology), `"`); err != nil {
-			return err
-		}
+		writeStrings(o, `, "`, stringCleaner(l.Technology), `"`)
 	}
 
-	return writeStrings(o, ")")
+	writeStrings(o, ")")
 }
 
 func relationDirection(s string) string {
@@ -161,118 +143,79 @@ func relationDirection(s string) string {
 	}
 }
 
-func dslSystems(o *bytes.Buffer, groups map[string][]string) error {
+func dslSystems(o *bytes.Buffer, groups map[string][]string) {
 	tmp := groups
 
 	if members, ok := tmp[""]; ok {
-		if err := writeStrings(o, "\n", strings.Join(members, "\n")); err != nil {
-			return err
-		}
+		writeStrings(o, strings.Join(members, "\n"))
 		delete(tmp, "")
 	}
 
 	for groupName, members := range tmp {
 		description := stringCleaner(groupName)
-		id := strings.ReplaceAll(description, "\n", "_")
-		if err := writeStrings(
-			o, "\nSystem_Boundary(", id, description, ") {", strings.Join(members, "\n"), "\n}",
-		); err != nil {
-			return err
-		}
+		id := strings.NewReplacer("\n", "", " ", "").Replace(description)
+		writeStrings(
+			o, "\nSystem_Boundary(", id, `, "`, description, "\") {\n", strings.Join(members, "\n"), "\n}",
+		)
 	}
-
-	return nil
 }
 
-func dslContainerType(o *bytes.Buffer, n *container) error {
-	tag := "Container"
+func dslContainerType(o *bytes.Buffer, n *container) {
 	if n.IsUser {
-		tag = "User"
-	}
-	if err := writeStrings(o, tag); err != nil {
-		return err
-	}
-
-	switch n.IsQueue && n.IsDatabase {
-	case true:
-	case false:
+		writeStrings(o, "Person")
+	} else {
+		writeStrings(o, "Container")
 		if n.IsQueue {
-			if err := writeStrings(o, "Queue"); err != nil {
-				return err
-			}
-		}
-
-		if n.IsDatabase {
-			if err := writeStrings(o, "Db"); err != nil {
-				return err
-			}
+			writeStrings(o, "Queue")
+		} else if n.IsDatabase {
+			writeStrings(o, "Db")
 		}
 	}
 
 	if n.IsExternal {
-		if err := writeStrings(o, "_Ext"); err != nil {
-			return err
-		}
+		writeStrings(o, "_Ext")
 	}
-
-	return nil
 }
 
-func dslContainer(n *container) (string, error) {
-	if n.ID == "" {
-		return "", errors.New("container must be identified: 'id' attribute")
-	}
-
+func dslContainer(n *container) string {
 	var o bytes.Buffer
 
-	// container type
-	if err := dslContainerType(&o, n); err != nil {
-		return "", err
-	}
+	dslContainerType(&o, n)
 
-	// container definition
-	if err := writeStrings(&o, "("); err != nil {
-		return "", err
-	}
-
-	if err := writeStrings(&o, n.ID); err != nil {
-		return "", err
-	}
+	writeStrings(&o, "(", n.ID)
 
 	label := n.Label
 	if label == "" {
 		label = n.ID
 	}
 
-	if err := writeStrings(&o, `, "`, stringCleaner(label), `"`); err != nil {
-		return "", err
-	}
+	writeStrings(&o, `, "`, stringCleaner(label), `"`)
 
 	if n.Technology != "" {
-		if err := writeStrings(&o, `, "`, stringCleaner(n.Technology), `"`); err != nil {
-			return "", err
-		}
+		writeStrings(&o, `, "`, stringCleaner(n.Technology), `"`)
 	}
 
-	if err := writeStrings(&o, ")"); err != nil {
-		return "", err
+	if n.Description != "" {
+		writeStrings(&o, `, "`, stringCleaner(n.Description), `"`)
 	}
 
-	return o.String(), nil
+	writeStrings(&o, ")")
+
+	return o.String()
 }
 
 func dslFooter(footer string) string {
 	if footer == "" {
-		return "\n" + `footer "generated by diagramastext.dev - %date('yyyy-MM-dd')"`
+		footer = "generated by diagramastext.dev - %date('yyyy-MM-dd')"
 	}
-	return "\n" + `footer "` + stringCleaner(footer) + `"`
+	return `footer "` + stringCleaner(footer) + "\"\n"
 }
 
 func dslTitle(title string) string {
 	if title == "" {
 		return ""
 	}
-	return "\n" + `title "` + stringCleaner(title) + `"`
+	return `title "` + stringCleaner(title) + "\"\n"
 }
 
 // plantUMLRequest converts the diagram as code to the 64Bytes encoded string to query plantuml
@@ -298,9 +241,9 @@ func plantUMLRequest(v []byte) (string, error) {
 }
 
 func compress(v []byte) ([]byte, error) {
-	var options = compression2.DefaultOptions()
+	var options = compression.DefaultOptions()
 	var w bytes.Buffer
-	if err := compression2.Compress(&options, compression2.FORMAT_DEFLATE, v, &w); err != nil {
+	if err := compression.Compress(&options, compression.FORMAT_DEFLATE, v, &w); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil
