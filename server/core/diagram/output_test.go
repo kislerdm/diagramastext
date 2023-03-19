@@ -1,6 +1,7 @@
 package diagram
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -99,6 +100,55 @@ func Test_responseSVG_Serialize(t *testing.T) {
 				}
 				if !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("Serialize() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func TestMockOutput_Serialize(t *testing.T) {
+	type fields struct {
+		V   []byte
+		Err error
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    []byte
+		wantErr error
+	}{
+		{
+			name: "happy path: error",
+			fields: fields{
+				Err: errors.New("foobar"),
+			},
+			wantErr: errors.New("foobar"),
+		},
+		{
+			name: "happy path: results",
+			fields: fields{
+				V: []byte(`foo`),
+			},
+			want:    []byte(`foo`),
+			wantErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				m := MockOutput{
+					V:   tt.fields.V,
+					Err: tt.fields.Err,
+				}
+				got, err := m.Serialize()
+				if !reflect.DeepEqual(tt.wantErr, err) {
+					t.Errorf("unexpected error")
+					return
+				}
+
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("unexpected result")
+					return
 				}
 			},
 		)

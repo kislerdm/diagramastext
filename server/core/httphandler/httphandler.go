@@ -1,9 +1,13 @@
 package httphandler
 
 import (
+	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/diagram/c4container"
@@ -38,9 +42,12 @@ type httpHandler struct {
 	corsHeaders             corsHeaders
 }
 
-func (h httpHandler) response(w http.ResponseWriter, body []byte, status int, err error) {
+func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
+	status := http.StatusOK
+
 	if err != nil {
 		h.reportErrorFn(err)
+		status = err.(httpHandlerError).HTTPCode
 	}
 
 	h.corsHeaders.setHeaders(w.Header())
@@ -51,45 +58,63 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, status int, er
 func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch p := r.URL.Path; p {
 	case "status":
-		if r.Method == http.MethodGet {
-			h.response(w, nil, http.StatusOK, nil)
+		switch r.Method {
+		case http.MethodGet, http.MethodOptions:
+			h.response(w, nil, nil)
+			return
+		default:
+			h.response(
+				w, nil, newInvalidMethodError(
+					errors.New("method "+r.Method+" not allowed for path: "+p),
+				),
+			)
 			return
 		}
-		h.response(w, nil, http.StatusMethodNotAllowed, nil)
-		return
+
 	default:
 		renderingHandler, ok := h.diagramRenderingHandler[p]
 		if !ok {
-			h.response(w, nil, http.StatusNotFound, nil)
+			h.response(w, []byte("not exists"), newHandlerNotExistsError(errors.New("handler not exists for path "+p)))
 			return
 		}
 
 		switch r.Method {
 		case http.MethodOptions:
-			h.response(w, nil, http.StatusOK, nil)
+			h.response(w, nil, nil)
 			return
+
 		case http.MethodPost:
 			defer func() { _ = r.Body.Close() }()
 			input, err := diagram.NewInputDriverHTTP(r.Body, r.Header)
 			if err != nil {
-				h.response(w, []byte("could not recognise the request"), http.StatusUnprocessableEntity, err)
+				h.response(w, []byte("wrong request content"), newValidationError(err))
 				return
 			}
 
 			generatedDiagram, err := renderingHandler(r.Context(), input)
 			if err != nil {
-				h.response(w, []byte("internal error"), http.StatusInternalServerError, err)
+				h.response(w, []byte("internal error"), newCoreLogicError(err))
 				return
 			}
 
 			bytes, err := generatedDiagram.Serialize()
 			if err != nil {
-				h.response(w, []byte("could not serialise the resulting diagram"), http.StatusInternalServerError, err)
+				h.response(w, []byte("internal error"), newDiagramSerialisationError(err))
 				return
 			}
-			h.response(w, bytes, http.StatusOK, nil)
+
+			h.response(w, bytes, nil)
+			return
+
+		default:
+			h.response(
+				w, nil, newInvalidMethodError(
+					errors.New("method "+r.Method+" not allowed for path: "+p),
+				),
+			)
 			return
 		}
+
 	}
 }
 
@@ -102,5 +127,81 @@ func (h corsHeaders) setHeaders(header http.Header) {
 		if k == "Access-Control-Allow-Origin" && (v == "" || v == "'*'") {
 			header.Set(k, "*")
 		}
+	}
+}
+
+const (
+	errorInvalidMethod           = "Request:InvalidMethod"
+	errorNotExists               = "Request:HandlerNotExists"
+	errorInvalidJSON             = "InputValidation:InvalidJSON"
+	errorValidJSONInvalidContent = "InputValidation:InvalidContent"
+	errorCoreLogic               = "Core:DiagramRendering"
+	errorResponseSerialisation   = "Response:DiagramSerialisation"
+)
+
+func newDiagramSerialisationError(err error) error {
+	return httpHandlerError{
+		Msg:      err.Error(),
+		Type:     errorResponseSerialisation,
+		HTTPCode: http.StatusInternalServerError,
+	}
+}
+
+func newCoreLogicError(err error) error {
+	return httpHandlerError{
+		Msg:      err.Error(),
+		Type:     errorCoreLogic,
+		HTTPCode: http.StatusInternalServerError,
+	}
+}
+
+func newHandlerNotExistsError(err error) error {
+	return httpHandlerError{
+		Msg:      err.Error(),
+		Type:     errorNotExists,
+		HTTPCode: http.StatusNotFound,
+	}
+}
+
+func newInvalidMethodError(err error) error {
+	return httpHandlerError{
+		Msg:      err.Error(),
+		Type:     errorInvalidMethod,
+		HTTPCode: http.StatusMethodNotAllowed,
+	}
+}
+
+func newValidationError(err error) error {
+	switch err.(type) {
+	case *json.SyntaxError:
+		return httpHandlerError{
+			Msg:      "faulty JSON",
+			Type:     errorInvalidJSON,
+			HTTPCode: http.StatusUnprocessableEntity,
+		}
+	default:
+		return httpHandlerError{
+			Msg:      err.Error(),
+			Type:     errorValidJSONInvalidContent,
+			HTTPCode: http.StatusBadRequest,
+		}
+	}
+}
+
+type httpHandlerError struct {
+	Msg      string
+	Type     string
+	HTTPCode int
+}
+
+func (e httpHandlerError) Error() string {
+	var o strings.Builder
+	writeStrings(&o, "[type:", e.Type, "][code:", strconv.Itoa(e.HTTPCode), "] ", e.Msg)
+	return o.String()
+}
+
+func writeStrings(o *strings.Builder, text ...string) {
+	for _, s := range text {
+		_, _ = o.WriteString(s)
 	}
 }
