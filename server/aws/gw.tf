@@ -304,7 +304,7 @@ resource "aws_api_gateway_usage_plan_key" "main" {
   usage_plan_id = aws_api_gateway_usage_plan.test.id
 }
 
-# custom domain
+# custom diagram
 resource "aws_api_gateway_domain_name" "this" {
   domain_name     = "api.${local.subdomain_prefix}diagramastext.dev"
   certificate_arn = "arn:aws:acm:us-east-1:027889758114:certificate/74feb1e2-797b-4ebb-8399-e1eee4ace87d"

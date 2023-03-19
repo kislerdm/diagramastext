@@ -1,5 +1,5 @@
 bin
-fig
+../aws/fig
 *.md
 deployment
 *.yml
