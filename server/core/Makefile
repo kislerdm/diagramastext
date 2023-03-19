@@ -33,3 +33,14 @@ compile: ## Compiles httpserver.
 		go mod tidy && \
 			CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -o ../../bin/httpserver -ldflags="-s -w" .
 
+ENV := stage
+IMAGE := us-docker.pkg.dev/diagramastext-$(ENV)/gcr.io/core
+IMAGETAG := `git rev-parse --short HEAD`
+
+docker-build: ## Builds docker image.
+	@ docker build -t $(IMAGE):$(IMAGETAG) .
+
+docker-push: ## Pushes newly-built docker image to the registry.
+	@ docker push $(IMAGE):$(IMAGETAG)
+	@ docker tag $(IMAGE):$(IMAGETAG) $(IMAGE):latest
+	@ docker push $(IMAGE):latest

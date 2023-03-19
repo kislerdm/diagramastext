@@ -1,5 +1,6 @@
 .idea
-.env
+.env*
 .terraform*
 bin
 .keys
+*.key*.json
