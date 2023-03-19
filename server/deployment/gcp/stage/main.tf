@@ -17,6 +17,6 @@ provider "google" {
 }
 
 module "core" {
-  source  = "./../stack"
+  source  = "../stack"
   project = "diagramastext-stage"
 }
