@@ -20,11 +20,11 @@ type MockRepositoryPrediction struct {
 	Err error
 }
 
-func (m MockRepositoryPrediction) WriteInputPrompt(_ context.Context, _ Input) error {
+func (m MockRepositoryPrediction) WriteInputPrompt(_ context.Context, _, _, _ string) error {
 	return m.Err
 }
 
-func (m MockRepositoryPrediction) WriteModelResult(_ context.Context, _ Input, _ string) error {
+func (m MockRepositoryPrediction) WriteModelResult(_ context.Context, _, _, _ string) error {
 	return m.Err
 }
 
