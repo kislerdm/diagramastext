@@ -1,6 +1,7 @@
 package diagram
 
 import (
+	"errors"
 	"io"
 	"math/rand"
 	"net/http"
@@ -161,4 +162,63 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 			},
 		)
 	}
+}
+
+func TestMockInput(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"invalid input", func(t *testing.T) {
+			// GIVEN
+			input := MockInput{Err: errors.New("foobar")}
+
+			// WHEN
+			err := input.Validate()
+
+			// THEN
+			if !reflect.DeepEqual(err, errors.New("foobar")) {
+				t.Fatalf("unexpected error")
+			}
+		},
+	)
+
+	t.Run(
+		"getters", func(t *testing.T) {
+			// GIVEN
+			wantUser := &User{
+				ID: "id",
+			}
+
+			const (
+				wantPrompt    = "foobarbaz"
+				wantRequestID = "bar"
+			)
+
+			input := MockInput{
+				Prompt:    wantPrompt,
+				RequestID: wantRequestID,
+				User:      wantUser,
+			}
+
+			// WHEN
+			err := input.Validate()
+			gotUser := input.GetUser()
+			gotRequestID := input.GetRequestID()
+			gotPrompt := input.GetPrompt()
+
+			// THEN
+			if err != nil {
+				t.Fatalf("unexpected error")
+			}
+			if !reflect.DeepEqual(wantUser, gotUser) {
+				t.Fatalf("unexpected user attr")
+			}
+			if wantPrompt != gotPrompt {
+				t.Fatalf("unexpected prompt")
+			}
+			if wantRequestID != gotRequestID {
+				t.Fatalf("unexpected requestID")
+			}
+		},
+	)
 }

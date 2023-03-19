@@ -86,19 +86,27 @@ func NewC4ContainersHandler(
 	}, nil
 }
 
+const (
+	notRegisteredBestOf uint8 = 2
+	notRegisteredModel        = "code-davinci-002"
+
+	registeredBestOf uint8 = 3
+	registeredModel        = notRegisteredModel
+)
+
 func defineBestOf(user *diagram.User) uint8 {
 	if user.IsRegistered {
-		return 3
+		return registeredBestOf
 	}
-	return 2
+	return notRegisteredBestOf
 }
 
 func defineModel(user *diagram.User) string {
 	if user.IsRegistered {
 		// FIXME: change for fine-tuned model after it's trained
-		return "code-davinci-002"
+		return notRegisteredModel
 	}
-	return "code-davinci-002"
+	return registeredModel
 }
 
 func addPromptRequestCondition(prompt string) string {
