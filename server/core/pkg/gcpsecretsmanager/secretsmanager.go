@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"hash/crc32"
+	"path"
+	"strings"
 
 	secretsmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
@@ -28,6 +30,11 @@ type Client struct {
 }
 
 func (c Client) ReadLastVersion(ctx context.Context, uri string, output interface{}) error {
+	uri, err := latestVersionURI(uri)
+	if err != nil {
+		return err
+	}
+
 	res, err := c.c.AccessSecretVersion(
 		ctx, &secretmanagerpb.AccessSecretVersionRequest{
 			Name: uri,
@@ -42,6 +49,30 @@ func (c Client) ReadLastVersion(ctx context.Context, uri string, output interfac
 	}
 
 	return json.Unmarshal(res.Payload.Data, output)
+}
+
+func latestVersionURI(uri string) (string, error) {
+	const (
+		tagProject      = "projects"
+		tagSecret       = "secrets"
+		tagVersion      = "versions"
+		tagVersionIndex = 3
+	)
+
+	p := strings.Split(uri, "/")
+	if len(p) < 4 || p[0] != tagProject || p[2] != tagSecret {
+		return "", errors.New("faulty secret URI")
+	}
+
+	// tag index + 1
+	versionTagIndex := tagVersionIndex + 1
+	for i, el := range p[tagVersionIndex:] {
+		if el == tagVersion {
+			versionTagIndex = tagVersionIndex + i
+		}
+	}
+
+	return path.Join(strings.Join(p[:versionTagIndex], "/"), "versions", "latest"), nil
 }
 
 func isValidResponse(res *secretmanagerpb.AccessSecretVersionResponse) error {

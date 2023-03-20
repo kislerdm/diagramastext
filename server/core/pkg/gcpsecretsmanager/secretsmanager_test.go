@@ -179,3 +179,78 @@ func TestClient_ReadLastVersionUnhappyPaths(t *testing.T) {
 		)
 	}
 }
+
+func Test_latestVersionURI(t *testing.T) {
+	type args struct {
+		uri string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			args: args{
+				uri: "projects/619195795350/secrets/core",
+			},
+			want:    "projects/619195795350/secrets/core/versions/latest",
+			wantErr: false,
+		},
+		{
+			name: "happy path: fixed version",
+			args: args{
+				uri: "projects/619195795350/secrets/core/versions/1",
+			},
+			want:    "projects/619195795350/secrets/core/versions/latest",
+			wantErr: false,
+		},
+		{
+			name: "happy path: corrupt version",
+			args: args{
+				uri: "projects/619195795350/secrets/core/version/1",
+			},
+			want:    "projects/619195795350/secrets/core/versions/latest",
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: too few URI elements",
+			args: args{
+				uri: "projects/619195795350/secrets",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: corrupt secrets tag",
+			args: args{
+				uri: "projects/619195795350/secret/foo",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: corrupt project tag",
+			args: args{
+				uri: "project/619195795350/secrets/foo",
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				got, err := latestVersionURI(tt.args.uri)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("latestVersionURI() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if got != tt.want {
+					t.Errorf("latestVersionURI() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
