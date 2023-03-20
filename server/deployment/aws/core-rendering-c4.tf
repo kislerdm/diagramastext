@@ -34,7 +34,7 @@ resource "aws_iam_policy" "core_rendering_c4_secret" {
 }
 
 module "core_rendering_c4" {
-  source             = "modules/lambda"
+  source             = "./modules/lambda"
   name               = "core-rendering-c4${local.suffix}"
   path_lambda_module = "${abspath(path.module)}/../cmd/lambda/core-c4"
   codebase_rebuild_trigger = {
