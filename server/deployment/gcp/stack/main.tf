@@ -51,6 +51,12 @@ resource "google_project_iam_member" "core_runner" {
   member   = "serviceAccount:${google_service_account.core_runner.email}"
 }
 
+variable "cors_headers" {
+  type        = map(string)
+  description = "CORS headers map."
+  default     = null
+}
+
 resource "google_cloud_run_v2_service" "core" {
   name     = "core"
   location = "us-central1"
@@ -76,6 +82,14 @@ resource "google_cloud_run_v2_service" "core" {
         value = "500"
       }
 
+      dynamic "env" {
+        for_each = var.cors_headers != null ? { foo = 0 } : {}
+        content {
+          name  = "CORS_HEADERS"
+          value = jsonencode(var.cors_headers)
+        }
+      }
+
       ports {
         container_port = 9000
       }
@@ -96,9 +110,14 @@ resource "google_cloud_run_v2_service" "core" {
 }
 
 resource "google_cloud_run_v2_service_iam_member" "core_runner" {
-  project = google_cloud_run_v2_service.core.project
+  project  = google_cloud_run_v2_service.core.project
   location = google_cloud_run_v2_service.core.location
-  name = google_cloud_run_v2_service.core.name
-  role = "roles/run.invoker"
-  member = "allUsers"
+  name     = google_cloud_run_v2_service.core.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+output "core_url" {
+  value       = google_cloud_run_v2_service.core.uri
+  description = "Core logic URL."
 }

@@ -28,8 +28,13 @@ module "core" {
   source   = "../stack"
   project  = "diagramastext-prod"
   imagetag = var.imagetag
+  cors_headers = {
+    "Access-Control-Allow-Origin"  = "https://diagramastext.dev"
+    "Access-Control-Allow-Headers" = "Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token"
+    "Access-Control-Allow-Methods" = "POST,OPTIONS"
+  }
 }
 
-output "secrets_uri" {
-  value = "projects/${data.google_project.project.number}/secrets/${module.core.secret_id}"
+output "core_url" {
+  value = module.core.core_url
 }
