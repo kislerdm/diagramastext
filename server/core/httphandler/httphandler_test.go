@@ -85,7 +85,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodGet,
 					URL: &url.URL{
-						Path: "status",
+						Path: "/status",
 					},
 				},
 			},
@@ -115,7 +115,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodOptions,
 					URL: &url.URL{
-						Path: "status",
+						Path: "/status",
 					},
 				},
 			},
@@ -143,7 +143,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodPost,
 					URL: &url.URL{
-						Path: "status",
+						Path: "/status",
 					},
 					Body: io.NopCloser(strings.NewReader(`foo`)),
 				},
@@ -154,7 +154,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				V:          nil,
 			},
 			wantErr: newInvalidMethodError(
-				errors.New("method " + http.MethodPost + " not allowed for path: status"),
+				errors.New("method " + http.MethodPost + " not allowed for path: /status"),
 			),
 		},
 		{
@@ -163,7 +163,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			errorsCollector: &errCollector{},
 			fields: fields{
 				diagramRenderingHandler: map[string]diagram.DiagramHandler{
-					"c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return diagram.MockOutput{
 							V: []byte(`{"svg":"foo"}`),
 						}, nil
@@ -178,7 +178,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodPost,
 					URL: &url.URL{
-						Path: "c4",
+						Path: "/c4",
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt":"foobar"}`)),
 				},
@@ -195,7 +195,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			errorsCollector: &errCollector{},
 			fields: fields{
 				diagramRenderingHandler: map[string]diagram.DiagramHandler{
-					"c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
 				},
@@ -208,7 +208,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodOptions,
 					URL: &url.URL{
-						Path: "c4",
+						Path: "/c4",
 					},
 				},
 			},
@@ -221,7 +221,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			name: "unhappy path: GET /c4, unsupported method",
 			fields: fields{
 				diagramRenderingHandler: map[string]diagram.DiagramHandler{
-					"c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
 				},
@@ -234,7 +234,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodGet,
 					URL: &url.URL{
-						Path: "c4",
+						Path: "/c4",
 					},
 				},
 			},
@@ -243,14 +243,14 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				Headers:    httpHeaders(corsHeaders),
 				StatusCode: http.StatusMethodNotAllowed,
 			},
-			wantErr: newInvalidMethodError(errors.New("method GET not allowed for path: c4")),
+			wantErr: newInvalidMethodError(errors.New("method GET not allowed for path: /c4")),
 		},
 		{
 			name:            "unhappy path: POST /c4, faulty input for non registered user",
 			errorsCollector: &errCollector{},
 			fields: fields{
 				diagramRenderingHandler: map[string]diagram.DiagramHandler{
-					"c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
 				},
@@ -263,7 +263,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodPost,
 					URL: &url.URL{
-						Path: "c4",
+						Path: "/c4",
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt":"a"}`)),
 				},
@@ -280,7 +280,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			errorsCollector: &errCollector{},
 			fields: fields{
 				diagramRenderingHandler: map[string]diagram.DiagramHandler{
-					"c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
 				},
@@ -293,7 +293,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodPost,
 					URL: &url.URL{
-						Path: "c4",
+						Path: "/c4",
 					},
 					Body: io.NopCloser(strings.NewReader(`foo`)),
 				},
@@ -314,7 +314,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			errorsCollector: &errCollector{},
 			fields: fields{
 				diagramRenderingHandler: map[string]diagram.DiagramHandler{
-					"c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, errors.New("foobar")
 					},
 				},
@@ -327,7 +327,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodPost,
 					URL: &url.URL{
-						Path: "c4",
+						Path: "/c4",
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt": "foobar"}`)),
 				},
@@ -344,7 +344,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			errorsCollector: &errCollector{},
 			fields: fields{
 				diagramRenderingHandler: map[string]diagram.DiagramHandler{
-					"c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return diagram.MockOutput{Err: errors.New("foobar")}, nil
 					},
 				},
@@ -357,7 +357,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodPost,
 					URL: &url.URL{
-						Path: "c4",
+						Path: "/c4",
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt": "foobar"}`)),
 				},
@@ -374,7 +374,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			errorsCollector: &errCollector{},
 			fields: fields{
 				diagramRenderingHandler: map[string]diagram.DiagramHandler{
-					"c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
 				},
@@ -387,7 +387,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				r: &http.Request{
 					Method: http.MethodOptions,
 					URL: &url.URL{
-						Path: "notFound",
+						Path: "/notFound",
 					},
 				},
 			},
@@ -396,7 +396,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				StatusCode: http.StatusNotFound,
 				V:          []byte("not exists"),
 			},
-			wantErr: newHandlerNotExistsError(errors.New("handler not exists for path notFound")),
+			wantErr: newHandlerNotExistsError(errors.New("handler not exists for path /notFound")),
 		},
 	}
 

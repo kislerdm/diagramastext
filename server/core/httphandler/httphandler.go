@@ -29,7 +29,7 @@ func NewHTTPHandler(
 
 	return &httpHandler{
 		diagramRenderingHandler: map[string]diagram.DiagramHandler{
-			"c4": c4DiagramHandler,
+			"/c4": c4DiagramHandler,
 		},
 		corsHeaders:   corsHeaders,
 		reportErrorFn: func(err error) { l.Println(err) },
@@ -57,7 +57,7 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
 
 func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch p := r.URL.Path; p {
-	case "status":
+	case "/status":
 		switch r.Method {
 		case http.MethodGet, http.MethodOptions:
 			h.response(w, nil, nil)
