@@ -40,8 +40,10 @@ func TestNewSecretmanager(t *testing.T) {
 
 	t.Run(
 		"unhappy path", func(t *testing.T) {
+			tmp := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 			// GIVEN
 			// No credentials
+			t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 			// WHEN
 			_, err := NewSecretmanager(context.TODO())
 
@@ -50,6 +52,8 @@ func TestNewSecretmanager(t *testing.T) {
 				t.Errorf("NewSecretmanager(): error expected")
 				return
 			}
+
+			_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", tmp)
 		},
 	)
 }
@@ -71,7 +75,7 @@ func TestClient_ReadLastVersionHappyPath(t *testing.T) {
 			client := Client{
 				c: mockGCPSecretsmanagerClient{
 					v: &secretmanagerpb.AccessSecretVersionResponse{
-						Name: "foo",
+						Name: "projects/1111111/secrets/foo",
 						Payload: &secretmanagerpb.SecretPayload{
 							Data:       []byte(`{"foo":"bar"}`),
 							DataCrc32C: probeChecksum([]byte(`{"foo":"bar"}`)),
@@ -82,7 +86,7 @@ func TestClient_ReadLastVersionHappyPath(t *testing.T) {
 
 			// WHEN
 			var s secret
-			err := client.ReadLastVersion(context.TODO(), "foo", &s)
+			err := client.ReadLastVersion(context.TODO(), "projects/1111111/secrets/foo", &s)
 
 			// THEN
 			if err != nil {
