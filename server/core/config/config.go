@@ -11,6 +11,7 @@ import (
 const (
 	tableWritePrompt          = "user_prompt"
 	tableWriteModelPrediction = "openai_response"
+	defaultSSLMode            = "verify-full"
 )
 
 type repositoryPredictionConfig struct {
@@ -20,6 +21,7 @@ type repositoryPredictionConfig struct {
 	DBPassword      string `json:"db_password"`
 	TablePrompt     string `json:"table_prompt"`
 	TablePrediction string `json:"table_prediction"`
+	SSLMode         string `json:"ssl_mode"`
 }
 
 type secret struct {
@@ -43,6 +45,7 @@ func LoadDefaultConfig(ctx context.Context, clientSecretsManager diagram.Reposit
 		RepositoryPredictionConfig: repositoryPredictionConfig{
 			TablePrompt:     tableWritePrompt,
 			TablePrediction: tableWriteModelPrediction,
+			SSLMode:         defaultSSLMode,
 		},
 	}
 
@@ -82,5 +85,9 @@ func loadEnvVarConfig(cfg *Config) {
 
 	if v := os.Getenv("TABLE_PREDICTION"); v != "" {
 		cfg.RepositoryPredictionConfig.TablePrediction = v
+	}
+
+	if v := os.Getenv("SSL_MODE"); v != "" {
+		cfg.RepositoryPredictionConfig.SSLMode = v
 	}
 }

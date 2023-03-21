@@ -61,6 +61,7 @@ func init() {
 			DBPassword:      cfg.RepositoryPredictionConfig.DBPassword,
 			TablePrompt:     cfg.RepositoryPredictionConfig.TablePrompt,
 			TablePrediction: cfg.RepositoryPredictionConfig.TablePrediction,
+			SSLMode:         cfg.RepositoryPredictionConfig.SSLMode,
 		},
 	)
 	if err != nil {
