@@ -8,6 +8,7 @@ terraform {
 
   backend "gcs" {
     bucket = "tf-diagramastext-root"
+    prefix = "deploymentenvironment"
   }
 }
 

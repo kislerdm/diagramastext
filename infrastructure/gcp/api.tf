@@ -11,6 +11,20 @@ resource "google_project_service" "containerregistry" {
   disable_on_destroy         = true
 }
 
+# https://cloud.google.com/artifact-registry/docs/transition/setup-gcr-repo
+resource "google_project_service" "cloudresourcemanager" {
+  project = "diagramastext-${local.env_suffix}"
+  service = "cloudresourcemanager.googleapis.com"
+
+  timeouts {
+    create = "30m"
+    update = "40m"
+  }
+
+  disable_dependent_services = true
+  disable_on_destroy         = true
+}
+
 resource "google_project_service" "artifactregistry" {
   project = "diagramastext-${local.env_suffix}"
   service = "artifactregistry.googleapis.com"

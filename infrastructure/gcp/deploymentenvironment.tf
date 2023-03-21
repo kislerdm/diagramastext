@@ -59,3 +59,11 @@ resource "google_project_iam_member" "project_admin" {
   member     = "serviceAccount:${google_service_account.project_admin.email}"
   depends_on = [google_project.this]
 }
+
+resource "google_project_iam_member" "project_admin_gcr" {
+  project    = google_service_account.project_admin.project
+  for_each   = toset(["roles/artifactregistry.createOnPushRepoAdmin", "roles/storage.admin"])
+  role       = each.key
+  member     = "serviceAccount:${google_service_account.project_admin.email}"
+  depends_on = [google_project.this]
+}

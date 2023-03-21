@@ -42,7 +42,7 @@ resource "google_iam_workload_identity_pool_provider" "this" {
     issuer_uri = "https://token.actions.githubusercontent.com"
   }
 
-  disabled = true
+  disabled = false
 
   depends_on = [google_project_service.this]
 }
