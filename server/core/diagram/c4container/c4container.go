@@ -61,15 +61,17 @@ func NewC4ContainersHandler(
 			defineBestOf(input.GetUser()),
 		)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(err.Error())
 		}
 
-		if err := clientRepositoryPrediction.WriteInputPrompt(
-			ctx, input.GetRequestID(), input.GetUser().ID, input.GetPrompt(),
-		); err == nil {
-			_ = clientRepositoryPrediction.WriteModelResult(
-				ctx, input.GetRequestID(), input.GetUser().ID, string(diagramPrediction),
-			)
+		if clientRepositoryPrediction != nil {
+			if err := clientRepositoryPrediction.WriteInputPrompt(
+				ctx, input.GetRequestID(), input.GetUser().ID, input.GetPrompt(),
+			); err == nil {
+				_ = clientRepositoryPrediction.WriteModelResult(
+					ctx, input.GetRequestID(), input.GetUser().ID, string(diagramPrediction),
+				)
+			}
 		}
 
 		var diagramGraph c4ContainersGraph
