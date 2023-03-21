@@ -1,4 +1,4 @@
-name: "Deploy:Server"
+name: "Deploy:Server:Core"
 
 on:
   pull_request:
@@ -21,7 +21,6 @@ on:
 permissions:
   id-token: write # This is required for requesting the JWT
   contents: read  # This is required for actions/checkout
-  pull-requests: write
 
 jobs:
   list_modules:
@@ -83,81 +82,6 @@ jobs:
           version: latest
           working-directory: "server/core"
 
-  test-infra:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    needs:
-      - unittest
-      - lint
-    defaults:
-      run:
-        working-directory: "server/core/deployment"
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Configure AWS Credentials Action For GitHub Actions
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-region: us-east-2
-          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
-          role-duration-seconds: 900
-      - name: Setup Terraform CLI
-        uses: hashicorp/setup-terraform@v2.0.3
-      - name: Terraform init
-        id: init
-        run: terraform init
-      - name: Terraform validate
-        id: validate
-        run: terraform validate
-      - name: Terraform plan
-        id: plan
-        run: |
-          terraform workspace select staging
-          terraform plan -lock-timeout=120s -no-color -out /tmp/terraform.tfplan
-        continue-on-error: true
-      - uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            // Prepare format of the comment
-            const resultValidate = `${{ steps.validate.outputs.exitcode }}` === '0' ? `${{ steps.validate.outputs.stdout }}` : `${{ steps.validate.outputs.stderr }}`;
-            const resultPlan = `${{ steps.plan.outputs.exitcode }}` === '0' ? `${{ steps.plan.outputs.stdout }}` : `${{ steps.plan.outputs.stderr }}`;
-            
-            const output = `#### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
-            <details><summary>Validation Output</summary>
-            
-            \`\`\`\n
-            ${resultValidate}
-            \`\`\`
-            
-            </details>
-            
-            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
-            
-            <details><summary>Show Plan</summary>
-            
-            \`\`\`\n
-            ${resultPlan}
-            \`\`\`
-            
-            </details>
-            
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
-            
-            // Publish comment
-            github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: output
-            })
-      - name: Status check
-        run: |
-          if [[ ! ${{ steps.validate.outputs.exitcode }} -eq 0 ]]; then echo "failed validation"; exit 1; fi
-          if [[ ! ${{ steps.plan.outputs.exitcode }} -eq 0 ]]; then echo "failed plan"; exit 1; fi
-
   deployment-staging:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -166,36 +90,28 @@ jobs:
     needs:
       - unittest
       - lint
-    defaults:
-      run:
-        working-directory: "server/core/deployment"
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Configure AWS Credentials Action For GitHub Actions
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Authenticate with GCP
+        uses: 'google-github-actions/auth@v1'
         with:
-          aws-region: us-east-2
-          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
-          role-duration-seconds: 900
+          workload_identity_provider: 'projects/619195795350/locations/global/workloadIdentityPools/github-access-pool'
+          service_account: 'terraform@diagramastext-stage.iam.gserviceaccount.com'
+      - name: Build docker image
+        working-directory: "server/core"
+        run: |
+          make docker-build IMAGE=gcr.io/diagramastext-stage/core
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.3
-      - name: Terraform init
-        id: init
-        run: terraform init
-      - name: Terraform validate
-        id: validate
-        run: terraform validate
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.19
       - name: Deploy
+        working-directory: "server/deployment/gcp/stage"
         run: |
-          terraform workspace select staging
-          terraform plan -lock-timeout=120s
-          terraform apply -auto-approve  
+          terraform init
+          terraform validate
+          TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform plan -lock-timeout=120s
+          TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform apply -auto-approve
 
   deployment-production:
     if: github.event_name != 'pull_request'
@@ -204,32 +120,25 @@ jobs:
       name: "production:server"
     needs:
       - deployment-staging
-    defaults:
-      run:
-        working-directory: "server/core/deployment"
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Configure AWS Credentials Action For GitHub Actions
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Authenticate with GCP
+        uses: 'google-github-actions/auth@v1'
         with:
-          aws-region: us-east-2
-          role-to-assume: arn:aws:iam::027889758114:role/GitHubActions-production
-          role-duration-seconds: 900
+          workload_identity_provider: 'projects/677209864825/locations/global/workloadIdentityPools/github-access-pool'
+          service_account: 'terraform@diagramastext-prod.iam.gserviceaccount.com'
+      - name: Build docker image
+        working-directory: "server/core"
+        run: |
+          make docker-build IMAGE=gcr.io/diagramastext-prod/core
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.3
-      - name: Terraform init
-        id: init
-        run: terraform init
-      - name: Terraform validate
-        id: validate
-        run: terraform validate
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.19
       - name: Deploy
+        working-directory: "server/deployment/gcp/prod"
         run: |
-          terraform plan -lock-timeout=120s
-          terraform apply -auto-approve  
+          terraform init
+          terraform validate
+          TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform plan -lock-timeout=120s
+          TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform apply -auto-approve
