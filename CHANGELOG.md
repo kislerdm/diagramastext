@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.3] - 2023-03-21
+
+### Fixed
+
+- Migrated the core logic to GCP to bypass the OpenAI latency exceeding the AWS GW request limit of 29 sec. _Note_ that
+  the tf codebase for AWS infra is preserved for the release.
+
+### Changed
+
+- Refactored the [`core`](./server/core) logic:
+    - [Port-adaptor](https://web.archive.org/web/20180822100852/http://alistair.cockburn.us/Hexagonal+architecture)
+      approach
+    - Split sub-packages to dedicated modules in the `pkg` directory. Note that the packages below released as `v0.0.1`:
+        - HTTP client with the backoff-retry mechanism
+        - GCP Secretsmanager
+        - Postgres client
+        - OpenAI client
+- [tf](infrastructure/neon) state with the Neon db provisioning migrated to GCP.
+
 ## [0.0.2] - 2023-02-21
 
 ### Changed
@@ -15,7 +34,9 @@
   "top_p": 1,
   "frequency_penalty": 0,
   "presence_penalty": 0,
-  "stop": ["\n"]
+  "stop": [
+    "\n"
+  ]
 }
 ```
 
@@ -23,7 +44,7 @@
 
 ### Security
 
-- Added the vault to manage access credentials to improve security 
+- Added the vault to manage access credentials to improve security
 
 ## [0.0.1] - 2023-02-13
 
@@ -54,6 +75,8 @@ Configuration:
   "top_p": 1,
   "frequency_penalty": 0,
   "presence_penalty": 0,
-  "stop": ["\n"]
+  "stop": [
+    "\n"
+  ]
 }
 ```
