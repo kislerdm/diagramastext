@@ -4,24 +4,24 @@ terraform {
       source  = "kislerdm/neon"
       version = "~> 0.1.0"
     }
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 4.0"
+    google = {
+      source  = "hashicorp/google"
+      version = "4.56.0"
     }
   }
 
-  backend "s3" {
-    bucket = "dev.diagramastext.terraform"
-    key    = "neon"
-    region = "us-east-2"
+  backend "gcs" {
+    bucket = "tf-diagramastext-root"
+    prefix = "neon"
   }
 }
 
-provider "neon" {}
-
-provider "aws" {
-  region = "us-east-2"
+provider "google" {
+  project = "diagramastext-root"
+  region  = "us-central1"
 }
+
+provider "neon" {}
 
 locals {
   neon_branch_id = "br-steep-silence-472824"
