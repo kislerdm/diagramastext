@@ -23,73 +23,73 @@ permissions:
   contents: read  # This is required for actions/checkout
 
 jobs:
-#  list_modules:
-#    defaults:
-#      run:
-#        working-directory: "server/core"
-#    runs-on: ubuntu-latest
-#    name: "List modules"
-#    outputs:
-#      modules: ${{ steps.ls.outputs.modules }}
-#    steps:
-#      - uses: actions/checkout@v3
-#        with:
-#          fetch-depth: 1
-#      - name: ls
-#        id: ls
-#        run: echo "modules=$(python3 ../../.github/workflows/scripts/ls_modules.py -p .)" >> $GITHUB_OUTPUT
-#
-#  unittest:
-#    defaults:
-#      run:
-#        working-directory: "server/core"
-#    runs-on: ubuntu-latest
-#    name: "Unittest"
-#    needs:
-#      - list_modules
-#    strategy:
-#      matrix:
-#        module: ${{ fromJSON(needs.list_modules.outputs.modules) }}
-#    steps:
-#      - uses: actions/checkout@v3
-#        with:
-#          fetch-depth: 0
-#      - name: Set up Go
-#        uses: actions/setup-go@v3
-#        with:
-#          go-version: 1.19
-#      - name: Unittests
-#        run: |
-#          cd ${{ matrix.module.path }}
-#          go mod tidy
-#          go test -race -coverprofile=${{ matrix.module.flag }}.txt -covermode=atomic ./...
-#      - name: Upload coverage to Codecov
-#        uses: codecov/codecov-action@v3
-#        with:
-#          flags: ${{ matrix.module.flag }}
-#          files: ${{ matrix.module.flag }}.txt
-#
-#  lint:
-#    runs-on: ubuntu-latest
-#    name: "Lint"
-#    steps:
-#      - uses: actions/checkout@v3
-#      - uses: actions/setup-go@v3
-#        with:
-#          go-version: 1.19
-#      - uses: golangci/golangci-lint-action@v3
-#        with:
-#          version: latest
-#          working-directory: "server/core"
+  list_modules:
+    defaults:
+      run:
+        working-directory: "server/core"
+    runs-on: ubuntu-latest
+    name: "List modules"
+    outputs:
+      modules: ${{ steps.ls.outputs.modules }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - name: ls
+        id: ls
+        run: echo "modules=$(python3 ../../.github/workflows/scripts/ls_modules.py -p .)" >> $GITHUB_OUTPUT
+
+  unittest:
+    defaults:
+      run:
+        working-directory: "server/core"
+    runs-on: ubuntu-latest
+    name: "Unittest"
+    needs:
+      - list_modules
+    strategy:
+      matrix:
+        module: ${{ fromJSON(needs.list_modules.outputs.modules) }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - name: Unittests
+        run: |
+          cd ${{ matrix.module.path }}
+          go mod tidy
+          go test -race -coverprofile=${{ matrix.module.flag }}.txt -covermode=atomic ./...
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          flags: ${{ matrix.module.flag }}
+          files: ${{ matrix.module.flag }}.txt
+
+  lint:
+    runs-on: ubuntu-latest
+    name: "Lint"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+      - uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          working-directory: "server/core"
 
   deploy-stage:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: "staging:server:core"
-#    needs:
-#      - unittest
-#      - lint
+    needs:
+      - unittest
+      - lint
     steps:
       - uses: actions/checkout@v3
         with:
