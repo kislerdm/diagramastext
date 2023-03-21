@@ -20,7 +20,6 @@ services:
     environment:
       API_URL: "http://localhost:${PORT_SERVER}/"
       VERSION: $VERSION
-      TOKEN: 'foobar'
     ports:
       - ${PORT_CLIENT}:8080
     volumes:
