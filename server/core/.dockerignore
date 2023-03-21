@@ -1,0 +1,7 @@
+bin
+../aws/fig
+*.md
+deployment
+*.yml
+Makefile
+Dockerfile

@@ -62,6 +62,10 @@ Thank you! 🙏
 - We follow [TDD](https://www.guru99.com/test-driven-development.html)
 - We follow [RDD](https://tom.preston-werner.com/2010/08/23/readme-driven-development.html)
 - We maintain flat modules structure whether possible
+- We embrace clean architecture inspired by Alistair
+  Cockburn's [port-adapter approach](https://web.archive.org/web/20180822100852/http://alistair.cockburn.us/Hexagonal+architecture)
+  and Martin Fowler's [inversion of control](https://martinfowler.com/bliki/InversionOfControl.html), see a great
+  write-up [here](https://jmgarridopaz.github.io/content/hexagonalarchitecture.html#tc2-3) on the subjects matter
 - We aim for simplicity with the least external dependencies
 - We follow conventional _comments_ [guideline](https://conventionalcomments.org/) for code reviews
 - We follow conventional _commits_ [guideline](https://www.conventionalcommits.org/en/v1.0.0/):
@@ -93,11 +97,11 @@ Thank you! 🙏
     - GitHub Actions
 - Infra:
     - GCP
-      - IAM
-      - SecretsManager
-      - CloudRun
-      - IdentityPlatform
-    - AWS (infra deprecated)
+        - IAM
+        - SecretsManager
+        - CloudRun
+        - IdentityPlatform
+    - AWS (infra deprecated as of 2023-03)
     - GitHub Pages
     - [Neon](https://neon.tech/)
     - Cloudflare
@@ -115,7 +119,9 @@ Thank you! 🙏
 
 ### Architecture
 
-![architecture](https://www.plantuml.com/plantuml/svg/RP3DRk8m58NtUGfFf151cf3DhAggeeK8gFY9-56NaHDV4akE7TatBRnzxM1eKPjDh7FEPvzxnmQfnguHmHykIz4n83LYQnwIHDEFKSMnxehEW2wLH90uAbMJj89AnyG6cU15ClaVPquwh9P9Gms2jb8-SSG9HwsxFK2E0aZ8EAqqTI5dCNWdvIL6l1C6mL4f14t2HuIo7lyWdaXC_ZAA40tEzejNgvYnmT226MYZP9wUC7AL_v7mO7_XC0XsPuitKSUzHXOIGHzf2TRrPW7Md2Zz9VKtgHOaTTp67fuNz-Pr4zQ-Ri0zjmMHRts7_iqfc98NO0ZMS9sKS4bIMGbkwj16zdOyothKGdsVJAkMLXGzschLjEZYy_q-IrvtcxLd3dt_Mzc5F8A-C8rY87v3fZtoROGPID0KxslUo1SkgJxtsvnltl9bEalNqsWOZ44ooty2)
+#### C4 Context Level
+
+![architecture-context](architecture_c4_l1.svg)
 
 ### Local setup
 

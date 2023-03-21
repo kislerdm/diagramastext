@@ -610,7 +610,6 @@ Please describe what should have happened following the actions you described.
         const prompt = document.getElementById("prompt").value.trim();
 
         const urlAPI = "{{ .Env.API_URL }}";
-        const apiKey = "{{ .Env.TOKEN }}";
 
         if (placeholder !== prompt) {
             loaderShow();
@@ -627,7 +626,6 @@ Please describe what should have happened following the actions you described.
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-api-key": apiKey,
                 },
                 body: JSON.stringify({
                     "prompt": prompt,
