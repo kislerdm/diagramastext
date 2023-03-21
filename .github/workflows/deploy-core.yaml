@@ -103,6 +103,10 @@ jobs:
         working-directory: "server/core"
         run: |
           make docker-build IMAGE=gcr.io/diagramastext-stage/core
+      - name: Push the image to registry
+        working-directory: "server/core"
+        run: |
+          make docker-push IMAGE=gcr.io/diagramastext-stage/core
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.3
       - name: Deploy
@@ -110,8 +114,9 @@ jobs:
         run: |
           terraform init
           terraform validate
-          TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform plan -lock-timeout=120s
-          TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform apply -auto-approve
+          export TF_VAR_imagetag=$(git rev-parse --short HEAD)
+          terraform plan -lock-timeout=120s
+          terraform apply -auto-approve
 
   deploy-prod:
     if: github.event_name != 'pull_request'
@@ -133,6 +138,10 @@ jobs:
         working-directory: "server/core"
         run: |
           make docker-build IMAGE=gcr.io/diagramastext-prod/core
+      - name: Push the image to registry
+        working-directory: "server/core"
+        run: |
+          make docker-push IMAGE=gcr.io/diagramastext-prod/core
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.3
       - name: Deploy
@@ -140,5 +149,6 @@ jobs:
         run: |
           terraform init
           terraform validate
-          TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform plan -lock-timeout=120s
-          TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform apply -auto-approve
+          export TF_VAR_imagetag=$(git rev-parse --short HEAD)
+          terraform plan -lock-timeout=120s
+          terraform apply -auto-approve
