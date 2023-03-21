@@ -15,6 +15,7 @@ func TestConfig_Validate(t *testing.T) {
 		DBPassword      string
 		TablePrompt     string
 		TablePrediction string
+		SSLMode         string
 	}
 	tests := []struct {
 		name    string
@@ -30,6 +31,19 @@ func TestConfig_Validate(t *testing.T) {
 				DBPassword:      "postgres",
 				TablePrompt:     "foo",
 				TablePrediction: "bar",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid: ssl - full verification",
+			fields: fields{
+				DBHost:          "localhost",
+				DBName:          "postgres",
+				DBUser:          "postgres",
+				DBPassword:      "postgres",
+				TablePrompt:     "foo",
+				TablePrediction: "bar",
+				SSLMode:         "verify-full",
 			},
 			wantErr: nil,
 		},
@@ -93,6 +107,19 @@ func TestConfig_Validate(t *testing.T) {
 			},
 			wantErr: errors.New("table_prediction must be provided"),
 		},
+		{
+			name: "invalid: ssl mode is wrong",
+			fields: fields{
+				DBHost:          "localhost",
+				DBName:          "postgres",
+				DBUser:          "postgres",
+				DBPassword:      "postgres",
+				TablePrompt:     "foo",
+				TablePrediction: "bar",
+				SSLMode:         "qux",
+			},
+			wantErr: errors.New("ssl mode qux is not supported"),
+		},
 	}
 
 	t.Parallel()
@@ -107,6 +134,7 @@ func TestConfig_Validate(t *testing.T) {
 					DBPassword:      tt.fields.DBPassword,
 					TablePrompt:     tt.fields.TablePrompt,
 					TablePrediction: tt.fields.TablePrediction,
+					SSLMode:         tt.fields.SSLMode,
 				}
 				err := cfg.Validate()
 				if !reflect.DeepEqual(err, tt.wantErr) {
@@ -380,6 +408,59 @@ func TestClient_Close(t *testing.T) {
 			// THEN
 			if err == nil {
 				t.Errorf("expected error")
+			}
+		},
+	)
+}
+
+func Test_host(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"with port", func(t *testing.T) {
+			// GIVEN
+			hosts := []string{
+				"localhost",
+				"127.0.0.1",
+			}
+			ports := []string{"5432", "15342", "1213"}
+
+			for _, hostStr := range hosts {
+				for _, port := range ports {
+					// WHEN
+					hostInput := hostStr + ":" + port
+					gotHostPsqlStr := host(hostInput)
+
+					// THEN
+					wantPsqlStr := " host=" + hostStr + " port=" + port
+					if gotHostPsqlStr != wantPsqlStr {
+						t.Errorf("unexpected result for input host " + hostStr + ":" + port)
+						return
+					}
+				}
+			}
+		},
+	)
+
+	t.Run(
+		"without port", func(t *testing.T) {
+			// GIVEN
+			hosts := []string{
+				"ep-fragrant-mouse-914820.us-east-2.aws.neon.tech",
+			}
+
+			// WHEN
+			for _, hostStr := range hosts {
+				// WHEN
+				hostInput := hostStr
+				gotHostPsqlStr := host(hostInput)
+
+				// THEN
+				wantPsqlStr := " host=" + hostStr
+				if gotHostPsqlStr != wantPsqlStr {
+					t.Errorf("unexpected result for input host " + hostStr)
+					return
+				}
 			}
 		},
 	)

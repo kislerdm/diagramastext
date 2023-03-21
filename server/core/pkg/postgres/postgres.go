@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -17,6 +19,7 @@ type Config struct {
 	DBPassword      string `json:"db_password"`
 	TablePrompt     string `json:"table_prompt,omitempty"`
 	TablePrediction string `json:"table_prediction,omitempty"`
+	SSLMode         string `json:"ssl_mode"`
 }
 
 func (cfg Config) Validate() error {
@@ -35,7 +38,16 @@ func (cfg Config) Validate() error {
 	if cfg.TablePrediction == "" {
 		return errors.New("table_prediction must be provided")
 	}
-	return nil
+	return validateSSLMode(cfg.SSLMode)
+}
+
+func validateSSLMode(mode string) error {
+	switch mode {
+	case "verify-full", "disable", "":
+		return nil
+	default:
+		return errors.New("ssl mode " + mode + " is not supported")
+	}
 }
 
 // NewPostgresClient initiates the postgres Client.
@@ -48,11 +60,14 @@ func NewPostgresClient(ctx context.Context, cfg Config) (
 
 	connStr := "user=" + cfg.DBUser +
 		" dbname=" + cfg.DBName +
-		" host=" + cfg.DBHost +
-		" sslmode=verify-full"
+		host(cfg.DBHost)
 
 	if cfg.DBPassword != "" {
 		connStr += " password=" + cfg.DBPassword
+	}
+
+	if cfg.SSLMode != "" {
+		connStr += " sslmode=" + cfg.SSLMode
 	}
 
 	var db dbClient
@@ -74,6 +89,16 @@ func NewPostgresClient(ctx context.Context, cfg Config) (
 		tableWritePrompt:          cfg.TablePrompt,
 		tableWriteModelPrediction: cfg.TablePrediction,
 	}, nil
+}
+
+func host(host string) string {
+	hostList := strings.SplitN(host, ":", 2)
+	if len(hostList) == 2 {
+		if _, err := strconv.ParseUint(hostList[1], 10, 32); err == nil {
+			return " host=" + hostList[0] + " port=" + hostList[1]
+		}
+	}
+	return " host=" + host
 }
 
 type Client struct {
