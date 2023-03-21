@@ -95,10 +95,13 @@ jobs:
         with:
           fetch-depth: 0
       - name: Authenticate with GCP
+        id: auth
         uses: 'google-github-actions/auth@v1'
         with:
           workload_identity_provider: 'projects/619195795350/locations/global/workloadIdentityPools/github-access-pool/providers/github-oidc'
           service_account: 'terraform@diagramastext-stage.iam.gserviceaccount.com'
+      - name: Auth with docker registry
+        run: cat ${{ steps.auth.outputs.credentials_file_path }} | docker login -u _json_key --password-stdin https://gcr.io
       - name: Build&Push docker image
         working-directory: "server/core"
         run: |
@@ -127,15 +130,18 @@ jobs:
         with:
           fetch-depth: 0
       - name: Authenticate with GCP
+        id: auth
         uses: 'google-github-actions/auth@v1'
         with:
           workload_identity_provider: 'projects/677209864825/locations/global/workloadIdentityPools/github-access-pool/providers/github-oidc'
           service_account: 'terraform@diagramastext-prod.iam.gserviceaccount.com'
+      - name: Auth with docker registry
+        run: cat ${{ steps.auth.outputs.credentials_file_path }} | docker login -u _json_key --password-stdin https://gcr.io
       - name: Build&Push docker image
         working-directory: "server/core"
         run: |
-          make docker-build IMAGE=gcr.io/diagramastext-stage/core
-          make docker-push IMAGE=gcr.io/diagramastext-stage/core
+          make docker-build IMAGE=gcr.io/diagramastext-prod/core
+          make docker-push IMAGE=gcr.io/diagramastext-prod/core
       - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v2.0.3
       - name: Deploy
