@@ -97,7 +97,7 @@ jobs:
       - name: Authenticate with GCP
         uses: 'google-github-actions/auth@v1'
         with:
-          workload_identity_provider: 'projects/619195795350/locations/global/workloadIdentityPools/github-access-pool'
+          workload_identity_provider: 'projects/619195795350/locations/global/workloadIdentityPools/github-access-pool/providers/github-oidc'
           service_account: 'terraform@diagramastext-stage.iam.gserviceaccount.com'
       - name: Build docker image
         working-directory: "server/core"
@@ -127,7 +127,7 @@ jobs:
       - name: Authenticate with GCP
         uses: 'google-github-actions/auth@v1'
         with:
-          workload_identity_provider: 'projects/677209864825/locations/global/workloadIdentityPools/github-access-pool'
+          workload_identity_provider: 'projects/677209864825/locations/global/workloadIdentityPools/github-access-pool/providers/github-oidc'
           service_account: 'terraform@diagramastext-prod.iam.gserviceaccount.com'
       - name: Build docker image
         working-directory: "server/core"
