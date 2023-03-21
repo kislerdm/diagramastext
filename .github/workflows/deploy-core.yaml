@@ -82,11 +82,11 @@ jobs:
           version: latest
           working-directory: "server/core"
 
-  deployment-staging:
+  deploy-stage:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
-      name: "staging:server"
+      name: "staging:server:core"
     needs:
       - unittest
       - lint
@@ -113,13 +113,13 @@ jobs:
           TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform plan -lock-timeout=120s
           TF_VAR_imagetag=$(git rev-parse --short HEAD) terraform apply -auto-approve
 
-  deployment-production:
+  deploy-prod:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
-      name: "production:server"
+      name: "production:server:core"
     needs:
-      - deployment-staging
+      - deploy-stage
     steps:
       - uses: actions/checkout@v3
         with:
