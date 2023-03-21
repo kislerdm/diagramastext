@@ -5,9 +5,14 @@ help: ## Prints help message.
 
 PORT_SERVER := 9000
 PORT_CLIENT := 9001
+PORT_DBCLIENT := 9081
 GIT_SHA := `git log --pretty=format:"%H" -1`
 
 localenv: ## Provisions local development environment.
 	@ if [ "${OPENAI_API_KEY}" == "" ]; then echo "set OPENAI_API_KEY environment variable"; exit 137; fi
 	@ echo "access webclient on http://localhost:${PORT_CLIENT}"
-	@ VERSION=${GIT_SHA} PORT_SERVER=${PORT_SERVER} PORT_CLIENT=${PORT_CLIENT} docker compose up --force-recreate
+	@ echo "access database webclient on http://localhost:${PORT_DBCLIENT}"
+	@ VERSION=${GIT_SHA} PORT_SERVER=${PORT_SERVER} PORT_CLIENT=${PORT_CLIENT} docker compose up --force-recreate --build 1> /dev/null
+
+localenv-teardown: ## Cleans the local development environment.
+	@ docker compose down

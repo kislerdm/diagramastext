@@ -154,6 +154,16 @@ export OPENAI_API_KEY=##TOKEN##
 make localenv
 ```
 
+**Note**:
+- The webclient will be available on http://localhost:9001
+- The database webclient will be available on http://localhost:9081
+
+4. Run to clean the local environment:
+
+```commandline
+make localenv-teardown
+```
+
 ## License
 
 ### Codebase

@@ -1,24 +1,62 @@
-version: '3'
+version: '3.8'
 services:
-  server:
-    image: golang:1.19.3-alpine3.17
-    container_name: diagranastext-core
+  db:
+    image: postgres:15.1-alpine3.16
+    container_name: diagranastext-db
+    volumes:
+      - ./server/sql/core.sql:/docker-entrypoint-initdb.d/core.sql
     environment:
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    restart: always
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres", "-d", "postgres" ]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
+  pgweb:
+    container_name: pgweb
+    restart: always
+    image: sosedoff/pgweb
+    ports:
+      - "9081:8081"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/postgres?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  server:
+    depends_on:
+      db:
+        condition: service_healthy
+    image: diagranastext-core
+    container_name: diagranastext-core
+    build:
+      context: ./server/core
+      dockerfile: Dockerfile
+    environment:
+      MODEL_API_KEY: ${OPENAI_API_KEY}
+      MODEL_MAX_TOKENS: 500
+      SSL_MODE: disable
+      DB_HOST: 'db:5432'
+      DB_DBNAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
       CORS_HEADERS: '{"Access-Control-Allow-Origin":"http://localhost:${PORT_CLIENT}","Access-Control-Allow-Methods":"POST,OPTIONS","Access-Control-Allow-Headers":"Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token"}'
       PORT: 9000
+      GOOGLE_APPLICATION_CREDENTIALS: '/key.json'
     ports:
       - ${PORT_SERVER}:9000
     volumes:
-      - ./server/core:/app
-    working_dir: /app
-    command: ["/bin/sh", "-c", "go mod tidy && go run cmd/httpserver/main.go"]
+      - ./dummy-key.json:/key.json
 
   webclient:
     image: golang:1.19.3-alpine3.17
     container_name: diagranastext-webclient
     environment:
-      API_URL: "http://localhost:${PORT_SERVER}/"
+      API_URL: "http://localhost:${PORT_SERVER}/c4"
       VERSION: $VERSION
     ports:
       - ${PORT_CLIENT}:8080
