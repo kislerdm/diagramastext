@@ -18,17 +18,12 @@ func NewOpenAIClient(cfg Config) (*Client, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-
-	c := Client{
-		token:      cfg.Token,
-		maxTokens:  cfg.MaxTokens,
-		httpClient: cfg.HTTPClient,
-		baseURL:    baseURLOpenAI,
-	}
-
-	resolveConfigurations(&c)
-
-	return &c, nil
+	return &Client{
+		token:        cfg.Token,
+		organization: cfg.Organization,
+		maxTokens:    cfg.MaxTokens,
+		httpClient:   cfg.HTTPClient,
+	}, nil
 }
 
 // Config configuration of the OpenAI client.
@@ -41,6 +36,8 @@ type Config struct {
 
 	// https://platform.openai.com/docs/api-reference/authentication
 	Token string
+
+	Organization string
 
 	HTTPClient HTTPClient
 }
@@ -58,64 +55,111 @@ func (cfg Config) Validate() error {
 }
 
 const (
-	baseURLOpenAI      = "https://api.openai.com/v1/"
-	defaultMaxTokens   = 200
+	defaultMaxTokens   = 1000
 	defaultTemperature = 0.2
 	defaultTopP        = 1
 )
 
 // Client defines the OpenAI client object.
 type Client struct {
-	httpClient HTTPClient
-	token      string
-	baseURL    string
-	maxTokens  int
+	httpClient   HTTPClient
+	token        string
+	organization string
+	maxTokens    int
 }
 
-func resolveConfigurations(c *Client) {
-	if c.maxTokens <= 0 || c.maxTokens > 2048 {
-		c.maxTokens = defaultMaxTokens
+func (c Client) getMaxTokens(model string) int {
+	if c.maxTokens <= 0 || c.maxTokens > modelContextMaxTokes(model) {
+		return defaultMaxTokens
 	}
+	return c.maxTokens
 }
 
-func (c Client) Do(ctx context.Context, prompt string, model string, bestOf uint8) ([]byte, error) {
-	if err := c.validatePrompt(model, prompt); err != nil {
+func (c Client) Do(ctx context.Context, userPrompt string, systemContent string, model string) ([]byte, error) {
+	if err := c.validatePrompt(model, userPrompt, systemContent); err != nil {
 		return nil, err
 	}
 
-	payload := openAIRequest{
-		Model:            model,
-		Prompt:           prompt,
-		Stop:             []string{"\n"},
-		MaxTokens:        c.maxTokens,
-		TopP:             defaultTopP,
-		Temperature:      defaultTemperature,
-		FrequencyPenalty: 0,
-		PresencePenalty:  0,
-		BestOf:           bestOf,
-	}
-
-	respBytes, err := c.requestHandler(ctx, payload)
+	req, err := c.request(ctx, model, userPrompt, systemContent)
 	if err != nil {
 		return nil, err
 	}
 
-	return decodeResponse(respBytes)
-}
-
-func modelContextMaxTokes(model string) int {
-	switch model {
-	case "code-davinci-002":
-		return 8000
-	case "code-cushman-001":
-		return 2048
-	default:
-		return 2048
+	respBytes, err := c.requestHandler(req)
+	if err != nil {
+		return nil, err
 	}
+
+	return decodeResponse(respBytes, model)
 }
 
-func (c Client) validatePrompt(model, prompt string) error {
-	if len(prompt)+c.maxTokens > modelContextMaxTokes(model) {
+type payload interface {
+	openAIRequestCompletions | openAIRequestCompletionsChat
+}
+
+func newReader[T payload](v T) (io.Reader, error) {
+	var w bytes.Buffer
+	err := json.NewEncoder(&w).Encode(v)
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
+}
+
+func (c Client) request(ctx context.Context, model, userPrompt, systemContent string) (*http.Request, error) {
+	base := openAIRequestBase{
+		Model:            model,
+		Stop:             []string{"\n"},
+		TopP:             defaultTopP,
+		MaxTokens:        c.getMaxTokens(model),
+		Temperature:      defaultTemperature,
+		FrequencyPenalty: 0,
+		PresencePenalty:  0,
+		N:                1,
+	}
+
+	var (
+		payload io.Reader
+		err     error
+	)
+
+	switch model {
+	case "gpt-3.5-turbo":
+		payload, err = newReader(
+			openAIRequestCompletionsChat{
+				openAIRequestBase: base,
+				Messages: []openAIRequestChatMessage{
+					{
+						Role:    "system",
+						Content: systemContent,
+					},
+					{
+						Role:    "user",
+						Content: userPrompt,
+					},
+				},
+			},
+		)
+	default:
+		payload, err = newReader(
+			openAIRequestCompletions{
+				openAIRequestBase: base,
+				Prompt:            systemContent + "\n" + userPrompt + "\n",
+				BestOf:            2,
+			},
+		)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, baseURL(model)+"completions", payload)
+	return req, nil
+}
+
+func (c Client) validatePrompt(model, userPrompt, systemContent string) error {
+	if len(userPrompt)+len(systemContent)+c.getMaxTokens(model) > modelContextMaxTokes(model) {
 		return errors.New(
 			"prompt exceeds the model's context length." +
 				"see: https://platform.openai.com/docs/api-reference/completions/create#completions/create-max_tokens",
@@ -127,16 +171,12 @@ func (c Client) validatePrompt(model, prompt string) error {
 func (c Client) setHeader(req *http.Request) {
 	req.Header.Add("Authorization", "Bearer "+c.token)
 	req.Header.Add("Content-Type", "application/json")
+	if c.organization != "" {
+		req.Header.Add("OpenAI-Organization", c.organization)
+	}
 }
 
-func (c Client) requestHandler(ctx context.Context, payload openAIRequest) ([]byte, error) {
-	var w bytes.Buffer
-	err := json.NewEncoder(&w).Encode(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"completions", &w)
+func (c Client) requestHandler(req *http.Request) ([]byte, error) {
 	c.setHeader(req)
 
 	resp, err := c.httpClient.Do(req)
@@ -162,7 +202,51 @@ func (c Client) requestHandler(ctx context.Context, payload openAIRequest) ([]by
 	return buf, nil
 }
 
-func decodeResponse(respBytes []byte) ([]byte, error) {
+func baseURL(model string) string {
+	switch model {
+	case "gpt-3.5-turbo":
+		return "https://api.openai.com/v1/chat/"
+	default:
+		return "https://api.openai.com/v1/"
+	}
+}
+
+func modelContextMaxTokes(model string) int {
+	switch model {
+	case "gpt-3.5-turbo":
+		return 4096
+	case "code-davinci-002":
+		return 8001
+	default:
+		return 2049
+	}
+}
+
+func decodeResponse(respBytes []byte, model string) ([]byte, error) {
+	switch model {
+	case "gpt-3.5-turbo":
+		return decodeChatCompletionsResult(respBytes)
+	default:
+		return decodeCompletionsResult(respBytes)
+	}
+}
+
+func decodeChatCompletionsResult(respBytes []byte) ([]byte, error) {
+	var resp openAIResponseChat
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		return nil, err
+	}
+
+	if len(resp.Choices) == 0 {
+		return nil, errors.New("unsuccessful prediction")
+	}
+
+	s := cleanRawResponse(resp.Choices[0].Message.Content)
+
+	return []byte(s), nil
+}
+
+func decodeCompletionsResult(respBytes []byte) ([]byte, error) {
 	var resp openAIResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return nil, err
@@ -194,22 +278,46 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-type openAIRequest struct {
+type openAIRequestBase struct {
 	Model            string   `json:"model"`
-	Prompt           string   `json:"prompt"`
 	Stop             []string `json:"stop,omitempty"`
+	TopP             float32  `json:"top_p"`
 	MaxTokens        int      `json:"max_tokens,omitempty"`
 	Temperature      float32  `json:"temperature,omitempty"`
-	TopP             float32  `json:"top_p"`
 	FrequencyPenalty float32  `json:"frequency_penalty"`
 	PresencePenalty  float32  `json:"presence_penalty"`
-	BestOf           uint8    `json:"best_of"`
+	N                int      `json:"n"`
 }
 
-type openAIResponse struct {
+type openAIRequestCompletions struct {
+	openAIRequestBase
+	Prompt string `json:"prompt"`
+	BestOf uint8  `json:"best_of"`
+}
+
+type openAIRequestChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type openAIRequestCompletionsChat struct {
+	openAIRequestBase
+	Messages []openAIRequestChatMessage `json:"messages"`
+}
+
+type openAIResponseBase struct {
 	ID      string `json:"id"`
 	Object  string `json:"object"`
 	Created int    `json:"created"`
+	Usage   struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage"`
+}
+
+type openAIResponse struct {
+	openAIResponseBase
 	Model   string `json:"model"`
 	Choices []struct {
 		Text         string `json:"text"`
@@ -217,11 +325,18 @@ type openAIResponse struct {
 		Logprobs     int    `json:"logprobs"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
-	Usage struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
-	} `json:"usage"`
+}
+
+type openAIResponseChat struct {
+	openAIResponseBase
+	Choices []struct {
+		Index        int    `json:"index"`
+		FinishReason string `json:"finish_reason"`
+		Message      struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
 }
 
 type openAIErrorResponse struct {

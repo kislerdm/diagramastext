@@ -23,7 +23,7 @@ func TestMockModelInference(t *testing.T) {
 			}
 
 			// WHEN
-			got, err := c.Do(context.TODO(), "foobarbaz", "model-foo", 2)
+			got, err := c.Do(context.TODO(), "foobar", "quxquxx", "model-foo")
 
 			// THEN
 			if err != nil {
@@ -44,7 +44,7 @@ func TestMockModelInference(t *testing.T) {
 			c := MockModelInference{Err: wantErr}
 
 			// WHEN
-			got, err := c.Do(context.TODO(), "foobarbaz", "model-foo", 2)
+			got, err := c.Do(context.TODO(), "foobar", "quxquxx", "model-foo")
 
 			// THEN
 			if !reflect.DeepEqual(err, wantErr) {

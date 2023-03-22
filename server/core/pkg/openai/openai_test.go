@@ -54,8 +54,10 @@ func Test_clientOpenAI_setHeader(t *testing.T) {
 	t.Run(
 		"auth headers, organization specified", func(t *testing.T) {
 			// GIVEN
+			const wantOrganization = "foobar"
 			c := Client{
-				token: mockToken,
+				token:        mockToken,
+				organization: wantOrganization,
 			}
 			req := http.Request{
 				Header: make(map[string][]string),
@@ -71,6 +73,10 @@ func Test_clientOpenAI_setHeader(t *testing.T) {
 			}
 			if req.Header.Get("Content-Type") != "application/json" {
 				t.Errorf("header Content-Type must be set as application/json")
+				return
+			}
+			if req.Header.Get("OpenAI-Organization") != wantOrganization {
+				t.Errorf("header OpenAI-Organization must be set as " + wantOrganization)
 				return
 			}
 		},
@@ -193,7 +199,6 @@ func TestNewOpenAIClient(t *testing.T) {
 			want: &Client{
 				httpClient: http.DefaultClient,
 				token:      mockToken,
-				baseURL:    baseURLOpenAI,
 				maxTokens:  100,
 			},
 			wantErr: false,
@@ -206,7 +211,6 @@ func TestNewOpenAIClient(t *testing.T) {
 			want: &Client{
 				httpClient: http.DefaultClient,
 				token:      mockToken,
-				baseURL:    baseURLOpenAI,
 				maxTokens:  defaultMaxTokens,
 			},
 			wantErr: false,
@@ -295,7 +299,7 @@ func Test_clientOpenAI_Do(t *testing.T) {
 			args: args{
 				ctx:    context.TODO(),
 				prompt: "foobar",
-				model:  "code-davinci-002",
+				model:  "gpt-3.5-turbo",
 				bestOf: 2,
 			},
 			want:    []byte(`{"nodes":[{"id":"0"}]}`),
@@ -347,7 +351,6 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				c := Client{
 					httpClient: tt.fields.httpClient,
 					token:      tt.fields.token,
-					baseURL:    tt.fields.baseURL,
 					maxTokens:  tt.fields.maxTokens,
 				}
 				got, err := c.Do(tt.args.ctx, tt.args.prompt, tt.args.model, tt.args.bestOf)
