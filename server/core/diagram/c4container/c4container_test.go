@@ -2,6 +2,7 @@ package c4container
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -209,7 +210,7 @@ func TestNewC4ContainersHandlerInitUnhappyPath(t *testing.T) {
 			}
 
 			if err == nil || err.Error() !=
-				"diagram/c4container/c4container.go:49: model inference client must be provided" {
+				"diagram/c4container/c4container.go:62: model inference client must be provided" {
 				t.Fatalf("unexpected error")
 			}
 		},
@@ -230,42 +231,8 @@ func TestNewC4ContainersHandlerInitUnhappyPath(t *testing.T) {
 				t.Fatalf("unexpected client")
 			}
 
-			if err == nil || err.Error() != "diagram/c4container/c4container.go:52: http client must be provided" {
+			if err == nil || err.Error() != "diagram/c4container/c4container.go:65: http client must be provided" {
 				t.Fatalf("unexpected error")
-			}
-		},
-	)
-}
-
-func Test_defineBestOf(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"not registered user", func(t *testing.T) {
-			// GIVEN
-			user := &diagram.User{ID: "NA"}
-
-			// WHEN
-			got := defineBestOf(user)
-
-			// THEN
-			if got != notRegisteredBestOf {
-				t.Fatalf("unexpected bestOf")
-			}
-		},
-	)
-
-	t.Run(
-		"registered user", func(t *testing.T) {
-			// GIVEN
-			user := &diagram.User{ID: "foobar", IsRegistered: true}
-
-			// WHEN
-			got := defineBestOf(user)
-
-			// THEN
-			if got != registeredBestOf {
-				t.Fatalf("unexpected bestOf")
 			}
 		},
 	)
@@ -300,6 +267,88 @@ func Test_defineModel(t *testing.T) {
 			// THEN
 			if got != registeredModel {
 				t.Fatalf("unexpected Model")
+			}
+		},
+	)
+}
+
+func Test_UnmarshalGraph(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"default legend behaviour", func(t *testing.T) {
+			// GIVEN
+			graphPrediction := []byte(`{"nodes":[{"id":"0"}]}`)
+			want := c4ContainersGraph{
+				Containers: []*container{{ID: "0"}},
+				WithLegend: true,
+			}
+
+			// WHEN
+			var got c4ContainersGraph
+			err := json.Unmarshal(graphPrediction, &got)
+
+			// THEN
+			if err != nil {
+				t.Error("unexpected error")
+				return
+			}
+
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got: %+v, want: %+v", got, want)
+				return
+			}
+		},
+	)
+
+	t.Run(
+		"legend is off explicitly", func(t *testing.T) {
+			// GIVEN
+			graphPrediction := []byte(`{"nodes":[{"id":"0"}],"legend":false}`)
+			want := c4ContainersGraph{
+				Containers: []*container{{ID: "0"}},
+				WithLegend: false,
+			}
+
+			// WHEN
+			var got c4ContainersGraph
+			err := json.Unmarshal(graphPrediction, &got)
+
+			// THEN
+			if err != nil {
+				t.Error("unexpected error")
+				return
+			}
+
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got: %+v, want: %+v", got, want)
+				return
+			}
+		},
+	)
+
+	t.Run(
+		"legend is on explicitly", func(t *testing.T) {
+			// GIVEN
+			graphPrediction := []byte(`{"nodes":[{"id":"0"}],"legend":true}`)
+			want := c4ContainersGraph{
+				Containers: []*container{{ID: "0"}},
+				WithLegend: true,
+			}
+
+			// WHEN
+			var got c4ContainersGraph
+			err := json.Unmarshal(graphPrediction, &got)
+
+			// THEN
+			if err != nil {
+				t.Error("unexpected error")
+				return
+			}
+
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got: %+v, want: %+v", got, want)
+				return
 			}
 		},
 	)

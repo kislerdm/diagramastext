@@ -37,6 +37,7 @@ No modules.
 | <a name="input_cors_headers"></a> [cors\_headers](#input\_cors\_headers) | CORS headers map. | `map(string)` | `null` | no |
 | <a name="input_imagetag"></a> [imagetag](#input\_imagetag) | Docker image tag. | `string` | n/a | yes |
 | <a name="input_location"></a> [location](#input\_location) | Geo-location. | `string` | `"us-central1"` | no |
+| <a name="input_model_max_tokens"></a> [model\_max\_tokens](#input\_model\_max\_tokens) | https://platform.openai.com/docs/api-reference/chat/create#chat/create-max_tokens | `number` | `500` | no |
 | <a name="input_project"></a> [project](#input\_project) | Project ID. | `string` | n/a | yes |
 
 ## Outputs

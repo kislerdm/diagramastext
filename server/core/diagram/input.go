@@ -41,7 +41,7 @@ func (v MockInput) GetUser() *User {
 }
 
 func (v MockInput) GetPrompt() string {
-	return v.Prompt
+	return strings.ReplaceAll(v.Prompt, "\n", "")
 }
 
 func (v MockInput) GetRequestID() string {
@@ -112,7 +112,7 @@ func NewInputDriverHTTP(body io.Reader, headers http.Header) (Input, error) {
 	return o, nil
 }
 
-func userProfileFromHTTPHeaders(headers http.Header) *User {
+func userProfileFromHTTPHeaders(_ http.Header) *User {
 	// FIXME: change when the auth layer is implemented
 	return &User{ID: "NA"}
 }

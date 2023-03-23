@@ -51,7 +51,7 @@ func (m MockRepositorySecretsVault) ReadLastVersion(_ context.Context, _ string,
 
 // ModelInference interface to communicate with the model.
 type ModelInference interface {
-	Do(ctx context.Context, prompt string, model string, bestOf uint8) ([]byte, error)
+	Do(ctx context.Context, userPrompt string, systemContent string, model string) ([]byte, error)
 }
 
 type MockModelInference struct {
@@ -59,7 +59,7 @@ type MockModelInference struct {
 	Err error
 }
 
-func (m MockModelInference) Do(_ context.Context, _, _ string, _ uint8) ([]byte, error) {
+func (m MockModelInference) Do(_ context.Context, _, _, _ string) ([]byte, error) {
 	if m.Err != nil {
 		return nil, m.Err
 	}

@@ -24,11 +24,12 @@ variable "imagetag" {
 }
 
 module "core" {
-  source     = "../stack"
-  project    = "diagramastext-prod"
-  imagetag   = var.imagetag
-  location   = "us-central1"
-  api_domain = "api.diagramastext.dev"
+  source           = "../stack"
+  project          = "diagramastext-prod"
+  imagetag         = var.imagetag
+  location         = "us-central1"
+  api_domain       = "api.diagramastext.dev"
+  model_max_tokens = 600
   cors_headers = {
     "Access-Control-Allow-Origin"  = "https://diagramastext.dev"
     "Access-Control-Allow-Headers" = "Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token"

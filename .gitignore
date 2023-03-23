@@ -2,5 +2,11 @@
 .env*
 .terraform*
 bin
+
+# GCP SA keys
 .keys
 *.key*.json
+
+# http client plugin cfg for local tests
+http-client.private.*json
+*.http
