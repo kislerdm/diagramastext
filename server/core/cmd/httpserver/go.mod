@@ -3,10 +3,10 @@ module httpserver
 go 1.19
 
 require (
-	github.com/kislerdm/diagramastext/server/core v0.0.2
+	github.com/kislerdm/diagramastext/server/core v0.0.4
 	github.com/kislerdm/diagramastext/server/core/pkg/gcpsecretsmanager v0.0.1
 	github.com/kislerdm/diagramastext/server/core/pkg/httpclient v0.0.1
-	github.com/kislerdm/diagramastext/server/core/pkg/openai v0.0.1
+	github.com/kislerdm/diagramastext/server/core/pkg/openai v0.0.2
 	github.com/kislerdm/diagramastext/server/core/pkg/postgres v0.0.1
 )
 
@@ -35,9 +35,9 @@ require (
 )
 
 replace (
-	github.com/kislerdm/diagramastext/server/core v0.0.2 => ../../
+	github.com/kislerdm/diagramastext/server/core v0.0.4 => ../../
 	github.com/kislerdm/diagramastext/server/core/pkg/gcpsecretsmanager v0.0.1 => ../../pkg/gcpsecretsmanager
 	github.com/kislerdm/diagramastext/server/core/pkg/httpclient v0.0.1 => ../../pkg/httpclient
-	github.com/kislerdm/diagramastext/server/core/pkg/openai v0.0.1 => ../../pkg/openai
+	github.com/kislerdm/diagramastext/server/core/pkg/openai v0.0.2 => ../../pkg/openai
 	github.com/kislerdm/diagramastext/server/core/pkg/postgres v0.0.1 => ../../pkg/postgres
 )
