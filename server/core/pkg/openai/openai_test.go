@@ -95,9 +95,9 @@ func Test_cleanRawResponse(t *testing.T) {
 		{
 			name: "faulty json end",
 			args: args{
-				s: `{"nodes":[{"id":"0","label":"Go Web Server","technology":"Go","description":"Authenticates users"},{"id":"1","label":"Kafka","technology":"Kafka","is_database":true},{"id":"2"},{"id":"3","label":"Database","technology":"MySQL","is_database":true}],`,
+				s: `{"nodes":[{"id":"0","label":"Go Web Server","technology":"Go","description":"Authenticates users"},{"id":"1","label":"Kafka","technology":"Kafka","database":true},{"id":"2"},{"id":"3","label":"Database","technology":"MySQL","database":true}],`,
 			},
-			want: `{"nodes":[{"id":"0","label":"Go Web Server","technology":"Go","description":"Authenticates users"},{"id":"1","label":"Kafka","technology":"Kafka","is_database":true},{"id":"2"},{"id":"3","label":"Database","technology":"MySQL","is_database":true}]}`,
+			want: `{"nodes":[{"id":"0","label":"Go Web Server","technology":"Go","description":"Authenticates users"},{"id":"1","label":"Kafka","technology":"Kafka","database":true},{"id":"2"},{"id":"3","label":"Database","technology":"MySQL","database":true}]}`,
 		},
 		{
 			name: `"nodes":[{"id":"0"}]`,

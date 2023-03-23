@@ -109,13 +109,10 @@ func newReader[T payload](v T) (io.Reader, error) {
 func (c Client) request(ctx context.Context, model, userPrompt, systemContent string) (*http.Request, error) {
 	base := openAIRequestBase{
 		Model:            model,
-		Stop:             []string{"\n"},
-		TopP:             defaultTopP,
 		MaxTokens:        c.getMaxTokens(model),
 		Temperature:      defaultTemperature,
 		FrequencyPenalty: 0,
 		PresencePenalty:  0,
-		N:                1,
 	}
 
 	var (
@@ -145,11 +142,12 @@ func (c Client) request(ctx context.Context, model, userPrompt, systemContent st
 			openAIRequestCompletions{
 				openAIRequestBase: base,
 				Prompt:            systemContent + "\n" + userPrompt + "\n",
+				Stop:              []string{"\n"},
+				TopP:              defaultTopP,
 				BestOf:            2,
 			},
 		)
 	}
-
 	if err != nil {
 		return nil, err
 	}
@@ -241,9 +239,17 @@ func decodeChatCompletionsResult(respBytes []byte) ([]byte, error) {
 		return nil, errors.New("unsuccessful prediction")
 	}
 
-	s := cleanRawResponse(resp.Choices[0].Message.Content)
+	s := cleanRawResponse(cleanRawChatResponse(resp.Choices[0].Message.Content))
 
 	return []byte(s), nil
+}
+
+func cleanRawChatResponse(s string) string {
+	v := strings.SplitN(s, "\n\n```\n", 2)
+	if len(v) > 1 {
+		return strings.SplitN(v[1], "\n```\n\n", 2)[0]
+	}
+	return strings.SplitN(v[0], "\n```\n\n", 2)[0]
 }
 
 func decodeCompletionsResult(respBytes []byte) ([]byte, error) {
@@ -279,20 +285,19 @@ type HTTPClient interface {
 }
 
 type openAIRequestBase struct {
-	Model            string   `json:"model"`
-	Stop             []string `json:"stop,omitempty"`
-	TopP             float32  `json:"top_p"`
-	MaxTokens        int      `json:"max_tokens,omitempty"`
-	Temperature      float32  `json:"temperature,omitempty"`
-	FrequencyPenalty float32  `json:"frequency_penalty"`
-	PresencePenalty  float32  `json:"presence_penalty"`
-	N                int      `json:"n"`
+	Model            string  `json:"model"`
+	MaxTokens        int     `json:"max_tokens,omitempty"`
+	Temperature      float32 `json:"temperature,omitempty"`
+	FrequencyPenalty float32 `json:"frequency_penalty"`
+	PresencePenalty  float32 `json:"presence_penalty"`
 }
 
 type openAIRequestCompletions struct {
 	openAIRequestBase
-	Prompt string `json:"prompt"`
-	BestOf uint8  `json:"best_of"`
+	Stop   []string `json:"stop,omitempty"`
+	Prompt string   `json:"prompt"`
+	TopP   float32  `json:"top_p"`
+	BestOf uint8    `json:"best_of"`
 }
 
 type openAIRequestChatMessage struct {
