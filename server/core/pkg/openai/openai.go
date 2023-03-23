@@ -55,7 +55,7 @@ func (cfg Config) Validate() error {
 }
 
 const (
-	defaultMaxTokens   = 1000
+	defaultMaxTokens   = 500
 	defaultTemperature = 0.2
 	defaultTopP        = 1
 )
