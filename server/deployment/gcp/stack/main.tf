@@ -58,7 +58,7 @@ resource "google_cloud_run_v2_service" "this" {
       }
       env {
         name  = "MODEL_MAX_TOKENS"
-        value = "500"
+        value = var.model_max_tokens
       }
 
       dynamic "env" {
