@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased] - 2023-03-23
+
+### Added
+
+- Support for the [`User`](https://github.com/plantuml-stdlib/C4-PlantUML/#supported-diagram-types) C4 macro.
+
+### Fixed
+
+- ([#56](https://github.com/kislerdm/diagramastext/issues/56)) Moved from the model
+  from "[code-davinci-002](https://platform.openai.com/docs/models/codex)"
+  to "[gpt-3.5-turbo](https://platform.openai.com/docs/models/gpt-3-5)" following on the OpenAI announcement to
+  discontinue support for the Codex API.
+
 ## [0.0.3] - 2023-03-21
 
 ### Fixed
