@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 )
 
 type env struct {
@@ -27,39 +28,59 @@ func main() {
 	flag.StringVar(&pathServe, "path", "/public", "path to index.html file")
 	flag.Parse()
 
-	_, err := template.ParseFS(os.DirFS(pathServe), "*.html")
+	h, err := newHandler(pathServe)
 	if err != nil {
 		log.Println(err)
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	http.HandleFunc(
-		"/", func(w http.ResponseWriter, r *http.Request) {
-			templates, err := template.ParseFS(os.DirFS(pathServe), "*.html")
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = w.Write([]byte("<html><h1>Error</h1><p>" + err.Error() + "</p></html>"))
-				return
-			}
-			if err := templates.ExecuteTemplate(
-				w, "index.html", impute{
-					Env: env{
-						API_URL: os.Getenv("API_URL"),
-						VERSION: os.Getenv("VERSION"),
-						TOKEN:   os.Getenv("TOKEN"),
-					},
-				},
-			); err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = w.Write([]byte("<html><h1>Error</h1><p>" + err.Error() + "</p></html>"))
-				return
-			}
-		},
-	)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	if err := http.ListenAndServe(":"+port, h); err != nil {
 		log.Println(err)
+	}
+}
+
+func newHandler(p string) (http.Handler, error) {
+	if _, err := template.ParseFiles(path.Join(p, "index.html")); err != nil {
+		return nil, err
+	}
+	return handler{
+		Dir:          p,
+		filesHandler: http.FileServer(http.Dir(p)),
+	}, nil
+}
+
+type handler struct {
+	Dir string
+
+	filesHandler http.Handler
+}
+
+func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/":
+		t, err := template.ParseFiles(path.Join(h.Dir, "index.html"))
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("<html><h1>Error</h1><p>" + err.Error() + "</p></html>"))
+			return
+		}
+		if err := t.ExecuteTemplate(
+			w, "index.html", impute{
+				Env: env{
+					API_URL: os.Getenv("API_URL"),
+					VERSION: os.Getenv("VERSION"),
+					TOKEN:   os.Getenv("TOKEN"),
+				},
+			},
+		); err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("<html><h1>Error</h1><p>" + err.Error() + "</p></html>"))
+			return
+		}
+	default:
+		h.filesHandler.ServeHTTP(w, r)
 	}
 }
