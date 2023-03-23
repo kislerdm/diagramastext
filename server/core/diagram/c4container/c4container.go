@@ -1,6 +1,7 @@
 package c4container
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 
@@ -14,7 +15,20 @@ type c4ContainersGraph struct {
 	Rels       []*rel       `json:"links"`
 	Title      string       `json:"title,omitempty"`
 	Footer     string       `json:"footer,omitempty"`
-	WithLegend bool         `json:"with_legend,omitempty"`
+	WithLegend bool         `json:"legend,omitempty"`
+}
+
+func (l *c4ContainersGraph) UnmarshalJSON(data []byte) error {
+	type tmp c4ContainersGraph
+	var v tmp
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	if !bytes.Contains(data, []byte(`"legend"`)) {
+		v.WithLegend = true
+	}
+	*l = c4ContainersGraph(v)
+	return nil
 }
 
 // container C4 container definition.
@@ -116,6 +130,16 @@ const contentSystem =
 	`three connected boxes
 	{"nodes":[{"id":"0"},{"id":"1"},{"id":"2"}],` +
 	`"links":[{"from":"0","to":"1"},{"from":"1","to":"2"},{"from":"2","to":"0"}]}` + "\n" +
+
+	// example
+	`three boxes without legend
+	{"nodes":[{"id":"0"},{"id":"1"},{"id":"2"}],` +
+	`"links":[{"from":"0","to":"1"},{"from":"1","to":"2"},{"from":"2","to":"0"}],"legend":false}` + "\n" +
+
+	// example
+	`three boxes, remove legend
+	{"nodes":[{"id":"0"},{"id":"1"},{"id":"2"}],` +
+	`"links":[{"from":"0","to":"1"},{"from":"1","to":"2"},{"from":"2","to":"0"}],"legend":false}` + "\n" +
 
 	// example
 	`c4 containers:golang web server authenticating users read from external mysql database

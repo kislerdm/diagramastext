@@ -5,6 +5,31 @@
 ### Added
 
 - Support for the [`User`](https://github.com/plantuml-stdlib/C4-PlantUML/#supported-diagram-types) C4 macro.
+- Diagram legend by default. It can be removed upon an explicit prompt's request only. 
+**Examples**: 
+
+The prompt yields the diagram with the legend: 
+```
+diagram of three boxes 
+```
+
+The prompts yield the diagram without the legend:
+
+```
+diagram of three boxes without legend
+```
+
+```
+diagram of three boxes, no legend
+```
+
+```
+diagram of three boxes with no legend
+```
+
+```
+diagram of three boxes. remove legend
+```
 
 ### Fixed
 
