@@ -99,6 +99,13 @@ func Test_cleanRawResponse(t *testing.T) {
 			},
 			want: `{"nodes":[{"id":"0","label":"Go Web Server","technology":"Go","description":"Authenticates users"},{"id":"1","label":"Kafka","technology":"Kafka","is_database":true},{"id":"2"},{"id":"3","label":"Database","technology":"MySQL","is_database":true}]}`,
 		},
+		{
+			name: `"nodes":[{"id":"0"}]`,
+			args: args{
+				s: "\n" + `"nodes":[{"id":"0"}]` + "\n",
+			},
+			want: `{"nodes":[{"id":"0"}]}`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -111,25 +118,35 @@ func Test_cleanRawResponse(t *testing.T) {
 	}
 }
 
-func Test_clientOpenAI_decodeResponse(t *testing.T) {
+func Test_clientOpenAI_decodeResponseGPT35Turbo(t *testing.T) {
+	const model = "gpt-3.5-turbo"
+
 	t.Parallel()
 
 	t.Run(
 		"happy path", func(t *testing.T) {
 			// GIVEN
 			responseBytes, err := json.Marshal(
-				openAIResponse{
-					ID:     "foo",
-					Object: "bar",
-					Model:  "code-davinci-002",
+				openAIResponseChat{
+					openAIResponseBase: openAIResponseBase{
+						ID:     "foo",
+						Object: "chat.completion",
+					},
 					Choices: []struct {
-						Text         string `json:"text"`
 						Index        int    `json:"index"`
-						Logprobs     int    `json:"logprobs"`
 						FinishReason string `json:"finish_reason"`
+						Message      struct {
+							Role    string `json:"role"`
+							Content string `json:"content"`
+						} `json:"message"`
 					}{
 						{
-							Text: `"nodes":["id":"0"]`,
+							Index:        0,
+							FinishReason: "stop",
+							Message: openAIRequestChatMessage{
+								Role:    "assistant",
+								Content: `{"nodes":["id":"0"]}`,
+							},
 						},
 					},
 				},
@@ -138,7 +155,7 @@ func Test_clientOpenAI_decodeResponse(t *testing.T) {
 				t.Fatal(err)
 			}
 			// WHEN
-			got, err := decodeResponse(responseBytes)
+			got, err := decodeResponse(responseBytes, model)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -156,7 +173,7 @@ func Test_clientOpenAI_decodeResponse(t *testing.T) {
 			responseBytes := []byte(`{"id":"0"}`)
 
 			// WHEN
-			_, err := decodeResponse(responseBytes)
+			_, err := decodeResponse(responseBytes, model)
 
 			// THEN
 			if !reflect.DeepEqual(err, errors.New("unsuccessful prediction")) {
@@ -171,7 +188,82 @@ func Test_clientOpenAI_decodeResponse(t *testing.T) {
 			responseBytes := []byte(`{"id":"0"`)
 
 			// WHEN
-			_, err := decodeResponse(responseBytes)
+			_, err := decodeResponse(responseBytes, model)
+
+			// THEN
+			if err == nil {
+				t.Errorf("unmarshalling errors is expected")
+			}
+		},
+	)
+}
+
+func Test_clientOpenAI_decodeResponseCodeDavinci(t *testing.T) {
+	const model = "code-davinci-002"
+
+	t.Parallel()
+
+	t.Run(
+		"happy path", func(t *testing.T) {
+			// GIVEN
+			responseBytes, err := json.Marshal(
+				openAIResponse{
+					openAIResponseBase: openAIResponseBase{
+						ID:     "foo",
+						Object: "chat.completion",
+					},
+					Model: model,
+					Choices: []struct {
+						Text         string `json:"text"`
+						Index        int    `json:"index"`
+						Logprobs     int    `json:"logprobs"`
+						FinishReason string `json:"finish_reason"`
+					}{
+						{
+							Index: 0,
+							Text:  `{"nodes":["id":"0"]}`,
+						},
+					},
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// WHEN
+			got, err := decodeResponse(responseBytes, model)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// THEN
+			if !reflect.DeepEqual(got, []byte(`{"nodes":["id":"0"]}`)) {
+				t.Fatal("unexpected response")
+			}
+		},
+	)
+
+	t.Run(
+		"unhappy path: empty response", func(t *testing.T) {
+			// GIVEN
+			responseBytes := []byte(`{"id":"0"}`)
+
+			// WHEN
+			_, err := decodeResponse(responseBytes, model)
+
+			// THEN
+			if !reflect.DeepEqual(err, errors.New("unsuccessful prediction")) {
+				t.Fatal("unexpected error: unsuccessful prediction")
+			}
+		},
+	)
+
+	t.Run(
+		"unhappy path: unmarshalling", func(t *testing.T) {
+			// GIVEN
+			responseBytes := []byte(`{"id":"0"`)
+
+			// WHEN
+			_, err := decodeResponse(responseBytes, model)
 
 			// THEN
 			if err == nil {
@@ -204,14 +296,14 @@ func TestNewOpenAIClient(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "happy path: fixed max tokens",
+			name: "happy path: negative maxTokens",
 			args: args{
 				cfg: Config{Token: mockToken, MaxTokens: -100, HTTPClient: http.DefaultClient},
 			},
 			want: &Client{
 				httpClient: http.DefaultClient,
 				token:      mockToken,
-				maxTokens:  defaultMaxTokens,
+				maxTokens:  -100,
 			},
 			wantErr: false,
 		},
@@ -268,10 +360,8 @@ func Test_clientOpenAI_Do(t *testing.T) {
 		maxTokens  int
 	}
 	type args struct {
-		ctx    context.Context
-		prompt string
-		model  string
-		bestOf uint8
+		ctx                              context.Context
+		model, userPrompt, systemContent string
 	}
 	tests := []struct {
 		name    string
@@ -281,7 +371,31 @@ func Test_clientOpenAI_Do(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "happy path",
+			name: "happy path: gpt-3.5-turbo",
+			fields: fields{
+				httpClient: mockHTTPClient{
+					V: &http.Response{
+						Body: io.NopCloser(
+							strings.NewReader(
+								`{"id":"0","choices":[{"message":{"content":"{\"nodes\":[{\"id\":\"0\"}]}"}}]}`,
+							),
+						),
+						StatusCode: http.StatusOK,
+					},
+				},
+				token:     mockToken,
+				maxTokens: 100,
+			},
+			args: args{
+				ctx:           context.TODO(),
+				model:         "gpt-3.5-turbo",
+				systemContent: "foo",
+				userPrompt:    "bar",
+			},
+			want: []byte(`{"nodes":[{"id":"0"}]}`),
+		},
+		{
+			name: "happy path: code-davinci-002",
 			fields: fields{
 				httpClient: mockHTTPClient{
 					V: &http.Response{
@@ -297,13 +411,36 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				maxTokens: 100,
 			},
 			args: args{
-				ctx:    context.TODO(),
-				prompt: "foobar",
-				model:  "gpt-3.5-turbo",
-				bestOf: 2,
+				ctx:           context.TODO(),
+				model:         "code-davinci-002",
+				systemContent: "foo",
+				userPrompt:    "bar",
 			},
-			want:    []byte(`{"nodes":[{"id":"0"}]}`),
-			wantErr: false,
+			want: []byte(`{"nodes":[{"id":"0"}]}`),
+		},
+		{
+			name: "happy path: gpt-3.5-turbo, default maxTokens",
+			fields: fields{
+				httpClient: mockHTTPClient{
+					V: &http.Response{
+						Body: io.NopCloser(
+							strings.NewReader(
+								`{"id":"0","choices":[{"message":{"content":"{\"nodes\":[{\"id\":\"0\"}]}"}}]}`,
+							),
+						),
+						StatusCode: http.StatusOK,
+					},
+				},
+				token:     mockToken,
+				maxTokens: -100,
+			},
+			args: args{
+				ctx:           context.TODO(),
+				model:         "gpt-3.5-turbo",
+				systemContent: "foo",
+				userPrompt:    "bar",
+			},
+			want: []byte(`{"nodes":[{"id":"0"}]}`),
 		},
 		{
 			name: "unhappy path: invalid prompt",
@@ -311,9 +448,10 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				maxTokens: 10,
 			},
 			args: args{
-				ctx:    context.TODO(),
-				prompt: randomString(10000),
-				model:  "foobar",
+				ctx:           context.TODO(),
+				model:         "foobar",
+				userPrompt:    randomString(10000),
+				systemContent: "foo",
 			},
 			want:    nil,
 			wantErr: true,
@@ -335,8 +473,9 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				maxTokens: 10,
 			},
 			args: args{
-				ctx:    context.TODO(),
-				prompt: "foobar",
+				ctx:           context.TODO(),
+				userPrompt:    "foobar",
+				systemContent: "qux",
 			},
 			want:    nil,
 			wantErr: true,
@@ -353,7 +492,7 @@ func Test_clientOpenAI_Do(t *testing.T) {
 					token:      tt.fields.token,
 					maxTokens:  tt.fields.maxTokens,
 				}
-				got, err := c.Do(tt.args.ctx, tt.args.prompt, tt.args.model, tt.args.bestOf)
+				got, err := c.Do(tt.args.ctx, tt.args.userPrompt, tt.args.systemContent, tt.args.model)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Do() error = %v, wantErr %v", err, tt.wantErr)
 					return
