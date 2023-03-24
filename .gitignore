@@ -10,3 +10,7 @@ bin
 # http client plugin cfg for local tests
 http-client.private.*json
 *.http
+
+# js
+node_modules
+coverage
