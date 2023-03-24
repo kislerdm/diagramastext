@@ -525,6 +525,8 @@
 
 <script>
     const version = "{{.Env.VERSION}}";
+    const promptLengthMaxBaseUser = 100,
+        promptLengthMaxRegisteredUser = 300;
 
     function generateFeedbackLink(prompt) {
         let url = "https://github.com/kislerdm/diagramastext/issues/new";
@@ -633,10 +635,6 @@ Please describe what should have happened following the actions you described.
             }).then((resp) => {
                 loaderHide();
 
-                if (!resp.ok) {
-                    throw new Error("critical error");
-                }
-
                 switch (resp.status) {
                     case 200:
                         resp.json()
@@ -650,8 +648,12 @@ Please describe what should have happened following the actions you described.
                                 }
                             })
                         break;
+                    case 400:
+                        showErrorPopupValidation("Unexpected prompt length");
+                        break;
                     case 429:
-                        throw Error("the server is experiencing high load, please try later");
+                        showErrorPopup("The server is experiencing high load, please try later");
+                        break;
                     default:
                         resp.text().then((msg) => {
                             throw new Error(msg);
@@ -666,7 +668,7 @@ Please describe what should have happened following the actions you described.
 
     function validatePrompt(prompt) {
         const minLength = 3,
-            maxLength = 500;
+            maxLength = promptLengthMaxBaseUser;
         if (prompt.length < minLength || prompt.length > maxLength) {
             throw new RangeError(`The prompt must be between ${minLength} and ${maxLength} characters long`)
         }
