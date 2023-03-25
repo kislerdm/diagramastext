@@ -1,5 +1,5 @@
-import {User} from './user.js';
-import {config} from "./config.js";
+import {User} from './src/user.ts';
+import {config} from "./config.ts";
 
 const promptLengthMin = 3,
     promptLengthMaxBaseUser = 100,
@@ -177,7 +177,7 @@ class Flow {
     download() {
         if (this._svg !== "") {
             const link = document.createElement("a");
-            link.setAttribute("download", "diagram.svg");
+            link.setAttribute("download", "diagram.disclaimer");
             link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(this._svg)}`);
             link.click();
         }
@@ -189,4 +189,8 @@ class Flow {
 }
 
 const flow = new Flow(config);
-export default flow;
+
+export default function trigger() {
+    flow.trigger()
+}
+

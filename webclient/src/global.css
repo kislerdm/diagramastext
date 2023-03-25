@@ -1,0 +1,87 @@
+*, :after, :before {
+    box-sizing: border-box;
+    border: 0 solid #e5e7eb
+}
+
+:after, :before {
+    --tw-content: "";
+}
+
+a {
+    color: white;
+}
+
+a:link {
+    text-decoration: none;
+}
+
+a:visited {
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: none;
+}
+
+a:active {
+    text-decoration: none;
+}
+
+html {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    -moz-tab-size: 4;
+    -o-tab-size: 4;
+    tab-size: 4;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background-color: #e8e5e5;
+    margin: 0;
+}
+
+main {
+    width: 800px;
+}
+
+@media only screen and (max-width: 600px) {
+    main {
+        width: 100%;
+    }
+}
+
+header {
+    padding: 1em;
+    width: 100%;
+}
+
+button {
+    margin-top: 15px;
+    border-radius: 1.8rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    background: #919ea8;
+    border: #ccc9c9 solid 1px;
+    font-size: 20px;
+    color: white;
+    box-shadow: 0 0 3px 3px #ccc9c9;
+}
+
+button:hover {
+    box-shadow: 0 0 10px 10px #ccc9c9;
+}
+
+button:active {
+    box-shadow: none;
+    background: #ccc9c9;
+}
+
+button:disabled {
+    box-shadow: none;
+    background: #ccc9c9;
+}

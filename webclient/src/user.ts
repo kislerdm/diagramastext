@@ -1,13 +1,16 @@
 const defaultNA = "NA";
 
 export class User {
+    private readonly _id: string
+    private readonly _fingerprint: string
+
     constructor() {
-        this.fingerprint = get_fingerprint(navigator.userAgent);
-        this.id = defaultNA;
+        this._fingerprint = get_fingerprint(navigator.userAgent);
+        this._id = defaultNA;
     }
 
     is_registered() {
-        return this.id !== defaultNA;
+        return this._id !== defaultNA;
     }
 
     login() {
@@ -22,17 +25,16 @@ export class User {
  * @param {string} userAgent: user-agent string.
  * @return {string} fingerprint string.
  */
-function get_fingerprint(userAgent) {
+export function get_fingerprint(userAgent: string): string {
     if (userAgent === "") {
         return defaultNA;
     }
 
-    function rotate_left(n, s) {
-        var t4 = (n << s) | (n >>> (32 - s));
-        return t4;
-    };
+    function rotate_left(n: number, s: number): number {
+        return (n << s) | (n >>> (32 - s));
+    }
 
-    function lsb_hex(val) {
+    function lsb_hex(val: number): string {
         var str = '';
         var i;
         var vh;
@@ -43,9 +45,9 @@ function get_fingerprint(userAgent) {
             str += vh.toString(16) + vl.toString(16);
         }
         return str;
-    };
+    }
 
-    function cvt_hex(val) {
+    function cvt_hex(val: number): string {
         var str = '';
         var i;
         var v;
@@ -54,9 +56,9 @@ function get_fingerprint(userAgent) {
             str += v.toString(16);
         }
         return str;
-    };
+    }
 
-    function Utf8Encode(string) {
+    function Utf8Encode(string: string): string {
         string = string.replace(/\r\n/g, '\n');
         var utftext = '';
         for (var n = 0; n < string.length; n++) {
@@ -73,7 +75,9 @@ function get_fingerprint(userAgent) {
             }
         }
         return utftext;
-    };var blockstart;
+    }
+
+    var blockstart;
     var i, j;
     var W = new Array(80);
     var H0 = 0x67452301;
@@ -82,10 +86,10 @@ function get_fingerprint(userAgent) {
     var H3 = 0x10325476;
     var H4 = 0xC3D2E1F0;
     var A, B, C, D, E;
-    var temp;
-    const msg = Utf8Encode(userAgent);
+    var temp: number;
+    const msg: string = Utf8Encode(userAgent);
     var msg_len = msg.length;
-    var word_array = new Array();
+    var word_array: number[] = new Array<number>();
     for (i = 0; i < msg_len - 3; i += 4) {
         j = msg.charCodeAt(i) << 24 | msg.charCodeAt(i + 1) << 16 | msg.charCodeAt(i + 2) << 8 | msg.charCodeAt(i + 3);
         word_array.push(j);
@@ -154,6 +158,7 @@ function get_fingerprint(userAgent) {
         H3 = (H3 + D) & 0x0ffffffff;
         H4 = (H4 + E) & 0x0ffffffff;
     }
-    var temp = cvt_hex(H0) + cvt_hex(H1) + cvt_hex(H2) + cvt_hex(H3) + cvt_hex(H4);
-    return temp.toLowerCase();
+
+    const out: string = cvt_hex(H0) + cvt_hex(H1) + cvt_hex(H2) + cvt_hex(H3) + cvt_hex(H4);
+    return out.toLowerCase();
 }

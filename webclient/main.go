@@ -86,14 +86,14 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("<html><h1>Error</h1><p>" + err.Error() + "</p></html>"))
 			return
 		}
-	case "/src/config.js":
-		t, err := template.ParseFiles(path.Join(h.Dir, "src", "config.js"))
+	case "/src/config.ts":
+		t, err := template.ParseFiles(path.Join(h.Dir, "src", "config.ts"))
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if err := t.ExecuteTemplate(w, "config.js", h.imputation); err != nil {
+		if err := t.ExecuteTemplate(w, "config.ts", h.imputation); err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
