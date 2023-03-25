@@ -6,11 +6,7 @@
 		"testlive": "vitest",
 		"test": "vitest run --coverage",
 		"dev": "vite",
-		"build": "vite build",
-		"preview": "vite preview"
-	},
-	"stackblitz": {
-		"startCommand": "npm run test:ui"
+		"build": "vite build"
 	},
 	"devDependencies": {
 		"@vitest/coverage-c8": "^0.29.7",

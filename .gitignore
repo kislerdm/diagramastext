@@ -16,6 +16,7 @@ http-client.private.*json
 node_modules
 coverage
 build
+dist
 
 # debug
 npm-debug.log*
