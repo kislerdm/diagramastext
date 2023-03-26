@@ -5,3 +5,7 @@ export type Config = {
     promptMaxLengthUserBase: number
     promptMaxLengthUserRegistered: number
 };
+
+export type DataSVG = {
+    svg: string
+}

@@ -1,5 +1,5 @@
 import './global.css';
-import Main from "./components/main";
+import Main from "./main";
 import {Config} from "./ports";
 
 const cfg: Config = {
@@ -10,4 +10,4 @@ const cfg: Config = {
     promptMaxLengthUserRegistered: 300,
 };
 
-document.querySelector<HTMLDivElement>("main")!.innerHTML = Main(cfg);
+Main(document.querySelector<HTMLDivElement>("main")!, cfg);
