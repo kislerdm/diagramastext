@@ -55,14 +55,15 @@ type FsmHtmlID = {
     Download: string
 }
 
+let svg: string = "";
+
 class FSM {
     private _config: Config
     private _user: User
     private readonly _popup: Popup
     private readonly _loader: Loader
-    private _svg: string
     private _fetchErrorCnt: number = 0
-    private readonly _fetchErrorCntMax: number = 3
+    private readonly _fetchErrorCntMax: number = 2
     ids: FsmHtmlID
 
     constructor(cfg: Config, ids: FsmHtmlID, popup: Popup, loaderSpinner: Loader) {
@@ -72,8 +73,6 @@ class FSM {
 
         this._popup = popup;
         this._loader = loaderSpinner;
-
-        this._svg = "";
 
         this._user = new User();
 
@@ -117,90 +116,82 @@ class FSM {
         }
     }
 
-    private fetchDiagram(prompt: string) {
-        return fetch(this._config.urlAPI, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                "prompt": prompt,
-            }),
-        }).then((resp: Response) => {
-            if (!resp.ok) {
-                this._fetchErrorCnt++;
-                if (this._fetchErrorCnt == this._fetchErrorCntMax) {
-                    const link = generateFeedbackLink(prompt, this._config.version);
-                    throw new Error(`The errors repreat, please <a href="${link}" target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>`);
-                }
-            }
-
-            switch (resp.status) {
-                case 200:
-                    this._fetchErrorCnt = 0;
-                    resp.json()
-                        .then((data: DataSVG) => {
-                            if (data.svg === null) {
-                                throw new Error("empty response");
-                            } else {
-                                return data.svg;
-                            }
-                        })
-                    break;
-                case 400:
-                    throw new Error("Unexpected prompt length");
-                case 404:
-                    throw new Error("Faulty path");
-                case 429:
-                    throw new Error("The server is experiencing high load, please try later");
-                case 500:
-                    throw new Error("Unexpected error, please try later");
-                default:
-                    resp.text().then((msg) => {
-                        throw new Error(msg);
-                    })
-            }
-        })
-    }
-
     generateDiagram(prompt: string) {
         // @ts-ignore
         prompt = prompt.trim();
         if (FSM.placeholderInputPrompt() !== prompt) {
-            this._loader.show();
+            console.log(prompt);
             try {
                 this.validatePrompt(prompt);
                 // @ts-ignore
             } catch (e: Error) {
-                this._loader.hide();
                 this._popup!.error(e.message);
                 return;
             }
 
-            this.fetchDiagram(prompt)
-                .then((svg) => {
-                    //@ts-ignore
-                    if (svg !== "") {
-                        this._svg = svg!;
+            this._loader.show();
+            fetch(this._config.urlAPI, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    "prompt": prompt,
+                }),
+            }).then((resp: Response) => {
+                if (!resp.ok) {
+                    this._fetchErrorCnt++;
+                    if (this._fetchErrorCnt > this._fetchErrorCntMax) {
+                        const link = generateFeedbackLink(prompt, this._config.version);
+                        throw new Error(`The errors repreat, please <a href="${link}" target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>`);
                     }
-                })
+                }
+
+                switch (resp.status) {
+                    case 200:
+                        this._fetchErrorCnt = 0;
+                        resp.json()
+                            .then((data: DataSVG) => {
+                                if (data.svg === null) {
+                                    throw new Error("empty response");
+                                } else {
+                                    this._loader.hide();
+                                    svg = data.svg;
+
+                                    //@ts-ignore
+                                    document.getElementById(this.ids.Output).innerHTML = data.svg;
+
+                                    //@ts-ignore
+                                    document.getElementById(this.ids.Download).disabled = false;
+                                }
+                            })
+                        break;
+                    case 400:
+                        throw new Error("Unexpected prompt length");
+                    case 404:
+                        throw new Error("Faulty path");
+                    case 429:
+                        throw new Error("The server is experiencing high load, please try later");
+                    case 500:
+                        throw new Error("Unexpected error, please try later");
+                    default:
+                        resp.text().then((msg) => {
+                            throw new Error(msg);
+                        })
+                }
+            })
                 .catch((e) => {
+                    this._loader.hide();
                     this._popup!.error(e.message);
                 })
-
-            //@ts-ignore
-            document.getElementById(this.ids.Output)!.innerHTML = this._svg;
-            //@ts-ignore
-            document.getElementById(this.ids.Download).disabled = this._svg === "";
-            this._loader.hide();
         }
     }
 
     download() {
-        if (this._svg !== "") {
+        if (svg !== "") {
             const link = document.createElement("a");
             link.setAttribute("download", "diagram.svg");
-            link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(this._svg)}`);
+            link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
             link.click();
         }
     }
