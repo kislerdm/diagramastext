@@ -5,7 +5,7 @@ import Header from "./components/header";
 import {Config, DataSVG} from "@/ports";
 
 // @ts-ignore
-import placeholderDiagram from "./components/svg/output-placeholder.svg?raw";
+import placeholderOutputSVG from "./components/svg/output-placeholder.svg?raw";
 // @ts-ignore
 import logoGithub from "./components/svg/github.svg";
 // @ts-ignore
@@ -17,120 +17,57 @@ import logoEmail from "./components/svg/email.svg";
 import {User} from "./user";
 import {Loader, Popup} from "./components/popup";
 
-function generateFeedbackLink(prompt: string, version: string) {
-    let url = "https://github.com/kislerdm/diagramastext/issues/new";
-    const params = {
-        assignee: "kislerdm",
-        labels: ["feedback", "defect"],
-        title: `Webclient issue`,
-        body: `## Environment
-- App version: ${version}
+export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
+    const placeholderInputPrompt = "C4 diagram of a Go web server reading from external Postgres database over TCP",
+        id = {
+            Input: "0",
+            Trigger: "1",
+            Output: "2",
+            Download: "4",
+        };
 
-## Prompt
+    mountPoint.innerHTML = `${Header}
 
-\`\`\`
-${prompt}
-\`\`\`
+<div style="font-size:30px;margin: 20px 0 10px">
+    Generate <span style="font-weight:bold">diagrams</span> using 
+    <span style="font-style:italic;font-weight:bold">plain English</span> in no time!
+</div>
 
-## Details
+${Input(id.Input, id.Trigger, cfg.promptMinLength, cfg.promptMaxLengthUserRegistered, placeholderInputPrompt)}
 
-- Please describe your chain of actions, i.e. what preceded the state you report?
-- Please attach screenshots whether possible
+<i class="${arrow}"></i>
 
-## Expected behaviour
+${Output(id.Output, id.Download, placeholderOutputSVG)}
 
-Please describe what should have happened following the actions you described.
-`,
-    };
-    //@ts-ignore
-    const query = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
+${Disclaimer}
 
-    return `${url}?${query}`;
-}
+${Footer(cfg.version)}
+`;
 
-type FsmHtmlID = {
-    Input: string
-    Output: string
-    Trigger: string
-    Download: string
-}
+    let svg = "";
+    const errorPopup = new Popup(mountPoint),
+        loadingSpinner = new Loader(mountPoint);
 
-let svg: string = "";
+    const user = new User();
 
-class FSM {
-    private _config: Config
-    private _user: User
-    private readonly _popup: Popup
-    private readonly _loader: Loader
-    private _fetchErrorCnt: number = 0
-    private readonly _fetchErrorCntMax: number = 2
-    ids: FsmHtmlID
-
-    constructor(cfg: Config, ids: FsmHtmlID, popup: Popup, loaderSpinner: Loader) {
-        FSM.validateConfig(cfg)
-        this._config = cfg;
-        this.ids = ids
-
-        this._popup = popup;
-        this._loader = loaderSpinner;
-
-        this._user = new User();
-
-        document.getElementById(this.ids.Trigger)!.addEventListener("click", () =>
-            //@ts-ignore
-            this.generateDiagram(document.getElementById(this.ids.Input)!.value)
-        )
-
+    // diagram generation flow
+    let _fetchErrorCnt = 0;
+    const _fetchErrorCntMax = 2;
+    document.getElementById(id.Trigger)!.addEventListener("click", () => {
         //@ts-ignore
-        document.getElementById(this.ids.Download)!.addEventListener("click", this.download)
-    }
+        const prompt = document.getElementById(id.Input)!.value.trim();
 
-    static validateConfig(cfg: Config) {
-        if (cfg.urlAPI === undefined || cfg.urlAPI === null || cfg.urlAPI === "") {
-            throw new TypeError("config must contain urlAPI attribute");
-        }
-    }
-
-    static placeholderInputPrompt(): string {
-        return "C4 diagram of a Go web server reading from external Postgres database over TCP";
-    }
-
-    static placeholderOutputSVG(): string {
-        return placeholderDiagram;
-    }
-
-    private validatePromptLength(prompt: string, lengthMin: number, lengthMax: number) {
-        if (prompt.length < lengthMin || prompt.length > lengthMax) {
-            throw new RangeError(`The prompt must be between ${lengthMin} and ${lengthMax} characters long`)
-        }
-    }
-
-    private validatePrompt(prompt: string) {
-        switch (this._user.is_registered()) {
-            case true:
-                this.validatePromptLength(prompt, this._config.promptMinLength, this._config.promptMaxLengthUserRegistered);
-                break;
-            default:
-                this.validatePromptLength(prompt, this._config.promptMinLength, this._config.promptMaxLengthUserBase);
-                break;
-        }
-    }
-
-    generateDiagram(prompt: string) {
-        // @ts-ignore
-        prompt = prompt.trim();
-        if (FSM.placeholderInputPrompt() !== prompt) {
-            console.log(prompt);
+        if (placeholderInputPrompt !== prompt) {
             try {
-                this.validatePrompt(prompt);
+                validatePrompt(prompt, user, cfg);
                 // @ts-ignore
             } catch (e: Error) {
-                this._popup!.error(e.message);
+                errorPopup.error(e.message);
                 return;
             }
 
-            this._loader.show();
-            fetch(this._config.urlAPI, {
+            loadingSpinner.show();
+            fetch(cfg.urlAPI, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -139,62 +76,36 @@ class FSM {
                     "prompt": prompt,
                 }),
             }).then((resp: Response) => {
+                loadingSpinner.hide();
                 if (!resp.ok) {
-                    this._fetchErrorCnt++;
-                    if (this._fetchErrorCnt > this._fetchErrorCntMax) {
-                        const link = generateFeedbackLink(prompt, this._config.version);
-                        throw new Error(`The errors repreat, please <a href="${link}" target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>`);
-                    }
-                }
+                    _fetchErrorCnt++;
 
-                switch (resp.status) {
-                    case 200:
-                        this._fetchErrorCnt = 0;
-                        resp.json()
-                            .then((data: DataSVG) => {
-                                if (data.svg === null) {
-                                    throw new Error("empty response");
-                                } else {
-                                    this._loader.hide();
-                                    svg = data.svg;
+                    const errorMsg = _fetchErrorCnt > _fetchErrorCntMax ? `The errors repreat, please 
+<a href="${generateFeedbackLink(prompt, cfg.version)}"
+    target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>` : mapStatusCode(resp.status);
 
-                                    //@ts-ignore
-                                    document.getElementById(this.ids.Output).innerHTML = data.svg;
-
-                                    //@ts-ignore
-                                    document.getElementById(this.ids.Download).disabled = false;
-                                }
-                            })
-                        break;
-                    case 400:
-                        throw new Error("Unexpected prompt length");
-                    case 404:
-                        throw new Error("Faulty path");
-                    case 429:
-                        throw new Error("The server is experiencing high load, please try later");
-                    case 500:
-                        throw new Error("Unexpected error, please try later");
-                    default:
-                        resp.text().then((msg) => {
-                            throw new Error(msg);
+                    errorPopup.error(errorMsg);
+                } else {
+                    _fetchErrorCnt = 0;
+                    resp.json()
+                        .then((data: DataSVG) => {
+                            svg = scaleSVG(data!.svg);
+                            //@ts-ignore
+                            document.getElementById(id.Output).innerHTML = svg;
+                            //@ts-ignore
+                            document.getElementById(id.Download).disabled = false;
                         })
                 }
             })
-                .catch((e) => {
-                    this._loader.hide();
-                    this._popup!.error(e.message);
-                })
         }
-    }
+    })
 
-    download() {
+    // download flow
+    document.getElementById(id.Download)!.addEventListener("click", () => {
         if (svg !== "") {
-            const link = document.createElement("a");
-            link.setAttribute("download", "diagram.svg");
-            link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
-            link.click();
+            download(svg)
         }
-    }
+    })
 }
 
 function Input(idInput: string, idTrigger: string, minLength: number, maxLength: number, placeholder: string): string {
@@ -239,31 +150,86 @@ const Disclaimer = `<div class="${box}" style="color:white;margin:50px 0 20px">
     <a href="mailto:hi@diagramastext.dev"><img src="${logoEmail}" alt="email logo"/></a>
 </div>`;
 
-export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
-    const id: FsmHtmlID = {
-        Input: "inpt",
-        Trigger: "trigger",
-        Output: "output",
-        Download: "download",
+function generateFeedbackLink(prompt: string, version: string) {
+    let url = "https://github.com/kislerdm/diagramastext/issues/new";
+    const params = {
+        assignee: "kislerdm",
+        labels: ["feedback", "defect"],
+        title: `Webclient issue`,
+        body: `## Environment
+- App version: ${version}
+
+## Prompt
+
+\`\`\`
+${prompt}
+\`\`\`
+
+## Details
+
+- Please describe your chain of actions, i.e. what preceded the state you report?
+- Please attach screenshots whether possible
+
+## Expected behaviour
+
+Please describe what should have happened following the actions you described.
+`,
     };
+    //@ts-ignore
+    const query = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
 
-    mountPoint.innerHTML = `${Header}
+    return `${url}?${query}`;
+}
 
-<div style="font-size:30px;margin: 20px 0 10px">
-    Generate <span style="font-weight:bold">diagrams</span> using 
-    <span style="font-style:italic;font-weight:bold">plain English</span> in no time!
-</div>
+function validatePromptLength(prompt: string, lengthMin: number, lengthMax: number) {
+    if (prompt.length < lengthMin || prompt.length > lengthMax) {
+        throw new RangeError(`The prompt must be between ${lengthMin} and ${lengthMax} characters long`)
+    }
+}
 
-${Input(id.Input, id.Trigger, cfg.promptMinLength, cfg.promptMaxLengthUserRegistered, FSM.placeholderInputPrompt())}
+function validatePrompt(prompt: string, user: User, cfg: Config) {
+    switch (user.is_registered()) {
+        case true:
+            validatePromptLength(prompt, cfg.promptMinLength, cfg.promptMaxLengthUserRegistered);
+            break;
+        default:
+            validatePromptLength(prompt, cfg.promptMinLength, cfg.promptMaxLengthUserBase);
+            break;
+    }
+}
 
-<i class="${arrow}"></i>
+function download(svg: string) {
+    const link = document.createElement("a");
+    link.setAttribute("download", "diagram.svg");
+    link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
+    link.click();
+}
 
-${Output(id.Output, id.Download, FSM.placeholderOutputSVG())}
+function mapStatusCode(status: number) {
+    switch (status) {
+        case 400:
+            return "Unexpected prompt length";
+        case 404:
+            return "Faulty path";
+        case 429:
+            return "The server is experiencing high load, please try later";
+        default:
+            return "Unexpected error, please try later";
+    }
+}
 
-${Disclaimer}
-
-${Footer(cfg.version)}
-`;
-
-    new FSM(cfg, id, new Popup(mountPoint), new Loader(mountPoint));
+/*
+* scaleSVG scales SVG to fit the parent DIV.
+* */
+export function scaleSVG(svg: string): string {
+    const parser = new DOMParser();
+    let doc = parser.parseFromString(svg, "image/svg+xml")!.querySelector("svg");
+    //@ts-ignore
+    doc.style.preserveAspectRatio="xMaxYMax";
+    //@ts-ignore
+    doc.style.width="100%";
+    //@ts-ignore
+    doc.style.height="100%";
+    //@ts-ignore
+    return new XMLSerializer().serializeToString(doc);
 }
