@@ -15,7 +15,38 @@ import logoLinkedin from "./components/svg/linkedin.svg";
 // @ts-ignore
 import logoEmail from "./components/svg/email.svg";
 import {User} from "./user";
-import {Popup, Loader} from "./components/popup";
+import {Loader, Popup} from "./components/popup";
+
+function generateFeedbackLink(prompt: string, version: string) {
+    let url = "https://github.com/kislerdm/diagramastext/issues/new";
+    const params = {
+        assignee: "kislerdm",
+        labels: ["feedback", "defect"],
+        title: `Webclient issue`,
+        body: `## Environment
+- App version: ${version}
+
+## Prompt
+
+\`\`\`
+${prompt}
+\`\`\`
+
+## Details
+
+- Please describe your chain of actions, i.e. what preceded the state you report?
+- Please attach screenshots whether possible
+
+## Expected behaviour
+
+Please describe what should have happened following the actions you described.
+`,
+    };
+    //@ts-ignore
+    const query = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
+
+    return `${url}?${query}`;
+}
 
 type FsmHtmlID = {
     Input: string
@@ -30,6 +61,8 @@ class FSM {
     private readonly _popup: Popup
     private readonly _loader: Loader
     private _svg: string
+    private _fetchErrorCnt: number = 0
+    private readonly _fetchErrorCntMax: number = 3
     ids: FsmHtmlID
 
     constructor(cfg: Config, ids: FsmHtmlID, popup: Popup, loaderSpinner: Loader) {
@@ -94,8 +127,17 @@ class FSM {
                 "prompt": prompt,
             }),
         }).then((resp: Response) => {
+            if (!resp.ok) {
+                this._fetchErrorCnt++;
+                if (this._fetchErrorCnt == this._fetchErrorCntMax) {
+                    const link = generateFeedbackLink(prompt, this._config.version);
+                    throw new Error(`The errors repreat, please <a href="${link}" target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>`);
+                }
+            }
+
             switch (resp.status) {
                 case 200:
+                    this._fetchErrorCnt = 0;
                     resp.json()
                         .then((data: DataSVG) => {
                             if (data.svg === null) {
@@ -111,6 +153,8 @@ class FSM {
                     throw new Error("Faulty path");
                 case 429:
                     throw new Error("The server is experiencing high load, please try later");
+                case 500:
+                    throw new Error("Unexpected error, please try later");
                 default:
                     resp.text().then((msg) => {
                         throw new Error(msg);
