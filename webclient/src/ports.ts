@@ -1,11 +1,11 @@
-export type Config = {
+export declare type Config = {
     version: string
     urlAPI: string
     promptMinLength: number
     promptMaxLengthUserBase: number
     promptMaxLengthUserRegistered: number
-};
+}
 
-export type DataSVG = {
+export declare type DataSVG = {
     svg: string
 }
