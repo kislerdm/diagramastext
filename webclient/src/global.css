@@ -3,30 +3,6 @@
     border: 0 solid #e5e7eb
 }
 
-:after, :before {
-    --tw-content: "";
-}
-
-a {
-    color: white;
-}
-
-a:link {
-    text-decoration: none;
-}
-
-a:visited {
-    text-decoration: none;
-}
-
-a:hover {
-    text-decoration: none;
-}
-
-a:active {
-    text-decoration: none;
-}
-
 html {
     line-height: 1.5;
     -webkit-text-size-adjust: 100%;
@@ -49,15 +25,34 @@ main {
     width: 800px;
 }
 
-@media only screen and (max-width: 600px) {
+@media only screen and (max-width: 800px) {
     main {
         width: 100%;
     }
 }
 
-header {
-    padding: 1em;
-    width: 100%;
+:after, :before {
+    --tw-content: "";
+}
+
+a {
+    color: white;
+}
+
+a:link {
+    text-decoration: none;
+}
+
+a:visited {
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: none;
+}
+
+a:active {
+    text-decoration: none;
 }
 
 button {
