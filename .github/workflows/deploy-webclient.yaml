@@ -21,8 +21,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-20.04
+    if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master')
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Test
+        run: |
+          npm install
+          npm run test
+
   deploy-stage:
     runs-on: ubuntu-20.04
+    defaults:
+      run:
+        working-directory: "webclient"
+    needs:
+      - test
     environment:
       name: "staging:webclient"
     if: github.ref == 'refs/heads/master' || (github.event.pull_request.merged == 'true' && github.base_ref == 'master' )
@@ -30,6 +47,13 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      - name: Build
+        env:
+          VITE_URL_API: "https://api-stage.diagramastext.dev/c4"
+          VITE_VERSION: ${{ GITHUB_SHA }}
+        run: |
+          npm install
+          npm build
       - name: Sync webclient
         uses: cpina/github-action-push-to-another-repository@v1.5.1
         env:
@@ -38,7 +62,7 @@ jobs:
           target-branch: "master"
           destination-github-username: "kislerdm"
           destination-repository-name: "diagramastext-webclient-stg"
-          source-directory: "webclient"
+          source-directory: "dist"
           target-directory: "webclient"
 
   deploy-prod:
@@ -53,17 +77,18 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Generate webclient
+      - name: Build
         env:
-          API_URL: "https://api.diagramastext.dev/c4"
+          VITE_URL_API: "https://api-stage.diagramastext.dev/c4"
+          VITE_VERSION: ${{ GITHUB_SHA }}
         run: |
-          docker run -e VERSION=$GITHUB_SHA -e API_URL=$API_URL -v ${PWD}:/app -t hairyhenderson/gomplate:stable -f /app/webclient/index.html -o /app/public/index.html
-          cp -r webclient/static public 
+          npm install
+          npm build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: './public'
+          path: './dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
