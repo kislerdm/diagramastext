@@ -1,5 +1,5 @@
 // @ts-ignore
-import {arrow, box, boxText, punch} from './main.module.css';
+import {arrow, box, boxText} from './main.module.css';
 import Footer from "./components/footer";
 import Header from "./components/header";
 import {Config, DataSVG} from "@/ports";
@@ -16,24 +16,6 @@ import logoLinkedin from "./components/svg/linkedin.svg";
 import logoEmail from "./components/svg/email.svg";
 import {User} from "./user";
 import {Loader, Popup} from "./components/popup";
-
-class PromptLengthLimit {
-    Min: number
-    Max: number
-
-    constructor(min: number, max: number) {
-        [min, max] = min < max ? [min, max] : [max, min];
-        this.Min = min
-        this.Max = max
-    }
-}
-
-function definePromptLengthLimit(cfg: Config, user: User): PromptLengthLimit {
-    if (user.is_registered()) {
-        return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserRegistered)
-    }
-    return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserBase)
-}
 
 export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
     const placeholderInputPrompt = "C4 diagram of a Go web server reading from external Postgres database over TCP",
@@ -76,6 +58,14 @@ ${Footer(cfg.version)}
     let _fetchErrorCnt = 0;
     const _fetchErrorCntMax = 2;
     document.getElementById(id.Trigger)!.addEventListener("click", () => {
+        function showError(status: number) {
+            _fetchErrorCnt++;
+            const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please 
+<a href="${generateFeedbackLink(prompt, cfg.version)}"
+    target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>` : mapStatusCode(status);
+            errorPopup.error(errorMsg);
+        }
+
         //@ts-ignore
         const prompt = document.getElementById(id.Input)!.value.trim();
         if (placeholderInputPrompt === prompt && firstTimeTriggered) {
@@ -84,35 +74,33 @@ ${Footer(cfg.version)}
         firstTimeTriggered = false;
         loadingSpinner.show();
         fetch(cfg.urlAPI, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    "prompt": prompt,
-                }),
-            }).then((resp: Response) => {
-                loadingSpinner.hide();
-                if (!resp.ok) {
-                    _fetchErrorCnt++;
-
-                    const errorMsg = _fetchErrorCnt > _fetchErrorCntMax ? `The errors repreat, please 
-<a href="${generateFeedbackLink(prompt, cfg.version)}"
-    target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>` : mapStatusCode(resp.status);
-
-                    errorPopup.error(errorMsg);
-                } else {
-                    _fetchErrorCnt = 0;
-                    resp.json()
-                        .then((data: DataSVG) => {
-                            svg = scaleSVG(data!.svg);
-                            //@ts-ignore
-                            document.getElementById(id.Output).innerHTML = svg;
-                            //@ts-ignore
-                            document.getElementById(id.Download).disabled = false;
-                        })
-                }
-            })
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                "prompt": prompt,
+            }),
+        }).then((resp: Response) => {
+            loadingSpinner.hide();
+            if (!resp.ok) {
+                showError(resp.status);
+            } else {
+                _fetchErrorCnt = 0;
+                resp.json()
+                    .then((data: DataSVG) => {
+                        svg = scaleSVG(data!.svg);
+                        //@ts-ignore
+                        document.getElementById(id.Output).innerHTML = svg;
+                        //@ts-ignore
+                        document.getElementById(id.Download).disabled = false;
+                    })
+            }
+        }).catch((e) => {
+            console.error(e);
+            loadingSpinner.hide();
+            showError(0);
+        });
     })
 
     // download flow
@@ -143,7 +131,29 @@ ${Footer(cfg.version)}
     })
 }
 
-function Input(idInput: string, idTrigger: string, idCounter: string, promptLengthLimit: PromptLengthLimit, placeholder: string): string {
+class PromptLengthLimit {
+    Min: number
+    Max: number
+
+    constructor(min: number, max: number) {
+        [min, max] = min < max ? [min, max] : [max, min];
+        this.Min = min
+        this.Max = max
+    }
+}
+
+function definePromptLengthLimit(cfg: Config, user: User): PromptLengthLimit {
+    if (user.is_registered()) {
+        return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserRegistered)
+    }
+    return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserBase)
+}
+
+function Input(idInput: string,
+               idTrigger: string,
+               idCounter: string,
+               promptLengthLimit: PromptLengthLimit,
+               placeholder: string): string {
     function textAreaLengthMax(v: number): number {
         const multiplier = 1.2;
         return Math.round(v * multiplier);
@@ -156,7 +166,7 @@ function Input(idInput: string, idTrigger: string, idCounter: string, promptLeng
               style="font-size:20px;color:#fff;text-align:left;border-radius:1rem;padding:1rem;width:100%;background:#263950;box-shadow:0 0 3px 3px #2b425e"
               placeholder="Type in the diagram description">${placeholder}</textarea>
     <div style="color:white;text-align:right"><p>Prompt length: <span id="${idCounter}">${placeholder.length}</span> / ${promptLengthLimit.Max} </p></div>
-    <div style="margin-top:-30px"><button id="${idTrigger}">Generate Diagram</button></div>
+    <div style="margin-top:-20px"><button id="${idTrigger}">Generate Diagram</button></div>
 </div>
 `
 }
@@ -238,7 +248,7 @@ function mapStatusCode(status: number) {
         case 429:
             return "The server is experiencing high load, please try later";
         default:
-            return "Unexpected error, please try later";
+            return "Unexpected error, please repeat request";
     }
 }
 
