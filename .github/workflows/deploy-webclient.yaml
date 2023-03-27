@@ -49,8 +49,8 @@ jobs:
       - name: Build
         env:
           VITE_URL_API: "https://api-stage.diagramastext.dev/c4"
-          VITE_VERSION: ${{ GITHUB_SHA }}
         run: |
+          export VITE_VERSION=$GITHUB_SHA
           npm install
           npm build
       - name: Sync webclient
@@ -79,8 +79,8 @@ jobs:
       - name: Build
         env:
           VITE_URL_API: "https://api-stage.diagramastext.dev/c4"
-          VITE_VERSION: ${{ GITHUB_SHA }}
         run: |
+          export VITE_VERSION=$GITHUB_SHA
           npm install
           npm build
 
