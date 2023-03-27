@@ -87,7 +87,9 @@ Thank you! 🙏
 
 - Languages:
     - Go 1.19
-    - JavaScript ES2021
+    - TypeScript, ES2020:
+      - [vite](https://vitejs.dev)
+      - [vitest](https://vitest.dev/)
     - Python 3.9
 - Markup:
     - Markdown
