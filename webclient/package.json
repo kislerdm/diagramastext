@@ -6,7 +6,8 @@
 		"testlive": "VITE_URL_API=http://localhost vitest",
 		"test": "VITE_URL_API=http://localhost vitest run --coverage",
 		"dev": "vite",
-		"build": "vite build"
+		"build": "vite build",
+		"preview": "vite preview"
 	},
 	"devDependencies": {
 		"@julr/vite-plugin-validate-env": "^0.2.2",

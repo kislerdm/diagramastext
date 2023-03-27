@@ -1,6 +1,6 @@
 import { test, assert } from 'vitest'
 
-import {get_fingerprint} from './../src/user';
+import {get_fingerprint} from '@/user';
 
 test('fingerprint: happy path', () => {
     // GIVEN

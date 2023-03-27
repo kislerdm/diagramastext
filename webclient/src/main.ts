@@ -17,6 +17,24 @@ import logoEmail from "./components/svg/email.svg";
 import {User} from "./user";
 import {Loader, Popup} from "./components/popup";
 
+class PromptLengthLimit {
+    Min: number
+    Max: number
+
+    constructor(min: number, max: number) {
+        [min, max] = min < max ? [min, max] : [max, min];
+        this.Min = min
+        this.Max = max
+    }
+}
+
+function definePromptLengthLimit(cfg: Config, user: User): PromptLengthLimit {
+    if (user.is_registered()) {
+        return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserRegistered)
+    }
+    return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserBase)
+}
+
 export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
     const placeholderInputPrompt = "C4 diagram of a Go web server reading from external Postgres database over TCP",
         id = {
@@ -24,7 +42,11 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
             Trigger: "1",
             Output: "2",
             Download: "4",
+            InputLengthCounter: "5",
         };
+
+    const user = new User();
+    const promptLengthLimit = definePromptLengthLimit(cfg, user);
 
     mountPoint.innerHTML = `${Header}
 
@@ -33,7 +55,7 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
     <span style="font-style:italic;font-weight:bold">plain English</span> in no time!
 </div>
 
-${Input(id.Input, id.Trigger, cfg.promptMinLength, cfg.promptMaxLengthUserRegistered, placeholderInputPrompt)}
+${Input(id.Input, id.Trigger, id.InputLengthCounter, promptLengthLimit, placeholderInputPrompt)}
 
 <i class="${arrow}"></i>
 
@@ -45,10 +67,10 @@ ${Footer(cfg.version)}
 `;
 
     let svg = "";
+    let firstTimeTriggered = true;
+
     const errorPopup = new Popup(mountPoint),
         loadingSpinner = new Loader(mountPoint);
-
-    const user = new User();
 
     // diagram generation flow
     let _fetchErrorCnt = 0;
@@ -56,18 +78,12 @@ ${Footer(cfg.version)}
     document.getElementById(id.Trigger)!.addEventListener("click", () => {
         //@ts-ignore
         const prompt = document.getElementById(id.Input)!.value.trim();
-
-        if (placeholderInputPrompt !== prompt) {
-            try {
-                validatePrompt(prompt, user, cfg);
-                // @ts-ignore
-            } catch (e: Error) {
-                errorPopup.error(e.message);
-                return;
-            }
-
-            loadingSpinner.show();
-            fetch(cfg.urlAPI, {
+        if (placeholderInputPrompt === prompt && firstTimeTriggered) {
+            return;
+        }
+        firstTimeTriggered = false;
+        loadingSpinner.show();
+        fetch(cfg.urlAPI, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -97,7 +113,6 @@ ${Footer(cfg.version)}
                         })
                 }
             })
-        }
     })
 
     // download flow
@@ -106,16 +121,42 @@ ${Footer(cfg.version)}
             download(svg)
         }
     })
+
+    // // input length counter update
+    function readInputLength(id: string): number {
+        // @ts-ignore
+        return document.getElementById(id)!.value.length;
+    }
+
+    document.getElementById(id.Input)!.addEventListener("input", () => {
+        const l = readInputLength(id.Input);
+        const span = document.getElementById(id.InputLengthCounter)!;
+        span.innerHTML = l.toString();
+        span.style.color = "#fff";
+        // @ts-ignore
+        document.getElementById(id.Trigger)!.disabled = false;
+        if (l > promptLengthLimit.Max || l < promptLengthLimit.Min) {
+            span.style.color = "red";
+            // @ts-ignore
+            document.getElementById(id.Trigger)!.disabled = true;
+        }
+    })
 }
 
-function Input(idInput: string, idTrigger: string, minLength: number, maxLength: number, placeholder: string): string {
+function Input(idInput: string, idTrigger: string, idCounter: string, promptLengthLimit: PromptLengthLimit, placeholder: string): string {
+    function textAreaLengthMax(v: number): number {
+        const multiplier = 1.2;
+        return Math.round(v * multiplier);
+    }
+
     return `<div class="${box}" style="margin-top:20px">
     <p class="${boxText}">Input:</p>
     <textarea id="${idInput}" 
-              minlength=${minLength} maxlength=${maxLength} rows="3"
+              minlength=${promptLengthLimit.Min} maxlength=${textAreaLengthMax(promptLengthLimit.Max)} rows="3"
               style="font-size:20px;color:#fff;text-align:left;border-radius:1rem;padding:1rem;width:100%;background:#263950;box-shadow:0 0 3px 3px #2b425e"
               placeholder="Type in the diagram description">${placeholder}</textarea>
-    <div><button id="${idTrigger}">Generate Diagram</button></div>
+    <div style="color:white;text-align:right"><p>Prompt length: <span id="${idCounter}">${placeholder.length}</span> / ${promptLengthLimit.Max} </p></div>
+    <div style="margin-top:-30px"><button id="${idTrigger}">Generate Diagram</button></div>
 </div>
 `
 }
@@ -181,23 +222,6 @@ Please describe what should have happened following the actions you described.
     return `${url}?${query}`;
 }
 
-function validatePromptLength(prompt: string, lengthMin: number, lengthMax: number) {
-    if (prompt.length < lengthMin || prompt.length > lengthMax) {
-        throw new RangeError(`The prompt must be between ${lengthMin} and ${lengthMax} characters long`)
-    }
-}
-
-function validatePrompt(prompt: string, user: User, cfg: Config) {
-    switch (user.is_registered()) {
-        case true:
-            validatePromptLength(prompt, cfg.promptMinLength, cfg.promptMaxLengthUserRegistered);
-            break;
-        default:
-            validatePromptLength(prompt, cfg.promptMinLength, cfg.promptMaxLengthUserBase);
-            break;
-    }
-}
-
 function download(svg: string) {
     const link = document.createElement("a");
     link.setAttribute("download", "diagram.svg");
@@ -225,11 +249,11 @@ export function scaleSVG(svg: string): string {
     const parser = new DOMParser();
     let doc = parser.parseFromString(svg, "image/svg+xml")!.querySelector("svg");
     //@ts-ignore
-    doc.style.preserveAspectRatio="xMaxYMax";
+    doc.style.preserveAspectRatio = "xMaxYMax";
     //@ts-ignore
-    doc.style.width="100%";
+    doc.style.width = "100%";
     //@ts-ignore
-    doc.style.height="100%";
+    doc.style.height = "100%";
     //@ts-ignore
     return new XMLSerializer().serializeToString(doc);
 }
