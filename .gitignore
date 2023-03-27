@@ -1,3 +1,4 @@
+.DS_Store
 .idea
 .env*
 .terraform*
@@ -10,3 +11,26 @@ bin
 # http client plugin cfg for local tests
 http-client.private.*json
 *.http
+
+# js
+node_modules
+coverage
+build
+dist
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+.vite

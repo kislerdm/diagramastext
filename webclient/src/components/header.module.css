@@ -1,0 +1,11 @@
+.title {
+    font-size: 50px;
+    margin-top: 30px;
+    color: #363434;
+}
+
+@media only screen and (max-width: 600px) {
+    .title {
+        font-size: 40px;
+    }
+}
