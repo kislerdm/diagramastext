@@ -11,6 +11,10 @@ on:
       - "webclient/**"
   workflow_dispatch:
 
+defaults:
+  run:
+    working-directory: "webclient"
+
 permissions:
   contents: read
   pages: write
@@ -34,9 +38,6 @@ jobs:
 
   deploy-stage:
     runs-on: ubuntu-20.04
-    defaults:
-      run:
-        working-directory: "webclient"
     needs:
       - test
     environment:
