@@ -62,7 +62,7 @@ jobs:
           target-branch: "master"
           destination-github-username: "kislerdm"
           destination-repository-name: "diagramastext-webclient-stg"
-          source-directory: "dist"
+          source-directory: "webclient/dist"
           target-directory: "webclient"
 
   deploy-prod:
