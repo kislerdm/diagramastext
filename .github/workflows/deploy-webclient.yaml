@@ -53,7 +53,7 @@ jobs:
         run: |
           export VITE_VERSION=$GITHUB_SHA
           npm install
-          npm build
+          npm run build
       - name: Sync webclient
         uses: cpina/github-action-push-to-another-repository@v1.5.1
         env:
@@ -83,7 +83,7 @@ jobs:
         run: |
           export VITE_VERSION=$GITHUB_SHA
           npm install
-          npm build
+          npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
