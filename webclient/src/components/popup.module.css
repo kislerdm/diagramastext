@@ -15,9 +15,15 @@
     margin: auto;
     border-radius: 1rem;
     padding: 20px;
-    width: 40%;
+    width: 50%;
     border: 1px solid #888;
     background-color: #fefefe;
+}
+
+@media only screen and (max-width: 600px) {
+    .modalContent {
+        width: 80%;
+    }
 }
 
 .close {
@@ -61,4 +67,3 @@
         transform: rotate(360deg);
     }
 }
-
