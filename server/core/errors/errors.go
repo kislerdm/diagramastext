@@ -1,22 +1,24 @@
 package errors
 
 import (
+	"bytes"
+	"encoding/json"
 	"reflect"
 	"runtime"
 	"strings"
 	"sync"
 )
 
-type err struct {
+type Error struct {
 	mu  sync.Mutex
 	buf []byte
 }
 
-func (e *err) Error() string {
+func (e *Error) Error() string {
 	return string(e.buf)
 }
 
-var std = &err{}
+var std = &Error{}
 
 // New defines the error pointing to the line where it occurred.
 func New(s string) error {
@@ -72,5 +74,29 @@ func itoa(buf *[]byte, i int) {
 }
 
 func IsError(e error, text string) bool {
-	return reflect.DeepEqual(&err{buf: []byte(text)}, e)
+	return reflect.DeepEqual(&Error{buf: []byte(text)}, e)
+}
+
+// ModelPredictionError model prediction error.
+type ModelPredictionError struct {
+	RawJSON []byte
+	msg     string
+}
+
+func (m ModelPredictionError) Error() string {
+	return m.msg
+}
+
+// NewPredictionError create a response object with error response from the model.
+func NewPredictionError(v []byte) error {
+	if !bytes.Contains(v, []byte(`"error"`)) {
+		return nil
+	}
+	var o struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(v, &o); err != nil {
+		return ModelPredictionError{RawJSON: v, msg: string(v)}
+	}
+	return ModelPredictionError{RawJSON: v, msg: o.Error}
 }

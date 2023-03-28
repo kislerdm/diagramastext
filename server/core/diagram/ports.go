@@ -6,8 +6,8 @@ import (
 	"net/http"
 )
 
-// DiagramHandler handler to generate a diagram given the input.
-type DiagramHandler func(ctx context.Context, input Input) (Output, error)
+// HTTPHandler handler to generate a diagram given the input.
+type HTTPHandler func(ctx context.Context, input Input) (Output, error)
 
 // RepositoryPrediction defines the interface to store prediction input (prompt) and model result.
 type RepositoryPrediction interface {

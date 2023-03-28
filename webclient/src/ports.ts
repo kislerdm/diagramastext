@@ -6,6 +6,18 @@ export declare type Config = {
     promptMaxLengthUserRegistered: number
 }
 
-export declare type DataSVG = {
-    svg: string
+export type ResponseSVG = {
+    svg: string;
+}
+
+export type ResponseError = {
+    error: string;
+}
+
+export function IsResponseError(obj: object): obj is ResponseError {
+    return "error" in obj;
+}
+
+export function IsResponseSVG(obj: object): obj is ResponseSVG {
+    return "svg" in obj;
 }

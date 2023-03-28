@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
+	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
@@ -33,7 +34,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 		args    args
 		input   diagram.Input
 		want    diagram.Output
-		wantErr bool
+		wantErr error
 	}{
 		{
 			name: "happy path",
@@ -93,7 +94,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 </g>
 </svg>`),
 			),
-			wantErr: false,
+			wantErr: nil,
 		},
 		{
 			name: "unhappy path: invalid input",
@@ -106,10 +107,10 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 				Err: errors.New("foobar"),
 			},
 			want:    nil,
-			wantErr: true,
+			wantErr: errors.New("foobar"),
 		},
 		{
-			name: "unhappy path: failed to predict",
+			name: "unhappy path: inference error",
 			args: args{
 				clientModelInference: diagram.MockModelInference{
 					Err: errors.New("foobar"),
@@ -124,7 +125,25 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 				},
 			},
 			want:    nil,
-			wantErr: true,
+			wantErr: errors.New("diagram/c4container/c4container.go:76: foobar"),
+		},
+		{
+			name: "unhappy path: failed to predict",
+			args: args{
+				clientModelInference: diagram.MockModelInference{
+					V: []byte(`{"error":"foobar"}`),
+				},
+				clientRepositoryPrediction: diagram.MockRepositoryPrediction{},
+				httpClient:                 diagram.MockHTTPClient{},
+			},
+			input: diagram.MockInput{
+				Prompt: "foobar",
+				User: &diagram.User{
+					ID: "NA",
+				},
+			},
+			want:    nil,
+			wantErr: diagramErrors.NewPredictionError([]byte(`{"error":"foobar"}`)),
 		},
 		{
 			name: "unhappy path: failed to deserialize prediction",
@@ -142,7 +161,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 				},
 			},
 			want:    nil,
-			wantErr: true,
+			wantErr: errors.New("unexpected end of JSON input"),
 		},
 		{
 			name: "unhappy path: failed to render diagram",
@@ -162,7 +181,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 				},
 			},
 			want:    nil,
-			wantErr: true,
+			wantErr: errors.New("diagram/c4container/plantuml.go:41: foobar"),
 		},
 	}
 
@@ -171,7 +190,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				c, err := NewC4ContainersHandler(
+				c, err := NewC4ContainersHTTPHandler(
 					tt.args.clientModelInference, tt.args.clientRepositoryPrediction, tt.args.httpClient,
 				)
 				if err != nil {
@@ -179,12 +198,24 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 				}
 
 				got, err := c(context.TODO(), tt.input)
-				if (err != nil) != tt.wantErr {
-					t.Errorf("NewC4ContainersHandler() error = %v, wantErr %v", err, tt.wantErr)
-					return
-				}
 				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("NewC4ContainersHandler() got = %v, want %v", got, tt.want)
+					t.Errorf("NewC4ContainersHTTPHandler() got = %v, want %v", got, tt.want)
+				}
+
+				var expectedError bool
+				switch err.(type) {
+				case nil:
+					expectedError = tt.wantErr == nil
+				case *json.SyntaxError:
+					expectedError = tt.wantErr != nil && err.Error() == tt.wantErr.Error()
+				case *diagramErrors.Error:
+					expectedError = tt.wantErr != nil && diagramErrors.IsError(err, tt.wantErr.Error())
+				default:
+					expectedError = reflect.DeepEqual(err, tt.wantErr)
+				}
+				if !expectedError {
+					t.Errorf("NewC4ContainersHTTPHandler() error = %v, wantErr %v", err, tt.wantErr)
+					return
 				}
 			},
 		)
@@ -202,7 +233,7 @@ func TestNewC4ContainersHandlerInitUnhappyPath(t *testing.T) {
 			var httpClient diagram.HTTPClient = diagram.MockHTTPClient{}
 
 			// WHEN
-			c, err := NewC4ContainersHandler(clientModelInference, clientRepositoryPrediction, httpClient)
+			c, err := NewC4ContainersHTTPHandler(clientModelInference, clientRepositoryPrediction, httpClient)
 
 			// THEN
 			if c != nil {
@@ -224,7 +255,7 @@ func TestNewC4ContainersHandlerInitUnhappyPath(t *testing.T) {
 			var httpClient diagram.HTTPClient
 
 			// WHEN
-			c, err := NewC4ContainersHandler(clientModelInference, clientRepositoryPrediction, httpClient)
+			c, err := NewC4ContainersHTTPHandler(clientModelInference, clientRepositoryPrediction, httpClient)
 
 			// THEN
 			if c != nil {

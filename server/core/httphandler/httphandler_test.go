@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
+	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 type mockWriter struct {
@@ -42,7 +43,7 @@ func (c *errCollector) Err(err error) {
 
 func Test_httpHandler_ServeHTTP(t *testing.T) {
 	type fields struct {
-		diagramRenderingHandler map[string]diagram.DiagramHandler
+		diagramRenderingHandler map[string]diagram.HTTPHandler
 		corsHeaders             corsHeaders
 	}
 
@@ -52,6 +53,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 
 	var httpHeaders = func(h map[string]string) http.Header {
 		o := http.Header{}
+		o.Add("Content-Type", "application/json")
 		for k, v := range h {
 			o.Add(k, v)
 		}
@@ -162,7 +164,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			name:            "happy path: POST /c4",
 			errorsCollector: &errCollector{},
 			fields: fields{
-				diagramRenderingHandler: map[string]diagram.DiagramHandler{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
 					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return diagram.MockOutput{
 							V: []byte(`{"svg":"foo"}`),
@@ -194,7 +196,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			name:            "happy path: OPTIONS /c4",
 			errorsCollector: &errCollector{},
 			fields: fields{
-				diagramRenderingHandler: map[string]diagram.DiagramHandler{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
 					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
@@ -220,7 +222,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 		{
 			name: "unhappy path: GET /c4, unsupported method",
 			fields: fields{
-				diagramRenderingHandler: map[string]diagram.DiagramHandler{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
 					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
@@ -249,7 +251,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			name:            "unhappy path: POST /c4, faulty input for non registered user",
 			errorsCollector: &errCollector{},
 			fields: fields{
-				diagramRenderingHandler: map[string]diagram.DiagramHandler{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
 					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
@@ -270,8 +272,8 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			},
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
-				StatusCode: http.StatusBadRequest,
-				V:          []byte("wrong request content"),
+				StatusCode: http.StatusUnprocessableEntity,
+				V:          []byte(`{"error":"wrong request content"}`),
 			},
 			wantErr: newValidationError(errors.New("prompt length must be between 3 and 100 characters")),
 		},
@@ -279,7 +281,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			name:            "unhappy path: POST /c4, faulty input JSON deserialization error",
 			errorsCollector: &errCollector{},
 			fields: fields{
-				diagramRenderingHandler: map[string]diagram.DiagramHandler{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
 					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
@@ -301,19 +303,49 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
 				StatusCode: http.StatusUnprocessableEntity,
-				V:          []byte("wrong request content"),
+				V:          []byte(`{"error":"wrong request content"}`),
 			},
 			wantErr: httpHandlerError{
 				Msg:      "faulty JSON",
-				Type:     errorInvalidJSON,
+				Type:     errorInvalidContent,
 				HTTPCode: http.StatusUnprocessableEntity,
 			},
+		},
+		{
+			name:            "unhappy path: POST /c4, model prediction error",
+			errorsCollector: &errCollector{},
+			fields: fields{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+						return nil, diagramErrors.NewPredictionError([]byte(`{"error":"qux"}`))
+					},
+				},
+				corsHeaders: corsHeaders,
+			},
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				r: &http.Request{
+					Method: http.MethodPost,
+					URL: &url.URL{
+						Path: "/c4",
+					},
+					Body: io.NopCloser(strings.NewReader(`{"prompt":"foobar"}`)),
+				},
+			},
+			wantW: &mockWriter{
+				Headers:    httpHeaders(corsHeaders),
+				StatusCode: http.StatusBadRequest,
+				V:          []byte(`{"error":"qux"}`),
+			},
+			wantErr: newModelPredictionError(diagramErrors.NewPredictionError([]byte(`{"error":"qux"}`))),
 		},
 		{
 			name:            "unhappy path: POST /c4, diagram rendering error",
 			errorsCollector: &errCollector{},
 			fields: fields{
-				diagramRenderingHandler: map[string]diagram.DiagramHandler{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
 					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, errors.New("foobar")
 					},
@@ -335,7 +367,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
 				StatusCode: http.StatusInternalServerError,
-				V:          []byte("internal error"),
+				V:          []byte(`{"error":"internal error"}`),
 			},
 			wantErr: newCoreLogicError(errors.New("foobar")),
 		},
@@ -343,7 +375,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			name:            "unhappy path: POST /c4, diagram response serialisation error",
 			errorsCollector: &errCollector{},
 			fields: fields{
-				diagramRenderingHandler: map[string]diagram.DiagramHandler{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
 					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return diagram.MockOutput{Err: errors.New("foobar")}, nil
 					},
@@ -365,15 +397,15 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
 				StatusCode: http.StatusInternalServerError,
-				V:          []byte("internal error"),
+				V:          []byte(`{"error":"internal error"}`),
 			},
-			wantErr: newDiagramSerialisationError(errors.New("foobar")),
+			wantErr: newResponseSerialisationError(errors.New("foobar")),
 		},
 		{
 			name:            "unhappy path: path not found",
 			errorsCollector: &errCollector{},
 			fields: fields{
-				diagramRenderingHandler: map[string]diagram.DiagramHandler{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
 					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
 						return nil, nil
 					},
@@ -394,7 +426,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
 				StatusCode: http.StatusNotFound,
-				V:          []byte("not exists"),
+				V:          []byte(`{"error":"not exists"}`),
 			},
 			wantErr: newHandlerNotExistsError(errors.New("handler not exists for path /notFound")),
 		},

@@ -11,6 +11,7 @@ import (
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/diagram/c4container"
+	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 // NewHTTPHandler initialises HTTP handler.
@@ -20,7 +21,7 @@ func NewHTTPHandler(
 ) (http.Handler, error) {
 	var l = log.New(os.Stderr, "", log.Lmicroseconds|log.LUTC|log.Lshortfile)
 
-	c4DiagramHandler, err := c4container.NewC4ContainersHandler(
+	c4DiagramHandler, err := c4container.NewC4ContainersHTTPHandler(
 		clientModel, clientRepositoryPrediction, httpClientDiagramRendering,
 	)
 	if err != nil {
@@ -28,7 +29,7 @@ func NewHTTPHandler(
 	}
 
 	return &httpHandler{
-		diagramRenderingHandler: map[string]diagram.DiagramHandler{
+		diagramRenderingHandler: map[string]diagram.HTTPHandler{
 			"/c4": c4DiagramHandler,
 		},
 		corsHeaders:   corsHeaders,
@@ -37,7 +38,7 @@ func NewHTTPHandler(
 }
 
 type httpHandler struct {
-	diagramRenderingHandler map[string]diagram.DiagramHandler
+	diagramRenderingHandler map[string]diagram.HTTPHandler
 	reportErrorFn           func(err error)
 	corsHeaders             corsHeaders
 }
@@ -52,6 +53,7 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
 
 	h.corsHeaders.setHeaders(w.Header())
 	w.WriteHeader(status)
+	w.Header().Add("Content-Type", "application/json")
 	_, _ = w.Write(body)
 }
 
@@ -74,7 +76,10 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		renderingHandler, ok := h.diagramRenderingHandler[p]
 		if !ok {
-			h.response(w, []byte("not exists"), newHandlerNotExistsError(errors.New("handler not exists for path "+p)))
+			h.response(
+				w, []byte(`{"error":"not exists"}`),
+				newHandlerNotExistsError(errors.New("handler not exists for path "+p)),
+			)
 			return
 		}
 
@@ -87,19 +92,24 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			defer func() { _ = r.Body.Close() }()
 			input, err := diagram.NewInputDriverHTTP(r.Body, r.Header)
 			if err != nil {
-				h.response(w, []byte("wrong request content"), newValidationError(err))
+				h.response(w, []byte(`{"error":"wrong request content"}`), newValidationError(err))
 				return
 			}
 
-			generatedDiagram, err := renderingHandler(r.Context(), input)
-			if err != nil {
-				h.response(w, []byte("internal error"), newCoreLogicError(err))
+			result, err := renderingHandler(r.Context(), input)
+			switch err.(type) {
+			case nil:
+			case diagramErrors.ModelPredictionError:
+				h.response(w, err.(diagramErrors.ModelPredictionError).RawJSON, newModelPredictionError(err))
+				return
+			default:
+				h.response(w, []byte(`{"error":"internal error"}`), newCoreLogicError(err))
 				return
 			}
 
-			bytes, err := generatedDiagram.Serialize()
+			bytes, err := result.Serialize()
 			if err != nil {
-				h.response(w, []byte("internal error"), newDiagramSerialisationError(err))
+				h.response(w, []byte(`{"error":"internal error"}`), newResponseSerialisationError(err))
 				return
 			}
 
@@ -131,19 +141,26 @@ func (h corsHeaders) setHeaders(header http.Header) {
 }
 
 const (
-	errorInvalidMethod           = "Request:InvalidMethod"
-	errorNotExists               = "Request:HandlerNotExists"
-	errorInvalidJSON             = "InputValidation:InvalidJSON"
-	errorValidJSONInvalidContent = "InputValidation:InvalidContent"
-	errorCoreLogic               = "Core:DiagramRendering"
-	errorResponseSerialisation   = "Response:DiagramSerialisation"
+	errorInvalidMethod         = "Request:InvalidMethod"
+	errorNotExists             = "Request:HandlerNotExists"
+	errorInvalidContent        = "InputValidation:InvalidContent"
+	errorCoreLogic             = "Core:DiagramRendering"
+	errorResponseSerialisation = "Response:DiagramSerialisation"
 )
 
-func newDiagramSerialisationError(err error) error {
+func newResponseSerialisationError(err error) error {
 	return httpHandlerError{
 		Msg:      err.Error(),
 		Type:     errorResponseSerialisation,
 		HTTPCode: http.StatusInternalServerError,
+	}
+}
+
+func newModelPredictionError(err error) error {
+	return httpHandlerError{
+		Msg:      err.Error(),
+		Type:     errorCoreLogic,
+		HTTPCode: http.StatusBadRequest,
 	}
 }
 
@@ -172,19 +189,18 @@ func newInvalidMethodError(err error) error {
 }
 
 func newValidationError(err error) error {
+	msg := err.Error()
+
 	switch err.(type) {
 	case *json.SyntaxError:
-		return httpHandlerError{
-			Msg:      "faulty JSON",
-			Type:     errorInvalidJSON,
-			HTTPCode: http.StatusUnprocessableEntity,
-		}
+		msg = "faulty JSON"
 	default:
-		return httpHandlerError{
-			Msg:      err.Error(),
-			Type:     errorValidJSONInvalidContent,
-			HTTPCode: http.StatusBadRequest,
-		}
+	}
+
+	return httpHandlerError{
+		Msg:      msg,
+		Type:     errorInvalidContent,
+		HTTPCode: http.StatusUnprocessableEntity,
 	}
 }
 

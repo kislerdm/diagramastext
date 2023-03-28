@@ -53,11 +53,11 @@ type rel struct {
 	Technology string `json:"technology,omitempty"`
 }
 
-// NewC4ContainersHandler initialises the handler to generate C4 containers diagram.
-func NewC4ContainersHandler(
+// NewC4ContainersHTTPHandler initialises the handler to generate C4 containers diagram.
+func NewC4ContainersHTTPHandler(
 	clientModelInference diagram.ModelInference, clientRepositoryPrediction diagram.RepositoryPrediction,
 	httpClient diagram.HTTPClient,
-) (diagram.DiagramHandler, error) {
+) (diagram.HTTPHandler, error) {
 	if clientModelInference == nil {
 		return nil, errors.New("model inference client must be provided")
 	}
@@ -86,6 +86,10 @@ func NewC4ContainersHandler(
 			}
 		}
 
+		if err := errors.NewPredictionError(diagramPrediction); err != nil {
+			return nil, err
+		}
+
 		var diagramGraph c4ContainersGraph
 		if err := json.Unmarshal(diagramPrediction, &diagramGraph); err != nil {
 			return nil, err
@@ -97,6 +101,7 @@ func NewC4ContainersHandler(
 		}
 
 		return diagram.NewResultSVG(diagramPostRendering)
+
 	}, nil
 }
 
@@ -119,7 +124,7 @@ const contentSystem =
 	`Every node has id,label,group,technology as strings, and external,queue,database,user as bool.` +
 	`Every link connects nodes using their id:from,to. It also has label,technology and direction as strings.` +
 	`Every json has title and footer as string.` +
-	`Output JSON only.` + "\n" +
+	`Output JSON. If error, return {"error": {{detailed decision explanation}} }` + "\n" +
 
 	// example
 	`Draw c4 container diagram with four containers,thee of which are external and belong to the system X.
@@ -173,4 +178,9 @@ const contentSystem =
 	`{"id":"1","label":"WebClient","technology":"JavaScript"},` +
 	`{"id":"2","label":"Backend","technology":"Go"}],` +
 	`"links":[{"from":"0","to":"1","label":"Uses","technology":"HTTP","direction":"LR"},` +
-	`{"from":"1","to":"2","label":"Uses","technology":"HTTP","direction":"LR"}]}`
+	`{"from":"1","to":"2","label":"Uses","technology":"HTTP","direction":"LR"}]}` +
+
+	// example
+	`anna calls bob` + "\n" +
+	`{"nodes":[{"id":"0","label":"Anna","user":true},{"id":"1","label":"Bob","user":true}],` +
+	`"links":[{"from":"0","to":"1","label":"Calls","technology":"Phone","direction":"LR"}]`
