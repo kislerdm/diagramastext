@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- User input validation according to the user status, i.e. registered/non-registered split
+- User fingerprint
+- Improved user feedback in case the model fails to predict a graph
+
+### Changed
+
+- Refactored the webclient codebase:
+  - typescript
+  - vite
+  - tests coverage improvement
+
 ## [0.0.4] - 2023-03-23
 
 ### Added
