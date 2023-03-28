@@ -2,7 +2,7 @@
 import {arrow, box, boxText} from './main.module.css';
 import Footer from "./components/footer";
 import Header from "./components/header";
-import {Config, DataSVG} from "@/ports";
+import {Config, IsResponseError, IsResponseSVG} from "./ports";
 
 // @ts-ignore
 import placeholderOutputSVG from "./components/svg/output-placeholder.svg?raw";
@@ -58,11 +58,10 @@ ${Footer(cfg.version)}
     let _fetchErrorCnt = 0;
     const _fetchErrorCntMax = 2;
     document.getElementById(id.Trigger)!.addEventListener("click", () => {
-        function showError(status: number) {
-            _fetchErrorCnt++;
+        function showError(status: number = 0, msg: string = "") {
             const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please 
 <a href="${generateFeedbackLink(prompt, cfg.version)}"
-    target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>` : mapStatusCode(status);
+    target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>` : mapStatusCode(status, msg);
             errorPopup.error(errorMsg);
         }
 
@@ -82,24 +81,32 @@ ${Footer(cfg.version)}
                 "prompt": prompt,
             }),
         }).then((resp: Response) => {
-            loadingSpinner.hide();
             if (!resp.ok) {
-                showError(resp.status);
+                _fetchErrorCnt++;
             } else {
                 _fetchErrorCnt = 0;
-                resp.json()
-                    .then((data: DataSVG) => {
-                        svg = scaleSVG(data!.svg);
+            }
+
+            loadingSpinner.hide();
+            resp.json()
+                .then((data: any) => {
+                    if (IsResponseError(data)) {
+                        showError(resp.status, data.error);
+                    } else if (IsResponseSVG(data)) {
+                        svg = scaleSVG(data.svg);
                         //@ts-ignore
                         document.getElementById(id.Output).innerHTML = svg;
                         //@ts-ignore
                         document.getElementById(id.Download).disabled = false;
-                    })
-            }
+                    } else {
+                        throw new Error("response data type not recognized")
+                    }
+                })
+
         }).catch((e) => {
             console.error(e);
             loadingSpinner.hide();
-            showError(0);
+            showError();
         });
     })
 
@@ -239,16 +246,25 @@ function download(svg: string) {
     link.click();
 }
 
-function mapStatusCode(status: number) {
+function mapStatusCode(status: number, msg: string): string {
+    function fallback(fallback: string): string {
+        if (msg.length > 0) {
+            return msg;
+        }
+        return fallback;
+    }
+
     switch (status) {
         case 400:
-            return "Unexpected prompt length";
+            return fallback("Model processing error");
         case 404:
-            return "Faulty path";
+            return fallback("Faulty path");
+        case 422:
+            return fallback("Faulty input");
         case 429:
-            return "The server is experiencing high load, please try later";
+            return fallback("The server is experiencing high load, please try later");
         default:
-            return "Unexpected error, please repeat request";
+            return fallback("Unexpected error, please repeat request");
     }
 }
 
