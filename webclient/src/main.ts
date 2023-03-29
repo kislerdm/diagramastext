@@ -17,14 +17,23 @@ import logoEmail from "./components/svg/email.svg";
 import {User} from "./user";
 import {Loader, Popup} from "./components/popup";
 
+function findElementByID(elements: HTMLCollectionOf<HTMLElement>, id: string): HTMLElement | null {
+    for (let i = 0; i < elements.length; i++) {
+        const element = elements.item(i);
+        if (element != null && element.id == id) {
+            return element;
+        }
+    }
+    return null;
+}
+
 export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
     const placeholderInputPrompt = "C4 diagram of a Go web server reading from external Postgres database over TCP",
         id = {
-            Input: "0",
-            Trigger: "1",
-            Output: "2",
-            Download: "4",
-            InputLengthCounter: "5",
+            Trigger: "0",
+            Output: "1",
+            Download: "2",
+            InputLengthCounter: "3"
         };
 
     const user = new User();
@@ -37,7 +46,7 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
     <span style="font-style:italic;font-weight:bold">plain English</span> in no time!
 </div>
 
-${Input(id.Input, id.Trigger, id.InputLengthCounter, promptLengthLimit, placeholderInputPrompt)}
+${Input(id.Trigger, id.InputLengthCounter, promptLengthLimit, placeholderInputPrompt)}
 
 <i class="${arrow}"></i>
 
@@ -57,7 +66,22 @@ ${Footer(cfg.version)}
     // diagram generation flow
     let _fetchErrorCnt = 0;
     const _fetchErrorCntMax = 2;
-    document.getElementById(id.Trigger)!.addEventListener("click", () => {
+
+    const inputBox: Element = mountPoint.getElementsByClassName(box)[0];
+    const input: HTMLTextAreaElement = inputBox.getElementsByTagName("textarea")[0];
+    const triggerBtn: HTMLElement | null = findElementByID(
+        inputBox!.getElementsByTagName("button"),
+        id.Trigger,
+    )
+
+    const outputBox: Element = mountPoint.getElementsByClassName(box)[1];
+    const output: HTMLElement | null = findElementByID(outputBox.getElementsByTagName("div"), id.Output);
+    const downloadBtn: HTMLElement | null = findElementByID(
+        outputBox!.getElementsByTagName("button"),
+        id.Download,
+    )
+
+    triggerBtn!.addEventListener("click", () => {
         function showError(status: number = 0, msg: string = "") {
             const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please 
 <a href="${generateFeedbackLink(prompt, cfg.version)}"
@@ -66,7 +90,7 @@ ${Footer(cfg.version)}
         }
 
         //@ts-ignore
-        const prompt = document.getElementById(id.Input)!.value.trim();
+        const prompt = input!.value.trim();
         if (placeholderInputPrompt === prompt && firstTimeTriggered) {
             return;
         }
@@ -95,9 +119,9 @@ ${Footer(cfg.version)}
                     } else if (IsResponseSVG(data)) {
                         svg = scaleSVG(data.svg);
                         //@ts-ignore
-                        document.getElementById(id.Output).innerHTML = svg;
+                        output!.innerHTML = svg;
                         //@ts-ignore
-                        document.getElementById(id.Download).disabled = false;
+                        downloadBtn!.disabled = false;
                     } else {
                         throw new Error("response data type not recognized")
                     }
@@ -111,29 +135,31 @@ ${Footer(cfg.version)}
     })
 
     // download flow
-    document.getElementById(id.Download)!.addEventListener("click", () => {
+    downloadBtn!.addEventListener("click", () => {
         if (svg !== "") {
-            download(svg)
+            const link = mountPoint.getElementsByTagName("a")[0]!;
+            link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
+            link.click();
         }
     })
 
-    // // input length counter update
-    function readInputLength(id: string): number {
+    // input length counter update
+    function readInputLength(input: HTMLTextAreaElement): number {
         // @ts-ignore
-        return document.getElementById(id)!.value.length;
+        return input!.value.trim().length;
     }
 
-    document.getElementById(id.Input)!.addEventListener("input", () => {
-        const l = readInputLength(id.Input);
-        const span = document.getElementById(id.InputLengthCounter)!;
+    input!.addEventListener("input", () => {
+        const l = readInputLength(input);
+        const span = findElementByID(inputBox.getElementsByTagName("span"), id.InputLengthCounter)!;
         span.innerHTML = l.toString();
         span.style.color = "#fff";
         // @ts-ignore
-        document.getElementById(id.Trigger)!.disabled = false;
+        triggerBtn!.disabled = false;
         if (l > promptLengthLimit.Max || l < promptLengthLimit.Min) {
             span.style.color = "red";
             // @ts-ignore
-            document.getElementById(id.Trigger)!.disabled = true;
+            triggerBtn!.disabled = true;
         }
     })
 }
@@ -156,8 +182,7 @@ function definePromptLengthLimit(cfg: Config, user: User): PromptLengthLimit {
     return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserBase)
 }
 
-function Input(idInput: string,
-               idTrigger: string,
+function Input(idTrigger: string,
                idCounter: string,
                promptLengthLimit: PromptLengthLimit,
                placeholder: string): string {
@@ -168,8 +193,7 @@ function Input(idInput: string,
 
     return `<div class="${box}" style="margin-top:20px">
     <p class="${boxText}">Input:</p>
-    <textarea id="${idInput}" 
-              minlength=${promptLengthLimit.Min} maxlength=${textAreaLengthMax(promptLengthLimit.Max)} rows="3"
+    <textarea minlength=${promptLengthLimit.Min} maxlength=${textAreaLengthMax(promptLengthLimit.Max)} rows="3"
               style="font-size:20px;color:#fff;text-align:left;border-radius:1rem;padding:1rem;width:100%;background:#263950;box-shadow:0 0 3px 3px #2b425e"
               placeholder="Type in the diagram description">${placeholder}</textarea>
     <div style="color:white;text-align:right"><p>Prompt length: <span id="${idCounter}">${placeholder.length}</span> / ${promptLengthLimit.Max} </p></div>
@@ -185,7 +209,10 @@ function Output(idOutput: string, idDownload: string, svg: string): string {
     <div id="${idOutput}" 
     style="border:solid #2d4765 2px;background:white;box-shadow:0 0 3px 3px #2b425e; width:inherit"
 >${svg}</div>
-    <div><button id="${idDownload}" disabled>Download</button></div>
+    <div>
+        <button id="${idDownload}" disabled>Download</button>
+        <a download="diagram.svg" href="data:image/svg+xml,${encodeURIComponent(svg)}">
+    </div>
 </div>
 `
 }
@@ -237,13 +264,6 @@ Please describe what should have happened following the actions you described.
     const query = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
 
     return `${url}?${query}`;
-}
-
-function download(svg: string) {
-    const link = document.createElement("a");
-    link.setAttribute("download", "diagram.svg");
-    link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
-    link.click();
 }
 
 function mapStatusCode(status: number, msg: string): string {
