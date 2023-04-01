@@ -2,14 +2,14 @@
 import {modal, modalContent, close, loader} from "./popup.module.css";
 
 export class Popup {
-    constructor(mountPoint: HTMLDivElement) {
-        mountPoint.innerHTML += `
+    mount(): string {
+        return `
 <div class="${modal}">
     <div class="${modalContent}">
         <span class="${close}">&times;</span>
         <div id="modalMsg"></div>
     </div>
-</div>`
+</div>`;
     }
 
     show(msg: string) {
@@ -47,11 +47,11 @@ export class Popup {
 }
 
 export class Loader {
-    constructor(mountPoint: HTMLDivElement) {
-        mountPoint.innerHTML += `<div id="loader" class="${modal}">
+    mount(): string {
+        return `<div id="loader" class="${modal}">
 <div class="${modalContent}" style="width:150px;margin-top:200px;border:none;box-shadow:none;background:none">
 <div class="${loader}"></div>
-</div></div>`
+</div></div>`;
     }
 
     show() {

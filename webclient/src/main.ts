@@ -17,14 +17,14 @@ import logoEmail from "./components/svg/email.svg";
 import {User} from "./user";
 import {Loader, Popup} from "./components/popup";
 
-function findElementByID(elements: HTMLCollectionOf<HTMLElement>, id: string): HTMLElement | null {
+function findElementByID(elements: HTMLCollectionOf<HTMLElement>, id: string): HTMLElement | undefined {
     for (let i = 0; i < elements.length; i++) {
         const element = elements.item(i);
         if (element != null && element.id == id) {
             return element;
         }
     }
-    return null;
+    return undefined
 }
 
 export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
@@ -38,6 +38,8 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
 
     const user = new User();
     const promptLengthLimit = definePromptLengthLimit(cfg, user);
+    const errorPopup = new Popup(),
+        loadingSpinner = new Loader();
 
     mountPoint.innerHTML = `${Header}
 
@@ -54,36 +56,38 @@ ${Output(id.Output, id.Download, placeholderOutputSVG)}
 
 ${Disclaimer}
 
+<div>
+${errorPopup.mount()}
+${loadingSpinner.mount()}
+</div>
+
 ${Footer(cfg.version)}
 `;
 
     let svg = "";
     let firstTimeTriggered = true;
 
-    const errorPopup = new Popup(mountPoint),
-        loadingSpinner = new Loader(mountPoint);
-
     // diagram generation flow
     let _fetchErrorCnt = 0;
     const _fetchErrorCntMax = 2;
 
-    const inputBox: Element = mountPoint.getElementsByClassName(box)[0];
-    const input: HTMLTextAreaElement = inputBox.getElementsByTagName("textarea")[0];
-    const triggerBtn: HTMLElement | null = findElementByID(
-        inputBox!.getElementsByTagName("button"),
+    const inputBox: Element = mountPoint.getElementsByClassName(box)[0]!;
+    const input: HTMLTextAreaElement = inputBox.getElementsByTagName("textarea")[0]!;
+    const triggerBtn: HTMLElement = findElementByID(
+        inputBox.getElementsByTagName("button"),
         id.Trigger,
-    )
+    )!;
 
-    const outputBox: Element = mountPoint.getElementsByClassName(box)[1];
-    const output: HTMLElement | null = findElementByID(outputBox.getElementsByTagName("div"), id.Output);
-    const downloadBtn: HTMLElement | null = findElementByID(
+    const outputBox: Element = mountPoint.getElementsByClassName(box)[1]!;
+    const output: HTMLElement = findElementByID(outputBox.getElementsByTagName("div"), id.Output)!;
+    const downloadBtn: HTMLElement = findElementByID(
         outputBox!.getElementsByTagName("button"),
         id.Download,
-    )
+    )!;
 
-    triggerBtn!.addEventListener("click", () => {
+    triggerBtn.addEventListener("click", () => {
         function showError(status: number = 0, msg: string = "") {
-            const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please 
+            const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please
 <a href="${generateFeedbackLink(prompt, cfg.version)}"
     target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>` : mapStatusCode(status, msg);
             errorPopup.error(errorMsg);
@@ -135,7 +139,7 @@ ${Footer(cfg.version)}
     })
 
     // download flow
-    downloadBtn!.addEventListener("click", () => {
+    downloadBtn.addEventListener("click", () => {
         if (svg !== "") {
             const link = mountPoint.getElementsByTagName("a")[0]!;
             link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
@@ -149,7 +153,7 @@ ${Footer(cfg.version)}
         return input!.value.trim().length;
     }
 
-    input!.addEventListener("input", () => {
+    input.addEventListener("input", () => {
         const l = readInputLength(input);
         const span = findElementByID(inputBox.getElementsByTagName("span"), id.InputLengthCounter)!;
         span.innerHTML = l.toString();
@@ -164,7 +168,7 @@ ${Footer(cfg.version)}
     })
 }
 
-class PromptLengthLimit {
+export class PromptLengthLimit {
     Min: number
     Max: number
 
@@ -182,7 +186,7 @@ function definePromptLengthLimit(cfg: Config, user: User): PromptLengthLimit {
     return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserBase)
 }
 
-function Input(idTrigger: string,
+export function Input(idTrigger: string,
                idCounter: string,
                promptLengthLimit: PromptLengthLimit,
                placeholder: string): string {

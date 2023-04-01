@@ -1,4 +1,5 @@
-import {describe, it} from 'vitest'
+import {assert, describe, it} from 'vitest'
+// @ts-ignore
 import {JSDOM} from 'jsdom';
 import Footer from "./../src/components/footer";
 import {equal} from "assert";
@@ -27,7 +28,7 @@ describe('Footer component with version', () => {
     it('p tags - copyright', () => {
         const copyright = pElements[0];
         equal(copyright!.style.fontSize, "16px", "unexpected fontsize of the copyright string")
-        console.assert(wantCopyrightFn(copyright!.innerHTML), "unexpected copyright content")
+        assert(wantCopyrightFn(copyright!.innerHTML), "unexpected copyright content")
     })
 
     it('p tags - version', () => {
@@ -60,6 +61,6 @@ describe('Footer component without version', () => {
     it('p tags - copyright', () => {
         const copyright = pElements[0];
         equal(copyright!.style.fontSize, "16px", "unexpected fontsize of the copyright string")
-        console.assert(wantCopyrightFn(copyright!.innerHTML), "unexpected copyright content")
+        assert(wantCopyrightFn(copyright!.innerHTML), "unexpected copyright content")
     })
 })
