@@ -4,6 +4,8 @@ import {JSDOM} from 'jsdom';
 import Main, {Input, PromptLengthLimit} from "./../src/main";
 import {Config} from "./../src/ports";
 import {equal} from "assert";
+// @ts-ignore
+import {arrow, box, boxText} from './../src/main.module.css';
 
 function filterByClassName(elements: HTMLCollectionOf<Element>, className: string): Array<Element> {
     let o: Array<Element> = [];
@@ -15,7 +17,7 @@ function filterByClassName(elements: HTMLCollectionOf<Element>, className: strin
     return o;
 }
 
-describe("Main page", () => {
+describe("Main page structure", () => {
     //GIVEN
     const mountPoint = new JSDOM("<main></main>").window.document.querySelector<HTMLDivElement>("main")!;
     const cfg: Config = {
@@ -34,58 +36,59 @@ describe("Main page", () => {
     const divs = mountPoint.getElementsByTagName("div"),
         boxes = filterByClassName(divs, "box");
 
-    it("should contain tags", () => {
-        equal(mountPoint.getElementsByTagName("header").length, 1, "single 'header' element expected")
-        equal(mountPoint.getElementsByTagName("footer").length, 1, "single 'footer' element expected")
-        equal(mountPoint.getElementsByTagName("span").length, 7, "7 'span' elements expected")
-        equal(mountPoint.getElementsByTagName("a").length, 10, "10 'a' elements expected")
-
-        equal(divs.length, 16, "16 'div' elements expected")
-        equal(boxes.length, 3, "three boxes expected")
-        equal(filterByClassName(divs, "modal")!.length, 2, "two popups expected")
-
-        // input
-        equal(mountPoint.getElementsByTagName("textarea").length, 1, "single textarea expected")
-
-        // output
-        equal(mountPoint.getElementsByTagName("svg").length, 1, "svg output expected")
+    it("should contain three boxes", () => {
+        equal(boxes.length, 3)
     })
 
-    it("should have the elements ordered", () => {
-        equal(mountPoint.children[0].tagName, "HEADER", "header is expected to be in the top")
-        assert(mountPoint.children[1].innerHTML.trim().startsWith("Generate"),
-            "the punchline is expected to be right after the header")
-
-        equal(mountPoint.children[mountPoint.children.length - 1].tagName, "FOOTER",
-            "header is expected to be in the bottom",
-        )
-        equal(boxes[0].getElementsByTagName("textarea").length, 1,
-            "input box is expected to be the first",
-        )
-        equal(boxes[1].getElementsByTagName("button")[0]!.innerHTML, "Download",
-            "output box is expected to be the second",
-        )
-        assert(boxes[2].innerHTML.includes("Please get in touch"), "disclaimer box is expected to be the third")
+    it("should have two popups mounted", () => {
+        equal(filterByClassName(divs, "modal")!.length, 2)
     })
 
-    it("should have the buttons", () => {
-        const btn = mountPoint.getElementsByTagName("button");
+    it("should have header in the top", () => {
+        equal(mountPoint.children[0].tagName, "HEADER")
+    })
 
-        equal(btn.length, 2)
+    it("should have punchline after the header", () => {
+        assert(mountPoint.children[1].innerHTML.trim().startsWith("Generate"))
+    })
 
+    it("should have the input box after the punchline", () => {
+        equal(boxes[0].getElementsByTagName("textarea").length, 1)
+    })
+
+    it("should have the output box after the input", () => {
+        equal(boxes[1].getElementsByTagName("button")[0]!.innerHTML, "Download")
+    })
+
+    it("should have the arrow between the input and output", () => {
+        equal(mountPoint.getElementsByTagName("i")[0]!.className, "arrow")
+    })
+
+    it("should have the disclaimer box after the output", () => {
+        assert(boxes[2].innerHTML.includes("Please get in touch"))
+    })
+
+    it("should have footer in the bottom", () => {
+        equal(mountPoint.children[mountPoint.children.length - 1].tagName, "FOOTER")
+    })
+
+    const btn = mountPoint.getElementsByTagName("button");
+    it("should have trigger btn to generate diagram", () => {
         equal(btn[0]!.innerHTML, "Generate Diagram", "trigger button expected");
         expect(!btn[0]!.disabled, "trigger button is expected to be enabled")
+    })
 
+    it("should have trigger btn to download generated diagram", () => {
         equal(btn[1]!.innerHTML, "Download", "download button expected")
         expect(btn[1]!.disabled, "download button is expected to be disabled")
     })
 })
 
-describe("Input box", () => {
+describe("Input structure", () => {
     //GIVEN
     const idTrigger = "foo";
     const idCounter = "bar";
-    const promptLengthLimit = new PromptLengthLimit(10, 100);
+    const promptLengthLimit = new PromptLengthLimit(1, 100);
     const placeholder = "qux";
 
     //WHEN
@@ -93,6 +96,18 @@ describe("Input box", () => {
 
     //THEN
     const input = new JSDOM(got).window.document.querySelector("div")!;
+
+    it("should have a single text element", () => {
+        equal(input.getElementsByTagName("textarea").length, 1)
+    })
+
+    it("should have two div elements", () => {
+        equal(input.getElementsByTagName("div").length, 2)
+    })
+
+    it("should have two p elements", () => {
+        equal(input.getElementsByTagName("p").length, 2)
+    })
 
     it("should have inline style", () => {
         equal(input.getAttribute("style"), "margin-top:20px")
@@ -148,5 +163,39 @@ describe("Input box", () => {
     })
 
     const counter = input.children[2].children[0];
-    assert(counter.innerHTML.trim().startsWith("Prompt length:"), "unexpected counter")
+    it("should have prompt length indicator:text prefix", () => {
+        assert(counter.innerHTML.trim().startsWith("Prompt length:"))
+    })
+
+    const counterLengthIndicator = counter.getElementsByTagName("span")[0];
+    it("should have prompt length indicator:min:id", () => {
+        equal(counterLengthIndicator.id, idCounter)
+    })
+
+    it("should have prompt length indicator:min:content", () => {
+        equal(counterLengthIndicator.innerHTML, placeholder.length)
+    })
+
+    it("should have prompt length indicator:max:content", () => {
+        assert(counter.innerHTML.trim().endsWith(`${promptLengthLimit.Max}`))
+    })
+
+    it("should have prompt length indicator:slash-between-min-max", () => {
+        assert(counter!.innerHTML.replace(`${promptLengthLimit.Max}`, "").trim().endsWith("/"))
+    })
+
+    const divs = input.getElementsByTagName("div"),
+        divBtn = divs[divs.length-1];
+    it("should have the trigger button in the bottom", () => {
+        assert(divBtn.children[0].tagName, "BUTTON")
+        assert(divBtn.children[0].id, idTrigger)
+    })
+
+    it("should have the trigger button with defined id", () => {
+        assert(divBtn.children[0].id, idTrigger)
+    })
+
+    it("should have the button's margins shrank", () => {
+        assert(divBtn.style.marginTop, "-20px")
+    })
 })
