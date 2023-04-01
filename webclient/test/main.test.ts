@@ -3,9 +3,6 @@ import {assert, describe, expect, it} from 'vitest'
 import {JSDOM} from 'jsdom';
 import Main, {Input, PromptLengthLimit} from "./../src/main";
 import {Config} from "./../src/ports";
-import {equal} from "assert";
-// @ts-ignore
-import {arrow, box, boxText} from './../src/main.module.css';
 
 function filterByClassName(elements: HTMLCollectionOf<Element>, className: string): Array<Element> {
     let o: Array<Element> = [];
@@ -37,15 +34,15 @@ describe("Main page structure", () => {
         boxes = filterByClassName(divs, "box");
 
     it("should contain three boxes", () => {
-        equal(boxes.length, 3)
+        assert.equal(boxes.length, 3)
     })
 
     it("should have two popups mounted", () => {
-        equal(filterByClassName(divs, "modal")!.length, 2)
+        assert.equal(filterByClassName(divs, "modal")!.length, 2)
     })
 
     it("should have header in the top", () => {
-        equal(mountPoint.children[0].tagName, "HEADER")
+        assert.equal(mountPoint.children[0].tagName, "HEADER")
     })
 
     it("should have punchline after the header", () => {
@@ -53,15 +50,15 @@ describe("Main page structure", () => {
     })
 
     it("should have the input box after the punchline", () => {
-        equal(boxes[0].getElementsByTagName("textarea").length, 1)
+        assert.equal(boxes[0].getElementsByTagName("textarea").length, 1)
     })
 
     it("should have the output box after the input", () => {
-        equal(boxes[1].getElementsByTagName("button")[0]!.innerHTML, "Download")
+        assert.equal(boxes[1].getElementsByTagName("button")[0]!.innerHTML, "Download")
     })
 
     it("should have the arrow between the input and output", () => {
-        equal(mountPoint.getElementsByTagName("i")[0]!.className, "arrow")
+        assert.equal(mountPoint.getElementsByTagName("i")[0]!.className, "arrow")
     })
 
     it("should have the disclaimer box after the output", () => {
@@ -69,17 +66,17 @@ describe("Main page structure", () => {
     })
 
     it("should have footer in the bottom", () => {
-        equal(mountPoint.children[mountPoint.children.length - 1].tagName, "FOOTER")
+        assert.equal(mountPoint.children[mountPoint.children.length - 1].tagName, "FOOTER")
     })
 
     const btn = mountPoint.getElementsByTagName("button");
     it("should have trigger btn to generate diagram", () => {
-        equal(btn[0]!.innerHTML, "Generate Diagram", "trigger button expected");
+        assert.equal(btn[0]!.innerHTML, "Generate Diagram", "trigger button expected");
         expect(!btn[0]!.disabled, "trigger button is expected to be enabled")
     })
 
     it("should have trigger btn to download generated diagram", () => {
-        equal(btn[1]!.innerHTML, "Download", "download button expected")
+        assert.equal(btn[1]!.innerHTML, "Download", "download button expected")
         expect(btn[1]!.disabled, "download button is expected to be disabled")
     })
 })
@@ -98,59 +95,59 @@ describe("Input structure", () => {
     const input = new JSDOM(got).window.document.querySelector("div")!;
 
     it("should have a single text element", () => {
-        equal(input.getElementsByTagName("textarea").length, 1)
+        assert.equal(input.getElementsByTagName("textarea").length, 1)
     })
 
     it("should have two div elements", () => {
-        equal(input.getElementsByTagName("div").length, 2)
+        assert.equal(input.getElementsByTagName("div").length, 2)
     })
 
     it("should have two p elements", () => {
-        equal(input.getElementsByTagName("p").length, 2)
+        assert.equal(input.getElementsByTagName("p").length, 2)
     })
 
     it("should have inline style", () => {
-        equal(input.getAttribute("style"), "margin-top:20px")
+        assert.equal(input.getAttribute("style"), "margin-top:20px")
     })
 
     it("should have four children", () => {
-        equal(input.children.length, 4)
+        assert.equal(input.children.length, 4)
     })
 
     it("should have proper label", () => {
-        equal(input.children[0].textContent, "Input:", "unexpected label")
+        assert.equal(input.children[0].textContent, "Input:", "unexpected label")
     })
 
     it("should have the textarea", () => {
-        equal(input.children[1].tagName, "TEXTAREA", "input textarea is expected")
+        assert.equal(input.children[1].tagName, "TEXTAREA", "input textarea is expected")
     })
 
     it("should have the textarea:style", () => {
         const wantStyle = "font-size:20px;color:#fff;text-align:left;border-radius:1rem;padding:1rem;width:100%;background:#263950;box-shadow:0 0 3px 3px #2b425e"
-        equal(input.children[1].getAttribute("style"), wantStyle, "unexpected style")
+        assert.equal(input.children[1].getAttribute("style"), wantStyle)
     })
 
 
     it("should have the textarea:size-rows", () => {
-        equal(input.children[1].getAttribute("rows"), 3, "unexpected number textarea rows")
+        assert.equal(input.children[1].getAttribute("rows"), "3")
     })
 
     it("should have the textarea:size-minlength", () => {
-        equal(input.children[1].getAttribute("minlength"), promptLengthLimit.Min, "unexpected minlength")
+        assert.equal(input.children[1].getAttribute("minlength"), `${promptLengthLimit.Min}`)
     })
 
     it("should have the textarea:size-maxlength", () => {
         const maxLengthMultiplier = 1.2;
-        equal(input.children[1].getAttribute("maxlength"), promptLengthLimit.Max * maxLengthMultiplier,
-            "unexpected maxlength")
+        assert.equal(input.children[1].getAttribute("maxlength"),
+            `${promptLengthLimit.Max * maxLengthMultiplier}`)
     })
 
     it("should have the textarea:placeholder", () => {
-        equal(input.children[1].getAttribute("placeholder"), "Type in the diagram description")
+        assert(input.children[1].getAttribute("placeholder"))
     })
 
     it("should have the textarea:placeholder-predefined-input", () => {
-        equal(input.children[1].innerHTML, placeholder)
+        assert.equal(input.children[1].innerHTML, placeholder)
     })
 
     it("should have prompt length indicator", () => {
@@ -159,7 +156,7 @@ describe("Input structure", () => {
 
     it("should have prompt length indicator:style", () => {
         const wantStyle = "color:white;text-align:right";
-        equal(input.children[2].getAttribute("style"), wantStyle, "unexpected style")
+        assert.equal(input.children[2].getAttribute("style"), wantStyle)
     })
 
     const counter = input.children[2].children[0];
@@ -169,11 +166,11 @@ describe("Input structure", () => {
 
     const counterLengthIndicator = counter.getElementsByTagName("span")[0];
     it("should have prompt length indicator:min:id", () => {
-        equal(counterLengthIndicator.id, idCounter)
+        assert.equal(counterLengthIndicator.id, idCounter)
     })
 
     it("should have prompt length indicator:min:content", () => {
-        equal(counterLengthIndicator.innerHTML, placeholder.length)
+        assert.equal(counterLengthIndicator.innerHTML, `${placeholder.length}`)
     })
 
     it("should have prompt length indicator:max:content", () => {
@@ -185,7 +182,7 @@ describe("Input structure", () => {
     })
 
     const divs = input.getElementsByTagName("div"),
-        divBtn = divs[divs.length-1];
+        divBtn = divs[divs.length - 1];
     it("should have the trigger button in the bottom", () => {
         assert(divBtn.children[0].tagName, "BUTTON")
         assert(divBtn.children[0].id, idTrigger)
