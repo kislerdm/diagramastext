@@ -217,7 +217,7 @@ export function Output(idOutput: string, idDownload: string, svg: string): strin
 `
 }
 
-const Disclaimer = `<div class="${box}" style="color:white;margin:50px 0 20px">
+export const Disclaimer = `<div class="${box}" style="color:white;margin:50px 0 20px">
     <p>"A picture is worth a thousand words": diagram is a powerful conventional instrument to explain the
     meaning of complex systems, or processes. Unfortunately, substantial effort is required to develop and maintain
     a diagram. It impacts effectiveness of knowledge sharing, especially in software development. Luckily, <a

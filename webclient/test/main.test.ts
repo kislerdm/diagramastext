@@ -2,7 +2,9 @@ import {assert, describe, expect, it} from 'vitest'
 // @ts-ignore
 import {JSDOM} from 'jsdom';
 
-import Main, {Input, Output, PromptLengthLimit} from "./../src/main";
+import Main, {Disclaimer, Input, Output, PromptLengthLimit} from "./../src/main";
+// @ts-ignore
+import {arrow, box, boxText} from './../src/main.module.css';
 import {Config} from "./../src/ports";
 
 function filterByClassName(elements: HTMLCollectionOf<Element>, className: string): Array<Element> {
@@ -32,7 +34,7 @@ describe("Main page component", () => {
 
     //THEN
     const divs = mountPoint.getElementsByTagName("div"),
-        boxes = filterByClassName(divs, "box");
+        boxes = filterByClassName(divs, box);
 
     it("shall contain three boxes", () => {
         assert.equal(boxes.length, 3)
@@ -59,7 +61,7 @@ describe("Main page component", () => {
     })
 
     it("shall have the arrow between the input and output", () => {
-        assert.equal(mountPoint.getElementsByTagName("i")[0]!.className, "arrow")
+        assert.equal(mountPoint.getElementsByTagName("i")[0]!.className, arrow)
     })
 
     it("shall have the disclaimer box after the output", () => {
@@ -94,74 +96,78 @@ describe("Input component", () => {
     const got = Input(idTrigger, idCounter, promptLengthLimit, placeholder);
 
     //THEN
-    const input = new JSDOM(got).window.document.querySelector("div")!;
+    const el = new JSDOM(got).window.document.querySelector("div")!;
+
+    it("shall have the class defined", () => {
+        assert.equal(el.className, box)
+    })
 
     it("shall have a single TEXTAREA element", () => {
-        assert.equal(input.getElementsByTagName("textarea").length, 1)
+        assert.equal(el.getElementsByTagName("textarea").length, 1)
     })
 
     it("shall have two DIV elements", () => {
-        assert.equal(input.getElementsByTagName("div").length, 2)
+        assert.equal(el.getElementsByTagName("div").length, 2)
     })
 
     it("shall have two P elements", () => {
-        assert.equal(input.getElementsByTagName("p").length, 2)
+        assert.equal(el.getElementsByTagName("p").length, 2)
     })
 
     it("shall have inline style", () => {
-        assert.equal(input.getAttribute("style"), "margin-top:20px")
+        assert.equal(el.getAttribute("style"), "margin-top:20px")
     })
 
     it("shall have four children", () => {
-        assert.equal(input.children.length, 4)
+        assert.equal(el.children.length, 4)
     })
 
     it("shall have proper label", () => {
-        assert.equal(input.children[0].textContent, "Input:", "unexpected label")
+        assert.equal(el.children[0].textContent, "Input:", "unexpected label")
     })
 
     it("shall have the textarea", () => {
-        assert.equal(input.children[1].tagName, "TEXTAREA", "input textarea is expected")
+        assert.equal(el.children[1].tagName, "TEXTAREA", "input textarea is expected")
     })
 
     it("shall have the textarea:style", () => {
         const wantStyle = "font-size:20px;color:#fff;text-align:left;border-radius:1rem;padding:1rem;width:100%;background:#263950;box-shadow:0 0 3px 3px #2b425e"
-        assert.equal(input.children[1].getAttribute("style"), wantStyle)
+        assert.equal(el.children[1].getAttribute("style"), wantStyle)
     })
 
 
     it("shall have the textarea:size-rows", () => {
-        assert.equal(input.children[1].getAttribute("rows"), "3")
+        assert.equal(el.children[1].getAttribute("rows"), "3")
     })
 
     it("shall have the textarea:size-minlength", () => {
-        assert.equal(input.children[1].getAttribute("minlength"), `${promptLengthLimit.Min}`)
+        assert.equal(el.children[1].getAttribute("minlength"), `${promptLengthLimit.Min}`)
     })
 
     it("shall have the textarea:size-maxlength", () => {
         const maxLengthMultiplier = 1.2;
-        assert.equal(input.children[1].getAttribute("maxlength"),
+        assert.equal(el.children[1].getAttribute("maxlength"),
             `${promptLengthLimit.Max * maxLengthMultiplier}`)
     })
 
     it("shall have the textarea:placeholder", () => {
-        assert(input.children[1].getAttribute("placeholder"))
+        assert(el.children[1].getAttribute("placeholder"))
     })
 
     it("shall have the textarea:placeholder-predefined-input", () => {
-        assert.equal(input.children[1].innerHTML, placeholder)
+        assert.equal(el.children[1].innerHTML, placeholder)
     })
 
     it("shall have prompt length indicator", () => {
-        assert(input.children[2].innerHTML.toLowerCase().includes("prompt length"))
+        assert(el.children[2].innerHTML.toLowerCase().includes("prompt length"))
     })
 
     it("shall have prompt length indicator:style", () => {
         const wantStyle = "color:white;text-align:right";
-        assert.equal(input.children[2].getAttribute("style"), wantStyle)
+        assert.equal(el.children[2].getAttribute("style"), wantStyle)
     })
 
-    const counter = input.children[2].children[0];
+    const counter = el.children[2].children[0];
     it("shall have prompt length indicator:text prefix", () => {
         assert(counter.innerHTML.trim().startsWith("Prompt length:"))
     })
@@ -183,7 +189,7 @@ describe("Input component", () => {
         assert(counter!.innerHTML.replace(`${promptLengthLimit.Max}`, "").trim().endsWith("/"))
     })
 
-    const divs = input.getElementsByTagName("div"),
+    const divs = el.getElementsByTagName("div"),
         divBtn = divs[divs.length - 1];
     it("shall have the trigger button in the bottom", () => {
         assert(divBtn.children[0].tagName, "BUTTON")
@@ -209,21 +215,25 @@ describe("Output component", () => {
     const got = Output(idOutput, idDownload, svg);
 
     //THEN
-    const box = new JSDOM(got).window.document.querySelector("div")!;
+    const el = new JSDOM(got).window.document.querySelector("div")!;
+
+    it("shall have the class defined", () => {
+        assert.equal(el.className, box)
+    })
 
     it("shall have the margin-top set to 20px", () => {
-        assert.equal(box.style.marginTop, "20px")
+        assert.equal(el.style.marginTop, "20px")
     })
 
     it("shall have the padding set to 20px", () => {
-        assert.equal(box.style.padding, "20px")
+        assert.equal(el.style.padding, "20px")
     })
 
     it("shall have two DIV elements", () => {
-        assert.equal(box.getElementsByTagName("div").length, 2)
+        assert.equal(el.getElementsByTagName("div").length, 2)
     })
 
-    const p = box.getElementsByTagName("p");
+    const p = el.getElementsByTagName("p");
     it("shall have one P elements", () => {
         assert.equal(p.length, 1)
     })
@@ -233,10 +243,10 @@ describe("Output component", () => {
     })
 
     it("shall have the class set to 'boxText' for p element", () => {
-        assert.equal(p[0].className, "boxText")
+        assert.equal(p[0].className, boxText)
     })
 
-    const divOutput = box.getElementsByTagName("div")[0]!;
+    const divOutput = el.getElementsByTagName("div")[0]!;
     it("shall have the div element for generated diagram", () => {
         assert.equal(divOutput.id, idOutput)
     })
@@ -266,7 +276,7 @@ describe("Output component", () => {
         )
     })
 
-    const btn = box.getElementsByTagName("button");
+    const btn = el.getElementsByTagName("button");
     it("shall have one BUTTON element", () => {
         assert.equal(btn.length, 1)
     })
@@ -283,7 +293,7 @@ describe("Output component", () => {
         assert.equal(btn[0]!.id, idDownload)
     })
 
-    const a = box.getElementsByTagName("a");
+    const a = el.getElementsByTagName("a");
     it("shall have one A element", () => {
         assert.equal(a.length, 1)
     })
@@ -294,5 +304,42 @@ describe("Output component", () => {
 
     it("shall have the filename fixed as 'diagram.svg'", () => {
         assert.equal(a[0]!.download, "diagram.svg")
+    })
+})
+
+describe("Disclaimer component", () => {
+    const el = new JSDOM(Disclaimer).window.document.querySelector("div")!;
+
+    it("shall have the class defined", () => {
+        assert.equal(el.className, box)
+    })
+
+    it("shall have the margin-top set to 50px", () => {
+        assert.equal(el.style.marginTop, "50px")
+    })
+
+    it("shall have the margin-bottom set to 20px", () => {
+        assert.equal(el.style.marginBottom, "20px")
+    })
+
+    it("shall have the margin-left set to 0", () => {
+        assert.equal(el.style.marginLeft, "0px")
+    })
+
+    it("shall have the margin-right set to 0", () => {
+        assert.equal(el.style.marginRight, "0px")
+    })
+
+    it("shall have two P elements", () => {
+        assert.equal(el.getElementsByTagName("p").length, 2)
+    })
+
+    it("shall have the feedback link", () => {
+        expect(el.innerHTML).toContain("get in touch")
+        expect(el.innerHTML).toContain(`<a href="mailto:`)
+    })
+
+    it("shall contain the quote-moto", () => {
+        expect(el.innerHTML).toContain(`"A picture is worth a thousand words"`)
     })
 })
