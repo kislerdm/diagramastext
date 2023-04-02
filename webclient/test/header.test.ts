@@ -6,7 +6,7 @@ import Header from "./../src/components/header";
 describe("Header component", () => {
     const got = new JSDOM(Header).window.document.getElementsByTagName("header");
 
-    it('shall include single header tag', () => {
+    it("shall include single header tag", () => {
         assert.equal(got.length, 1)
     })
 
@@ -45,8 +45,11 @@ describe("Header component", () => {
         assert.equal(span[2]!.innerHTML, "Text")
     })
 
-    it("shall have the span[2] with the font set to bold italic", () => {
+    it("shall have the span[2] with the font set to bold", () => {
         assert.equal(span[2]!.style.fontWeight, "bold")
+    })
+
+    it("shall have the span[2] with the font set to italic", () => {
         assert.equal(span[2]!.style.fontStyle, "italic")
     })
 })

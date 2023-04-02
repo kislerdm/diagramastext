@@ -6,6 +6,7 @@ import logoSlack from "./svg/slack.svg";
 import logoLinkedin from "./svg/linkedin.svg";
 // @ts-ignore
 import logoEmail from "./svg/email.svg";
+import MailToLinkStr from "./mailto";
 
 
 export default function Footer(version: string = ""): string {
@@ -17,18 +18,17 @@ export default function Footer(version: string = ""): string {
     const iconSquareSize = 20;
 
     const socialContact = `<p id="contacts" style="margin-top:-10px">
-    <a href="https://github.com/kislerdm/diagramastext">
+    <a href="https://github.com/kislerdm/diagramastext" target="_blank" rel="noopener">
         <img src="${logoGithub}" width=${iconSquareSize} height=${iconSquareSize} alt="github"/>
     </a>
-    <a href="https://join.slack.com/t/diagramastextdev/shared_invite/zt-1onedpbsz-ECNIfwjIj02xzBjWNGOllg">
+    <a href="https://join.slack.com/t/diagramastextdev/shared_invite/zt-1onedpbsz-ECNIfwjIj02xzBjWNGOllg" 
+       target="_blank" rel="noopener">
         <img src="${logoSlack}" width=${iconSquareSize} height=${iconSquareSize} alt="slack"/>
     </a>
-    <a href="https://www.linkedin.com/in/dkisler">
+    <a href="https://www.linkedin.com/in/dkisler" target="_blank" rel="noopener">
         <img src="${logoLinkedin}" width=${iconSquareSize} height=${iconSquareSize} alt="linkedin"/>
     </a>
-    <a href="mailto:contact@diagramastext.dev">
-        <img src="${logoEmail}" width=${iconSquareSize} height=${iconSquareSize} alt="email"/>
-    </a>
+    ${MailToLinkStr(`<img src="${logoEmail}" width=${iconSquareSize} height=${iconSquareSize} alt="email"/>`)}
 </p>`
 
     return `<footer style="padding:1rem">

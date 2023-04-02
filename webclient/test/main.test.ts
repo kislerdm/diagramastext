@@ -62,7 +62,8 @@ describe("Main page structure", () => {
     })
 
     it("should have the disclaimer box after the output", () => {
-        assert(boxes[2].innerHTML.includes("Please get in touch"))
+        expect(boxes[2].innerHTML).toContain(`"A picture is worth a thousand words"`)
+        expect(boxes[2].innerHTML).toContain(`<a href="mailto:contact@diagramastext.dev" target="_blank" rel="noopener">`)
     })
 
     it("should have footer in the bottom", () => {

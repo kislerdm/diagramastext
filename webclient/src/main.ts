@@ -10,6 +10,7 @@ import {User} from "./user";
 
 // @ts-ignore
 import placeholderOutputSVG from "./components/svg/output-placeholder.svg?raw";
+import MailToLinkStr from "./components/mailto";
 
 function findElementByID(elements: HTMLCollectionOf<HTMLElement>, id: string): HTMLElement | undefined {
     for (let i = 0; i < elements.length; i++) {
@@ -223,7 +224,7 @@ const Disclaimer = `<div class="${box}" style="color:white;margin:50px 0 20px">
             rel="noopener noreffer">LLM</a> development reached such level when special skills are no longer needed
     to prepare standardised diagram in seconds!</p>
     
-    <p>Please get in touch for feedback and details about collaboration. Thanks!</p>
+    <p>Please ${MailToLinkStr("get in touch")} for feedback and details about collaboration. Thanks!</p>
 </div>`;
 
 function generateFeedbackLink(prompt: string, version: string) {
