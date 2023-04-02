@@ -136,9 +136,9 @@ ${Footer(cfg.version)}
     // download flow
     downloadBtn.addEventListener("click", () => {
         if (svg !== "") {
-            const link = mountPoint.getElementsByTagName("a")[0]!;
-            link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
-            link.click();
+            const link = [...outputBox.getElementsByTagName("a")].find(link => link.download == "diagram.svg");
+            link!.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
+            link!.click();
         }
     })
 
@@ -182,9 +182,9 @@ function definePromptLengthLimit(cfg: Config, user: User): PromptLengthLimit {
 }
 
 export function Input(idTrigger: string,
-               idCounter: string,
-               promptLengthLimit: PromptLengthLimit,
-               placeholder: string): string {
+                      idCounter: string,
+                      promptLengthLimit: PromptLengthLimit,
+                      placeholder: string): string {
     function textAreaLengthMax(v: number): number {
         const multiplier = 1.2;
         return Math.round(v * multiplier);
@@ -201,16 +201,17 @@ export function Input(idTrigger: string,
 `
 }
 
-function Output(idOutput: string, idDownload: string, svg: string): string {
-    return `
-<div class="${box}" style="margin-top: 20px; padding: 20px;">
+export function Output(idOutput: string, idDownload: string, svg: string): string {
+    return `<div class="${box}" style="margin-top:20px;padding:20px">
     <p class="${boxText}">Output:</p>
+    
     <div id="${idOutput}" 
-    style="border:solid #2d4765 2px;background:white;box-shadow:0 0 3px 3px #2b425e; width:inherit"
+    style="border:solid #2d4765 2px;background:white;box-shadow:0 0 3px 3px #2b425e;width:inherit"
 >${svg}</div>
+    
     <div>
         <button id="${idDownload}" disabled>Download</button>
-        <a download="diagram.svg" href="data:image/svg+xml,${encodeURIComponent(svg)}">
+        <a download="diagram.svg"></a>
     </div>
 </div>
 `
