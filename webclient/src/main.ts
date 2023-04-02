@@ -1,21 +1,15 @@
 // @ts-ignore
 import {arrow, box, boxText} from './main.module.css';
+
 import Footer from "./components/footer";
 import Header from "./components/header";
+import {Loader, Popup} from "./components/popup";
+
 import {Config, IsResponseError, IsResponseSVG} from "./ports";
+import {User} from "./user";
 
 // @ts-ignore
 import placeholderOutputSVG from "./components/svg/output-placeholder.svg?raw";
-// @ts-ignore
-import logoGithub from "./components/svg/github.svg";
-// @ts-ignore
-import logoSlack from "./components/svg/slack.svg";
-// @ts-ignore
-import logoLinkedin from "./components/svg/linkedin.svg";
-// @ts-ignore
-import logoEmail from "./components/svg/email.svg";
-import {User} from "./user";
-import {Loader, Popup} from "./components/popup";
 
 function findElementByID(elements: HTMLCollectionOf<HTMLElement>, id: string): HTMLElement | undefined {
     for (let i = 0; i < elements.length; i++) {
@@ -230,13 +224,6 @@ const Disclaimer = `<div class="${box}" style="color:white;margin:50px 0 20px">
     to prepare standardised diagram in seconds!</p>
     
     <p>Please get in touch for feedback and details about collaboration. Thanks!</p>
-    
-    <a href="https://github.com/kislerdm/diagramastext"><img src="${logoGithub}" alt="github logo"/></a>
-    <a href="https://join.slack.com/t/diagramastextdev/shared_invite/zt-1onedpbsz-ECNIfwjIj02xzBjWNGOllg">
-        <img src="${logoSlack}" alt="slack logo"/>
-    </a>
-    <a href="https://www.linkedin.com/in/dkisler"><img src="${logoLinkedin}" alt="linkedin logo"/></a>
-    <a href="mailto:hi@diagramastext.dev"><img src="${logoEmail}" alt="email logo"/></a>
 </div>`;
 
 function generateFeedbackLink(prompt: string, version: string) {
