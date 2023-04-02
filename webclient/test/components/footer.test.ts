@@ -1,7 +1,8 @@
 import {assert, describe, it} from 'vitest'
 // @ts-ignore
 import {JSDOM} from 'jsdom';
-import Footer from "./../src/components/footer";
+
+import Footer from "./../../src/components/footer";
 
 describe("Footer component", () => {
     const got = new JSDOM(Footer()).window.document.getElementsByTagName("footer");

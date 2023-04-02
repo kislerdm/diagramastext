@@ -2,7 +2,7 @@ import {assert, describe, it} from 'vitest'
 // @ts-ignore
 import {JSDOM} from 'jsdom';
 
-import MailToLinkStr from "./../src/components/mailto";
+import MailToLinkStr from "./../../src/components/mailto";
 
 describe("GIVEN: no innerHTML provided", () => {
     // WHEN

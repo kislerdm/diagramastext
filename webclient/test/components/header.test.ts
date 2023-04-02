@@ -1,7 +1,7 @@
 import {assert, describe, it} from 'vitest'
 import {JSDOM} from 'jsdom';
 
-import Header from "./../src/components/header";
+import Header from "./../../src/components/header";
 
 describe("Header component", () => {
     const got = new JSDOM(Header).window.document.getElementsByTagName("header");
