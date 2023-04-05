@@ -89,7 +89,14 @@ ${Footer(cfg.version)}
         }
     });
 
-    triggerBtn.addEventListener("click", () => {
+    triggerBtn.addEventListener("click", () => generateDiagram());
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            generateDiagram();
+        }
+    });
+
+    function generateDiagram() {
         function showError(status: number = 0, msg: string = "") {
             const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please
 <a href="${generateFeedbackLink(prompt, cfg.version)}"
@@ -151,7 +158,7 @@ ${Footer(cfg.version)}
                 showError();
             }
         });
-    })
+    }
 
     // download flow
     downloadBtn.addEventListener("click", () => {
