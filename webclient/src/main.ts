@@ -77,6 +77,18 @@ ${Footer(cfg.version)}
         id.Download,
     )!;
 
+
+    const elapsedThresholdMS = 10000;
+    let elapsedRequestThreshold: boolean = false;
+
+    const controller = new AbortController();
+    inputBox.addEventListener("keydown", (e) => {
+        // @ts-ignore
+        if (elapsedRequestThreshold && (e.key === "Escape" || e.key === "Esc")) {
+            controller.abort();
+        }
+    });
+
     triggerBtn.addEventListener("click", () => {
         function showError(status: number = 0, msg: string = "") {
             const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please
@@ -85,12 +97,16 @@ ${Footer(cfg.version)}
             Popup.error(mountPoint, errorMsg);
         }
 
+        elapsedRequestThreshold = false;
+
         //@ts-ignore
         const prompt = input!.value.trim();
         if (placeholderInputPrompt === prompt && firstTimeTriggered) {
             return;
         }
+
         firstTimeTriggered = false;
+        const timeout = setTimeout(() => elapsedRequestThreshold = true, elapsedThresholdMS);
 
         Loader.show(mountPoint);
         fetch(cfg.urlAPI, {
@@ -101,6 +117,7 @@ ${Footer(cfg.version)}
             body: JSON.stringify({
                 "prompt": prompt,
             }),
+            signal: controller.signal,
         }).then((resp: Response) => {
             if (!resp.ok) {
                 _fetchErrorCnt++;
@@ -111,6 +128,7 @@ ${Footer(cfg.version)}
             Loader.hide(mountPoint);
             resp.json()
                 .then((data: any) => {
+                    clearTimeout(timeout);
                     if (IsResponseError(data)) {
                         showError(resp.status, data.error);
                     } else if (IsResponseSVG(data)) {
@@ -123,11 +141,15 @@ ${Footer(cfg.version)}
                         throw new Error("response data type not recognized")
                     }
                 })
-
         }).catch((e) => {
-            console.error(e);
+            clearTimeout(timeout);
             Loader.hide(mountPoint);
-            showError();
+            if (e.name === "AbortError") {
+                Popup.show(mountPoint, "Request cancelled by user");
+            } else {
+                console.error(e);
+                showError();
+            }
         });
     })
 

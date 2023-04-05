@@ -21,21 +21,26 @@ export class Popup {
         //@ts-ignore
         popup.style.display = "block";
 
-        popupClose.addEventListener("click", () => {
+        function hide() {
             //@ts-ignore
             msgEl.innerHTML = "";
             //@ts-ignore
             popup.style.display = "none";
-        })
+        }
+
+        popupClose.addEventListener("click", () => hide())
 
         window.onclick = (event) => {
             if (event.target === popup) {
-                //@ts-ignore
-                msgEl.innerHTML = "";
-                //@ts-ignore
-                popup.style.display = "none";
+                hide()
             }
         }
+
+        parent.addEventListener("keydown", (event) => {
+            if ((event.key === "Escape" || event.key === "Esc")) {
+                hide();
+            }
+        })
     }
 
     static error(parent: HTMLDivElement, msg: string) {
