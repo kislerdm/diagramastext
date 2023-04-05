@@ -1,12 +1,13 @@
 # Changelog
 
-## [Unreleased]
+## [0.0.5] - 2023-04-05
 
 ### Added
 
 - User input validation according to the user status, i.e. registered/non-registered split
-- User fingerprint
 - Improved user feedback in case the model fails to predict a graph
+- Cancellation of requests over 10 sec. upon the escape button click
+- Hide popup upon the escape button click
 
 ### Changed
 

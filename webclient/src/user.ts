@@ -5,7 +5,10 @@ export class User {
     private readonly _fingerprint: string
 
     constructor() {
-        this._fingerprint = get_fingerprint(navigator.userAgent);
+        // @ts-ignore
+        const userAgent = import.meta.env.DEV ? "NA" : navigator.userAgent;
+
+        this._fingerprint = get_fingerprint(userAgent);
         this._id = defaultNA;
     }
 
@@ -32,19 +35,6 @@ export function get_fingerprint(userAgent: string): string {
 
     function rotate_left(n: number, s: number): number {
         return (n << s) | (n >>> (32 - s));
-    }
-
-    function lsb_hex(val: number): string {
-        var str = '';
-        var i;
-        var vh;
-        var vl;
-        for (i = 0; i <= 6; i += 2) {
-            vh = (val >>> (i * 4 + 4)) & 0x0f;
-            vl = (val >>> (i * 4)) & 0x0f;
-            str += vh.toString(16) + vl.toString(16);
-        }
-        return str;
     }
 
     function cvt_hex(val: number): string {

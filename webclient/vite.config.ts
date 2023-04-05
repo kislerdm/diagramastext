@@ -1,50 +1,60 @@
-import {defineConfig, mergeConfig} from 'vite'
-import {defineConfig as defineConfigTesting} from 'vitest/config'
+import {defineConfig} from 'vite'
 import {Schema, ValidateEnv} from "@julr/vite-plugin-validate-env";
+import {parseRegexp} from "@vitest/utils";
 
-export default mergeConfig(
-    defineConfig({
-        base: "./",
-        esbuild: {
-            jsxFactory: "h",
-            jsxFragment: "Fragment",
+export default defineConfig({
+    base: "./",
+    esbuild: {
+        jsxFactory: "h",
+        jsxFragment: "Fragment",
+    },
+    server: {
+        port: 9001,
+        host: true,
+    },
+    build: {
+        minify: "terser",
+    },
+    test: {
+        globals: true,
+        environment: "jsdom",
+        setupFiles: ['./test/mock/setup.ts'],
+        include: ["./test/**/*.{ts,js}"],
+        exclude: ["./test/mock"],
+        css: {
+            include: parseRegexp("src\/(.*)css"),
+            modules: {
+                classNameStrategy: "non-scoped",
+            },
         },
-        server: {
-            port: 9001,
-            host: true,
+        coverage: {
+            all: true,
+            provider: "c8",
         },
-        build: {
-            minify: "terser",
-        },
-        plugins: [
-            ValidateEnv({
-                VITE_URL_API: (key, value) => {
-                    value = Schema.string({
-                        format: "url",
-                        protocol: true,
-                        tld: false,
-                    })(key, value)
+    },
+    plugins: [
+        ValidateEnv({
+            VITE_URL_API: (key, value) => {
+                value = Schema.string({
+                    format: "url",
+                    protocol: true,
+                    tld: false,
+                })(key, value)
 
 
-                    const allowedHosts = [
-                            "api.diagramastext.dev",
-                            "api-stage.diagramastext.dev",
-                            "localhost",
-                        ],
-                        split = value.split("://")[1];
+                const allowedHosts = [
+                        "api.diagramastext.dev",
+                        "api-stage.diagramastext.dev",
+                        "localhost",
+                    ],
+                    split = value.split("://")[1];
 
-                    if (!allowedHosts.filter((v) => split.startsWith(v)).length) {
-                        throw new Error(`${key} is set to not supported value`)
-                    }
+                if (!allowedHosts.filter((v) => split.startsWith(v)).length) {
+                    throw new Error(`${key} is set to not supported value`)
+                }
 
-                    return value
-                },
-            }),
-        ]
-    }),
-    defineConfigTesting({
-        test: {
-            include: ["./test/**/*.{ts,js}"],
-        },
-    }),
-)
+                return value
+            },
+        }),
+    ]
+})

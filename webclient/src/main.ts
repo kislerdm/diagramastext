@@ -1,34 +1,39 @@
 // @ts-ignore
 import {arrow, box, boxText} from './main.module.css';
+
 import Footer from "./components/footer";
 import Header from "./components/header";
+import {Loader, Popup} from "./components/popup";
+
 import {Config, IsResponseError, IsResponseSVG} from "./ports";
+import {User} from "./user";
 
 // @ts-ignore
 import placeholderOutputSVG from "./components/svg/output-placeholder.svg?raw";
-// @ts-ignore
-import logoGithub from "./components/svg/github.svg";
-// @ts-ignore
-import logoSlack from "./components/svg/slack.svg";
-// @ts-ignore
-import logoLinkedin from "./components/svg/linkedin.svg";
-// @ts-ignore
-import logoEmail from "./components/svg/email.svg";
-import {User} from "./user";
-import {Loader, Popup} from "./components/popup";
+import MailToLinkStr from "./components/mailto";
+
+function findElementByID(elements: HTMLCollectionOf<HTMLElement>, id: string): HTMLElement | undefined {
+    for (let i = 0; i < elements.length; i++) {
+        const element = elements.item(i);
+        if (element != null && element.id == id) {
+            return element;
+        }
+    }
+    return undefined
+}
 
 export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
     const placeholderInputPrompt = "C4 diagram of a Go web server reading from external Postgres database over TCP",
         id = {
-            Input: "0",
-            Trigger: "1",
-            Output: "2",
-            Download: "4",
-            InputLengthCounter: "5",
+            Trigger: "0",
+            Output: "1",
+            Download: "2",
+            InputLengthCounter: "3"
         };
 
     const user = new User();
     const promptLengthLimit = definePromptLengthLimit(cfg, user);
+
 
     mountPoint.innerHTML = `${Header}
 
@@ -37,41 +42,73 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
     <span style="font-style:italic;font-weight:bold">plain English</span> in no time!
 </div>
 
-${Input(id.Input, id.Trigger, id.InputLengthCounter, promptLengthLimit, placeholderInputPrompt)}
+${Input(id.Trigger, id.InputLengthCounter, promptLengthLimit, placeholderInputPrompt)}
 
 <i class="${arrow}"></i>
 
 ${Output(id.Output, id.Download, placeholderOutputSVG)}
 
 ${Disclaimer}
-
+<div>
+    ${Popup.mount()}
+    ${Loader.mount()}
+</div>
 ${Footer(cfg.version)}
 `;
 
     let svg = "";
     let firstTimeTriggered = true;
 
-    const errorPopup = new Popup(mountPoint),
-        loadingSpinner = new Loader(mountPoint);
-
     // diagram generation flow
     let _fetchErrorCnt = 0;
     const _fetchErrorCntMax = 2;
-    document.getElementById(id.Trigger)!.addEventListener("click", () => {
+
+    const inputBox: Element = mountPoint.getElementsByClassName(box)[0]!;
+    const input: HTMLTextAreaElement = inputBox.getElementsByTagName("textarea")[0]!;
+    const triggerBtn: HTMLElement = findElementByID(
+        inputBox.getElementsByTagName("button"),
+        id.Trigger,
+    )!;
+
+    const outputBox: Element = mountPoint.getElementsByClassName(box)[1]!;
+    const output: HTMLElement = findElementByID(outputBox.getElementsByTagName("div"), id.Output)!;
+    const downloadBtn: HTMLElement = findElementByID(
+        outputBox!.getElementsByTagName("button"),
+        id.Download,
+    )!;
+
+
+    const elapsedThresholdMS = 10000;
+    let elapsedRequestThreshold: boolean = false;
+
+    const controller = new AbortController();
+    inputBox.addEventListener("keydown", (e) => {
+        // @ts-ignore
+        if (elapsedRequestThreshold && (e.key === "Escape" || e.key === "Esc")) {
+            controller.abort();
+        }
+    });
+
+    triggerBtn.addEventListener("click", () => {
         function showError(status: number = 0, msg: string = "") {
-            const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please 
+            const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please
 <a href="${generateFeedbackLink(prompt, cfg.version)}"
     target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>` : mapStatusCode(status, msg);
-            errorPopup.error(errorMsg);
+            Popup.error(mountPoint, errorMsg);
         }
 
+        elapsedRequestThreshold = false;
+
         //@ts-ignore
-        const prompt = document.getElementById(id.Input)!.value.trim();
+        const prompt = input!.value.trim();
         if (placeholderInputPrompt === prompt && firstTimeTriggered) {
             return;
         }
+
         firstTimeTriggered = false;
-        loadingSpinner.show();
+        const timeout = setTimeout(() => elapsedRequestThreshold = true, elapsedThresholdMS);
+
+        Loader.show(mountPoint);
         fetch(cfg.urlAPI, {
             method: "POST",
             headers: {
@@ -80,6 +117,7 @@ ${Footer(cfg.version)}
             body: JSON.stringify({
                 "prompt": prompt,
             }),
+            signal: controller.signal,
         }).then((resp: Response) => {
             if (!resp.ok) {
                 _fetchErrorCnt++;
@@ -87,58 +125,65 @@ ${Footer(cfg.version)}
                 _fetchErrorCnt = 0;
             }
 
-            loadingSpinner.hide();
+            Loader.hide(mountPoint);
             resp.json()
                 .then((data: any) => {
+                    clearTimeout(timeout);
                     if (IsResponseError(data)) {
                         showError(resp.status, data.error);
                     } else if (IsResponseSVG(data)) {
                         svg = scaleSVG(data.svg);
                         //@ts-ignore
-                        document.getElementById(id.Output).innerHTML = svg;
+                        output!.innerHTML = svg;
                         //@ts-ignore
-                        document.getElementById(id.Download).disabled = false;
+                        downloadBtn!.disabled = false;
                     } else {
                         throw new Error("response data type not recognized")
                     }
                 })
-
         }).catch((e) => {
-            console.error(e);
-            loadingSpinner.hide();
-            showError();
+            clearTimeout(timeout);
+            Loader.hide(mountPoint);
+            if (e.name === "AbortError") {
+                Popup.show(mountPoint, "Request cancelled by user");
+            } else {
+                console.error(e);
+                showError();
+            }
         });
     })
 
     // download flow
-    document.getElementById(id.Download)!.addEventListener("click", () => {
+    downloadBtn.addEventListener("click", () => {
         if (svg !== "") {
-            download(svg)
+            const link = [...outputBox.getElementsByTagName("a")].find(link => link.download == "diagram.svg");
+            link!.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
+            link!.click();
         }
     })
 
-    // // input length counter update
-    function readInputLength(id: string): number {
+    // input length counter update
+    function readInputLength(input: HTMLTextAreaElement): number {
         // @ts-ignore
-        return document.getElementById(id)!.value.length;
+        return input!.value.trim().length;
     }
 
-    document.getElementById(id.Input)!.addEventListener("input", () => {
-        const l = readInputLength(id.Input);
-        const span = document.getElementById(id.InputLengthCounter)!;
+    input.addEventListener("input", () => {
+        const l = readInputLength(input);
+        const span = findElementByID(inputBox.getElementsByTagName("span"), id.InputLengthCounter)!;
         span.innerHTML = l.toString();
         span.style.color = "#fff";
         // @ts-ignore
-        document.getElementById(id.Trigger)!.disabled = false;
+        triggerBtn!.disabled = false;
         if (l > promptLengthLimit.Max || l < promptLengthLimit.Min) {
             span.style.color = "red";
             // @ts-ignore
-            document.getElementById(id.Trigger)!.disabled = true;
+            triggerBtn!.disabled = true;
         }
     })
 }
 
-class PromptLengthLimit {
+export class PromptLengthLimit {
     Min: number
     Max: number
 
@@ -156,11 +201,10 @@ function definePromptLengthLimit(cfg: Config, user: User): PromptLengthLimit {
     return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserBase)
 }
 
-function Input(idInput: string,
-               idTrigger: string,
-               idCounter: string,
-               promptLengthLimit: PromptLengthLimit,
-               placeholder: string): string {
+export function Input(idTrigger: string,
+                      idCounter: string,
+                      promptLengthLimit: PromptLengthLimit,
+                      placeholder: string): string {
     function textAreaLengthMax(v: number): number {
         const multiplier = 1.2;
         return Math.round(v * multiplier);
@@ -168,8 +212,7 @@ function Input(idInput: string,
 
     return `<div class="${box}" style="margin-top:20px">
     <p class="${boxText}">Input:</p>
-    <textarea id="${idInput}" 
-              minlength=${promptLengthLimit.Min} maxlength=${textAreaLengthMax(promptLengthLimit.Max)} rows="3"
+    <textarea minlength=${promptLengthLimit.Min} maxlength=${textAreaLengthMax(promptLengthLimit.Max)} rows="3"
               style="font-size:20px;color:#fff;text-align:left;border-radius:1rem;padding:1rem;width:100%;background:#263950;box-shadow:0 0 3px 3px #2b425e"
               placeholder="Type in the diagram description">${placeholder}</textarea>
     <div style="color:white;text-align:right"><p>Prompt length: <span id="${idCounter}">${placeholder.length}</span> / ${promptLengthLimit.Max} </p></div>
@@ -178,19 +221,23 @@ function Input(idInput: string,
 `
 }
 
-function Output(idOutput: string, idDownload: string, svg: string): string {
-    return `
-<div class="${box}" style="margin-top: 20px; padding: 20px;">
+export function Output(idOutput: string, idDownload: string, svg: string): string {
+    return `<div class="${box}" style="margin-top:20px;padding:20px">
     <p class="${boxText}">Output:</p>
+    
     <div id="${idOutput}" 
-    style="border:solid #2d4765 2px;background:white;box-shadow:0 0 3px 3px #2b425e; width:inherit"
+    style="border:solid #2d4765 2px;background:white;box-shadow:0 0 3px 3px #2b425e;width:inherit"
 >${svg}</div>
-    <div><button id="${idDownload}" disabled>Download</button></div>
+    
+    <div>
+        <button id="${idDownload}" disabled>Download</button>
+        <a download="diagram.svg"></a>
+    </div>
 </div>
 `
 }
 
-const Disclaimer = `<div class="${box}" style="color:white;margin:50px 0 20px">
+export const Disclaimer = `<div class="${box}" style="color:white;margin:50px 0 20px">
     <p>"A picture is worth a thousand words": diagram is a powerful conventional instrument to explain the
     meaning of complex systems, or processes. Unfortunately, substantial effort is required to develop and maintain
     a diagram. It impacts effectiveness of knowledge sharing, especially in software development. Luckily, <a
@@ -198,14 +245,7 @@ const Disclaimer = `<div class="${box}" style="color:white;margin:50px 0 20px">
             rel="noopener noreffer">LLM</a> development reached such level when special skills are no longer needed
     to prepare standardised diagram in seconds!</p>
     
-    <p>Please get in touch for feedback and details about collaboration. Thanks!</p>
-    
-    <a href="https://github.com/kislerdm/diagramastext"><img src="${logoGithub}" alt="github logo"/></a>
-    <a href="https://join.slack.com/t/diagramastextdev/shared_invite/zt-1onedpbsz-ECNIfwjIj02xzBjWNGOllg">
-        <img src="${logoSlack}" alt="slack logo"/>
-    </a>
-    <a href="https://www.linkedin.com/in/dkisler"><img src="${logoLinkedin}" alt="linkedin logo"/></a>
-    <a href="mailto:hi@diagramastext.dev"><img src="${logoEmail}" alt="email logo"/></a>
+    <p>Please ${MailToLinkStr("get in touch")} for feedback and details about collaboration. Thanks!</p>
 </div>`;
 
 function generateFeedbackLink(prompt: string, version: string) {
@@ -237,13 +277,6 @@ Please describe what should have happened following the actions you described.
     const query = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
 
     return `${url}?${query}`;
-}
-
-function download(svg: string) {
-    const link = document.createElement("a");
-    link.setAttribute("download", "diagram.svg");
-    link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
-    link.click();
 }
 
 function mapStatusCode(status: number, msg: string): string {
