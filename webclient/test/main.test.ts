@@ -1,4 +1,4 @@
-import {assert, describe, expect, it} from 'vitest'
+import {afterAll, assert, beforeAll, describe, expect, it} from 'vitest'
 // @ts-ignore
 import {JSDOM} from 'jsdom';
 
@@ -6,6 +6,9 @@ import Main, {Disclaimer, Input, Output, PromptLengthLimit} from "./../src/main"
 // @ts-ignore
 import {arrow, box, boxText} from './../src/main.module.css';
 import {Config} from "./../src/ports";
+
+// mocks
+import {config, MockSVGResponse} from "./mock/setup";
 
 function filterByClassName(elements: HTMLCollectionOf<Element>, className: string): Array<Element> {
     let o: Array<Element> = [];
@@ -341,5 +344,30 @@ describe("Disclaimer component", () => {
 
     it("shall contain the quote-moto", () => {
         expect(el.innerHTML).toContain(`"A picture is worth a thousand words"`)
+    })
+})
+
+// TODO: add UX tests with the server's mock:
+// Happy path: diagram generated on the button click
+// Unhappy path: invalid input prompt
+// Unhappy path: popup on the server's error response
+describe("Happy path of the diagram generation logic", () => {
+    //GIVEN
+    const mountPoint = new JSDOM("<main></main>").window.document.querySelector<HTMLDivElement>("main")!;
+
+    //WHEN
+    // @ts-ignore
+    Main(mountPoint, config)
+
+    // input non-default prompt
+    mountPoint.getElementsByClassName(box)[0]!.getElementsByTagName("textarea")[0]!.innerHTML = "foobar";
+    const btnTrigger = [...mountPoint.getElementsByTagName("button")].find(el => el.id == "0")!;
+
+    //THEN
+    it("shall yield the svg output", () => {
+        assert.equal(btnTrigger!.innerHTML, "Generate Diagram", "unexpected button selected")
+        assert.equal(mountPoint.getElementsByClassName(box)[0]!.getElementsByTagName("textarea")[0]!.value,
+            "foobar", "unexpected input set")
+        // expect(mountPoint.getElementsByClassName(box)[1]!.getElementsByTagName("div")[0]!.innerHTML).toBe(MockSVGResponse.svg)
     })
 })

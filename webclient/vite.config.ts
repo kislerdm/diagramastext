@@ -16,9 +16,11 @@ export default defineConfig({
         minify: "terser",
     },
     test: {
-        include: ["./test/**/*.{ts,js}"],
-        environment: "jsdom",
         globals: true,
+        environment: "jsdom",
+        setupFiles: ['./test/mock/setup.ts'],
+        include: ["./test/**/*.{ts,js}"],
+        exclude: ["./test/mock"],
         css: {
             include: parseRegexp("src\/(.*)css"),
             modules: {

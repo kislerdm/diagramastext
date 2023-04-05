@@ -33,8 +33,7 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
 
     const user = new User();
     const promptLengthLimit = definePromptLengthLimit(cfg, user);
-    const errorPopup = new Popup(),
-        loadingSpinner = new Loader();
+
 
     mountPoint.innerHTML = `${Header}
 
@@ -50,12 +49,10 @@ ${Input(id.Trigger, id.InputLengthCounter, promptLengthLimit, placeholderInputPr
 ${Output(id.Output, id.Download, placeholderOutputSVG)}
 
 ${Disclaimer}
-
 <div>
-${errorPopup.mount()}
-${loadingSpinner.mount()}
+    ${Popup.mount()}
+    ${Loader.mount()}
 </div>
-
 ${Footer(cfg.version)}
 `;
 
@@ -85,7 +82,7 @@ ${Footer(cfg.version)}
             const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please
 <a href="${generateFeedbackLink(prompt, cfg.version)}"
     target="_blank" rel="noopener" style="color:#3498db;font-weight:bold">report</a>` : mapStatusCode(status, msg);
-            errorPopup.error(errorMsg);
+            Popup.error(mountPoint, errorMsg);
         }
 
         //@ts-ignore
@@ -94,7 +91,8 @@ ${Footer(cfg.version)}
             return;
         }
         firstTimeTriggered = false;
-        loadingSpinner.show();
+
+        Loader.show(mountPoint);
         fetch(cfg.urlAPI, {
             method: "POST",
             headers: {
@@ -110,7 +108,7 @@ ${Footer(cfg.version)}
                 _fetchErrorCnt = 0;
             }
 
-            loadingSpinner.hide();
+            Loader.hide(mountPoint);
             resp.json()
                 .then((data: any) => {
                     if (IsResponseError(data)) {
@@ -128,7 +126,7 @@ ${Footer(cfg.version)}
 
         }).catch((e) => {
             console.error(e);
-            loadingSpinner.hide();
+            Loader.hide(mountPoint);
             showError();
         });
     })
@@ -287,6 +285,7 @@ function mapStatusCode(status: number, msg: string): string {
 export function scaleSVG(svg: string): string {
     const parser = new DOMParser();
     let doc = parser.parseFromString(svg, "image/svg+xml")!.querySelector("svg");
+    console.log(doc);
     //@ts-ignore
     doc.style.preserveAspectRatio = "xMaxYMax";
     //@ts-ignore
