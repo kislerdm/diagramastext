@@ -6,7 +6,7 @@
 
 - User input validation according to the user status, i.e. registered/non-registered split
 - Improved user feedback in case the model fails to predict a graph
-- Trigger diagram generation process on the enter key press
+- Trigger diagram generation process on the ctrl+enter keys press
 - Cancellation of requests over 10 sec. on the escape key press
 - Hide popup on the escape key press
 
