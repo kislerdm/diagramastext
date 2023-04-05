@@ -89,11 +89,15 @@ ${Footer(cfg.version)}
         }
     });
 
-    triggerBtn.addEventListener("click", () => generateDiagram());
-    input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
+    inputBox.addEventListener("keydown", (e) => {
+        // @ts-ignore
+        if (e.key === "Enter" && e.ctrlKey) {
             generateDiagram();
         }
+    });
+
+    triggerBtn.addEventListener("click", () => {
+        generateDiagram();
     });
 
     function generateDiagram() {
@@ -222,6 +226,7 @@ export function Input(idTrigger: string,
     <textarea minlength=${promptLengthLimit.Min} maxlength=${textAreaLengthMax(promptLengthLimit.Max)} rows="3"
               style="font-size:20px;color:#fff;text-align:left;border-radius:1rem;padding:1rem;width:100%;background:#263950;box-shadow:0 0 3px 3px #2b425e"
               placeholder="Type in the diagram description">${placeholder}</textarea>
+    <p style="color:#fff;font-size:12px;text-align:left;margin:0 0 -15px;">Click the button, or press Ctrl(Control)+Enter</p>
     <div style="color:white;text-align:right"><p>Prompt length: <span id="${idCounter}">${placeholder.length}</span> / ${promptLengthLimit.Max} </p></div>
     <div style="margin-top:-20px"><button id="${idTrigger}">Generate Diagram</button></div>
 </div>

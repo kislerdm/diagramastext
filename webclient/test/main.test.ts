@@ -114,7 +114,7 @@ describe("Input component", () => {
     })
 
     it("shall have two P elements", () => {
-        assert.equal(el.getElementsByTagName("p").length, 2)
+        assert.equal(el.getElementsByTagName("p").length, 3)
     })
 
     it("shall have inline style", () => {
@@ -122,7 +122,7 @@ describe("Input component", () => {
     })
 
     it("shall have four children", () => {
-        assert.equal(el.children.length, 4)
+        assert.equal(el.children.length, 5)
     })
 
     it("shall have proper label", () => {
@@ -161,16 +161,17 @@ describe("Input component", () => {
         assert.equal(el.children[1].innerHTML, placeholder)
     })
 
+    const promptLengthIndicator = el.children[3];
     it("shall have prompt length indicator", () => {
-        assert(el.children[2].innerHTML.toLowerCase().includes("prompt length"))
+        assert(promptLengthIndicator.innerHTML.toLowerCase().includes("prompt length"))
     })
 
     it("shall have prompt length indicator:style", () => {
         const wantStyle = "color:white;text-align:right";
-        assert.equal(el.children[2].getAttribute("style"), wantStyle)
+        assert.equal(promptLengthIndicator.getAttribute("style"), wantStyle)
     })
 
-    const counter = el.children[2].children[0];
+    const counter = promptLengthIndicator.children[0];
     it("shall have prompt length indicator:text prefix", () => {
         assert(counter.innerHTML.trim().startsWith("Prompt length:"))
     })
@@ -195,16 +196,42 @@ describe("Input component", () => {
     const divs = el.getElementsByTagName("div"),
         divBtn = divs[divs.length - 1];
     it("shall have the trigger button in the bottom", () => {
-        assert(divBtn.children[0].tagName, "BUTTON")
-        assert(divBtn.children[0].id, idTrigger)
+        assert.equal(divBtn.children[0].tagName, "BUTTON")
+        assert.equal(divBtn.children[0].id, idTrigger)
     })
 
     it("shall have the trigger button with defined id", () => {
-        assert(divBtn.children[0].id, idTrigger)
+        assert.equal(divBtn.children[0].id, idTrigger)
     })
 
     it("shall have the button's margins shrank", () => {
-        assert(divBtn.style.marginTop, "-20px")
+        assert.equal(divBtn.style.marginTop, "-20px")
+    })
+
+    const tipTriggerGeneration = el.children[2];
+    it("shall have the tip on how to trigger generation", () => {
+        assert.equal(tipTriggerGeneration.tagName, "P")
+    })
+
+    it("shall display 'Click the button, or press Ctrl(Control)+Enter' as a tip to trigger generation", () => {
+        assert.equal(tipTriggerGeneration.innerHTML, "Click the button, or press Ctrl(Control)+Enter")
+    })
+
+    it("shall defines the style for the tip to trigger generation", () => {
+        // @ts-ignore
+        assert.equal(tipTriggerGeneration.style.color, "rgb(255, 255, 255)")
+        // @ts-ignore
+        assert.equal(tipTriggerGeneration.style.fontSize, "12px")
+        // @ts-ignore
+        assert.equal(tipTriggerGeneration.style.textAlign, "left")
+        // @ts-ignore
+        assert.equal(tipTriggerGeneration.style.marginRight, "0px")
+        // @ts-ignore
+        assert.equal(tipTriggerGeneration.style.marginLeft, "0px")
+        // @ts-ignore
+        assert.equal(tipTriggerGeneration.style.marginTop, "0px")
+        // @ts-ignore
+        assert.equal(tipTriggerGeneration.style.marginBottom, "-15px")
     })
 })
 
