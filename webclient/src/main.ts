@@ -97,8 +97,6 @@ ${Footer(cfg.version)}
             Popup.error(mountPoint, errorMsg);
         }
 
-        elapsedRequestThreshold = false;
-
         //@ts-ignore
         const prompt = input!.value.trim();
         if (placeholderInputPrompt === prompt && firstTimeTriggered) {
@@ -129,6 +127,7 @@ ${Footer(cfg.version)}
             resp.json()
                 .then((data: any) => {
                     clearTimeout(timeout);
+                    elapsedRequestThreshold = false;
                     if (IsResponseError(data)) {
                         showError(resp.status, data.error);
                     } else if (IsResponseSVG(data)) {
@@ -143,6 +142,7 @@ ${Footer(cfg.version)}
                 })
         }).catch((e) => {
             clearTimeout(timeout);
+            elapsedRequestThreshold = false;
             Loader.hide(mountPoint);
             if (e.name === "AbortError") {
                 Popup.show(mountPoint, "Request cancelled by user");
