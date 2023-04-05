@@ -285,7 +285,6 @@ function mapStatusCode(status: number, msg: string): string {
 export function scaleSVG(svg: string): string {
     const parser = new DOMParser();
     let doc = parser.parseFromString(svg, "image/svg+xml")!.querySelector("svg");
-    console.log(doc);
     //@ts-ignore
     doc.style.preserveAspectRatio = "xMaxYMax";
     //@ts-ignore
