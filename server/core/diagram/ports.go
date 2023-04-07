@@ -12,7 +12,10 @@ type HTTPHandler func(ctx context.Context, input Input) (Output, error)
 // RepositoryPrediction defines the interface to store prediction input (prompt) and model result.
 type RepositoryPrediction interface {
 	WriteInputPrompt(ctx context.Context, requestID, userID, prompt string) error
-	WriteModelResult(ctx context.Context, requestID, userID, prediction string) error
+	WriteModelResult(
+		ctx context.Context, requestID, userID, prediction, model string,
+		usageTokensPrompt, usageTokensCompletions uint16,
+	) error
 	Close(ctx context.Context) error
 }
 
@@ -24,7 +27,7 @@ func (m MockRepositoryPrediction) WriteInputPrompt(_ context.Context, _, _, _ st
 	return m.Err
 }
 
-func (m MockRepositoryPrediction) WriteModelResult(_ context.Context, _, _, _ string) error {
+func (m MockRepositoryPrediction) WriteModelResult(_ context.Context, _, _, _, _ string, _, _ uint16) error {
 	return m.Err
 }
 
@@ -51,19 +54,23 @@ func (m MockRepositorySecretsVault) ReadLastVersion(_ context.Context, _ string,
 
 // ModelInference interface to communicate with the model.
 type ModelInference interface {
-	Do(ctx context.Context, userPrompt string, systemContent string, model string) ([]byte, error)
+	Do(ctx context.Context, userPrompt string, systemContent string, model string) (
+		prediction []byte, usageTokensPrompt uint16, usageTokensCompletions uint16, err error,
+	)
 }
 
 type MockModelInference struct {
-	V   []byte
-	Err error
+	V               []byte
+	UsagePrompt     uint16
+	UsageCompletion uint16
+	Err             error
 }
 
-func (m MockModelInference) Do(_ context.Context, _, _, _ string) ([]byte, error) {
+func (m MockModelInference) Do(_ context.Context, _, _, _ string) ([]byte, uint16, uint16, error) {
 	if m.Err != nil {
-		return nil, m.Err
+		return nil, 0, 0, m.Err
 	}
-	return m.V, nil
+	return m.V, m.UsagePrompt, m.UsageCompletion, nil
 }
 
 // HTTPClient client to communicate over http.
