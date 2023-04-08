@@ -129,20 +129,29 @@ func (c Client) WriteInputPrompt(ctx context.Context, requestID, userID, prompt 
 	return err
 }
 
-func (c Client) WriteModelResult(ctx context.Context, requestID, userID, prediction string) error {
+func (c Client) WriteModelResult(
+	ctx context.Context, requestID, userID, prediction, model string, usageTokensPrompt, usageTokensCompletions uint16,
+) error {
 	if requestID == "" {
 		return errors.New("request_id is required")
 	}
 	if prediction == "" {
 		return errors.New("response is required")
 	}
+	if model == "" {
+		return errors.New("model is required")
+	}
 	_, err := c.c.ExecContext(
 		ctx, `INSERT INTO `+c.tableWriteModelPrediction+
-			` (request_id, user_id, response, timestamp) VALUES ($1, $2, $3, $4)`,
+			` (request_id, user_id, response, timestamp, model, prompt_tokens, completion_tokens) 
+VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		requestID,
 		userID,
 		prediction,
 		time.Now().UTC(),
+		model,
+		usageTokensPrompt,
+		usageTokensCompletions,
 	)
 	return err
 }

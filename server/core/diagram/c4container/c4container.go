@@ -70,7 +70,7 @@ func NewC4ContainersHTTPHandler(
 		}
 
 		model := defineModel(input.GetUser())
-		diagramPrediction, usageTokensPrompt, usageTokensCompletions, err := clientModelInference.Do(
+		predictionRaw, diagramPrediction, usageTokensPrompt, usageTokensCompletions, err := clientModelInference.Do(
 			ctx, input.GetPrompt(), contentSystem, model,
 		)
 		if err != nil {
@@ -82,7 +82,7 @@ func NewC4ContainersHTTPHandler(
 				ctx, input.GetRequestID(), input.GetUser().ID, input.GetPrompt(),
 			); err == nil {
 				_ = clientRepositoryPrediction.WriteModelResult(
-					ctx, input.GetRequestID(), input.GetUser().ID, string(diagramPrediction), model, usageTokensPrompt,
+					ctx, input.GetRequestID(), input.GetUser().ID, predictionRaw, model, usageTokensPrompt,
 					usageTokensCompletions,
 				)
 			}

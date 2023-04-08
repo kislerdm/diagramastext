@@ -75,19 +75,21 @@ func (c Client) getMaxTokens(model string) int {
 	return c.maxTokens
 }
 
-func (c Client) Do(ctx context.Context, userPrompt string, systemContent string, model string) ([]byte, error) {
+func (c Client) Do(ctx context.Context, userPrompt string, systemContent string, model string) (
+	predictionRaw string, prediction []byte, usageTokensPrompt uint16, usageTokensCompletions uint16, err error,
+) {
 	if err := c.validatePrompt(model, userPrompt, systemContent); err != nil {
-		return nil, err
+		return "", nil, 0, 0, err
 	}
 
 	req, err := c.request(ctx, model, userPrompt, systemContent)
 	if err != nil {
-		return nil, err
+		return "", nil, 0, 0, err
 	}
 
 	respBytes, err := c.requestHandler(req)
 	if err != nil {
-		return nil, err
+		return "", nil, 0, 0, err
 	}
 
 	return decodeResponse(respBytes, model)
@@ -220,7 +222,9 @@ func modelContextMaxTokes(model string) int {
 	}
 }
 
-func decodeResponse(respBytes []byte, model string) ([]byte, error) {
+func decodeResponse(respBytes []byte, model string) (
+	predictionRaw string, prediction []byte, usageTokensPrompt uint16, usageTokensCompletions uint16, err error,
+) {
 	switch model {
 	case "gpt-3.5-turbo":
 		return decodeChatCompletionsResult(respBytes)
@@ -229,47 +233,70 @@ func decodeResponse(respBytes []byte, model string) ([]byte, error) {
 	}
 }
 
-func decodeChatCompletionsResult(respBytes []byte) ([]byte, error) {
+func decodeChatCompletionsResult(respBytes []byte) (string, []byte, uint16, uint16, error) {
 	var resp openAIResponseChat
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return nil, err
+	if err := json.Unmarshal(cleanRawBytesChatResponse(respBytes), &resp); err != nil {
+		return "", nil, 0, 0, err
 	}
 
 	if len(resp.Choices) == 0 {
-		return nil, errors.New("unsuccessful prediction")
+		return "", nil, 0, 0, errors.New("unsuccessful prediction")
 	}
 
 	s := cleanRawResponse(cleanRawChatResponse(resp.Choices[0].Message.Content))
 
-	return []byte(s), nil
+	return readRawResponseChat(respBytes), []byte(s), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
+}
+
+func readRawResponseChat(respBytes []byte) string {
+	v := bytes.Split(respBytes, []byte(`"content":`))
+	if len(v) < 2 {
+		return string(respBytes)
+	}
+	return string(bytes.Split(v[1], []byte(`},"finish_reason"`))[0])
+}
+
+// chatDescriptionSeparator separates the code snippet from the chat's natural language description
+const chatDescriptionSeparator = `|S|`
+
+func cleanRawBytesChatResponse(respBytes []byte) []byte {
+	respBytes = bytes.ReplaceAll(respBytes, []byte(`:\n\n{`), []byte(chatDescriptionSeparator+"{"))
+	respBytes = bytes.ReplaceAll(respBytes, []byte("```"), []byte(chatDescriptionSeparator))
+	respBytes = bytes.ReplaceAll(respBytes, []byte("\n"), nil)
+	respBytes = bytes.ReplaceAll(respBytes, []byte(`\n`), nil)
+	respBytes = bytes.ReplaceAll(respBytes, []byte(` "`), nil)
+	respBytes = bytes.TrimSpace(respBytes)
+	return respBytes
 }
 
 func cleanRawChatResponse(s string) string {
-	v := strings.SplitN(s, "\n\n```\n", 2)
+	v := strings.SplitN(s, chatDescriptionSeparator, 3)
 	if len(v) > 1 {
-		return strings.SplitN(v[1], "\n```\n\n", 2)[0]
+		return v[1]
 	}
-	return strings.SplitN(v[0], "\n```\n\n", 2)[0]
+	return v[0]
 }
 
-func decodeCompletionsResult(respBytes []byte) ([]byte, error) {
+func decodeCompletionsResult(respBytes []byte) (string, []byte, uint16, uint16, error) {
 	var resp openAIResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return nil, err
+		return "", nil, 0, 0, err
 	}
 
 	if len(resp.Choices) == 0 {
-		return nil, errors.New("unsuccessful prediction")
+		return "", nil, 0, 0, errors.New("unsuccessful prediction")
 	}
 
 	s := cleanRawResponse(resp.Choices[0].Text)
 
-	return []byte(s), nil
+	return resp.Choices[0].Text, []byte(s), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
 }
 
 func cleanRawResponse(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.TrimSuffix(s, ",")
+	s = removeInnerSpaces(s)
+
 	if s[:1] != "{" {
 		s = "{" + s
 	}
@@ -277,6 +304,21 @@ func cleanRawResponse(s string) string {
 		s += "}"
 	}
 	return s
+}
+
+func removeInnerSpaces(s string) string {
+	var o bytes.Buffer
+	var withinQuotedText bool
+	for i, el := range s[:] {
+		if el == '"' && !strings.HasSuffix(s[:i], `\`) {
+			withinQuotedText = !withinQuotedText
+		}
+		if !withinQuotedText && el == ' ' {
+			continue
+		}
+		_, _ = o.WriteRune(el)
+	}
+	return o.String()
 }
 
 // HTTPClient http client to interact with the server.
@@ -315,9 +357,9 @@ type openAIResponseBase struct {
 	Object  string `json:"object"`
 	Created int    `json:"created"`
 	Usage   struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
+		PromptTokens     uint16 `json:"prompt_tokens"`
+		CompletionTokens uint16 `json:"completion_tokens"`
+		TotalTokens      int    `json:"total_tokens"`
 	} `json:"usage"`
 }
 
@@ -338,8 +380,9 @@ type openAIResponseChat struct {
 		Index        int    `json:"index"`
 		FinishReason string `json:"finish_reason"`
 		Message      struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
+			Role         string `json:"role"`
+			Content      string `json:"content"`
+			FinishReason string `json:"finish_reason"`
 		} `json:"message"`
 	} `json:"choices"`
 }

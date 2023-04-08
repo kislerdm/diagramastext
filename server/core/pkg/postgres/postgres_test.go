@@ -298,8 +298,9 @@ func Test_client_WriteModelResult(t *testing.T) {
 		c dbClient
 	}
 	type args struct {
-		ctx                           context.Context
-		requestID, userID, prediction string
+		ctx                                       context.Context
+		requestID, userID, prediction, model      string
+		usageTokensPrompt, usageTokensCompletions uint16
 	}
 	tests := []struct {
 		name    string
@@ -313,10 +314,13 @@ func Test_client_WriteModelResult(t *testing.T) {
 				c: mockDbClient{},
 			},
 			args: args{
-				ctx:        context.TODO(),
-				requestID:  "693a35ba-e42c-4168-8afc-5a7c359d1d05",
-				userID:     "c40bad11-0822-4d84-9f61-44b9a97b0432",
-				prediction: `{"nodes":[{"id":"0"},{"id":"1"}]}`,
+				ctx:                    context.TODO(),
+				requestID:              "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+				userID:                 "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				prediction:             `{"nodes":[{"id":"0"},{"id":"1"}]}`,
+				model:                  "foobar",
+				usageTokensPrompt:      100,
+				usageTokensCompletions: 50,
 			},
 			wantErr: nil,
 		},
@@ -326,9 +330,12 @@ func Test_client_WriteModelResult(t *testing.T) {
 				c: mockDbClient{},
 			},
 			args: args{
-				ctx:        context.TODO(),
-				userID:     "c40bad11-0822-4d84-9f61-44b9a97b0432",
-				prediction: `{"nodes":[{"id":"0"},{"id":"1"}]}`,
+				ctx:                    context.TODO(),
+				userID:                 "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				prediction:             `{"nodes":[{"id":"0"},{"id":"1"}]}`,
+				model:                  "foobar",
+				usageTokensPrompt:      100,
+				usageTokensCompletions: 50,
 			},
 			wantErr: errors.New("request_id is required"),
 		},
@@ -338,11 +345,29 @@ func Test_client_WriteModelResult(t *testing.T) {
 				c: mockDbClient{},
 			},
 			args: args{
-				ctx:       context.TODO(),
-				requestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
-				userID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				ctx:                    context.TODO(),
+				requestID:              "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+				userID:                 "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				model:                  "foobar",
+				usageTokensPrompt:      100,
+				usageTokensCompletions: 50,
 			},
 			wantErr: errors.New("response is required"),
+		},
+		{
+			name: "unhappy path: no model",
+			fields: fields{
+				c: mockDbClient{},
+			},
+			args: args{
+				ctx:                    context.TODO(),
+				requestID:              "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+				userID:                 "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				prediction:             `{"nodes":[{"id":"0"},{"id":"1"}]}`,
+				usageTokensPrompt:      100,
+				usageTokensCompletions: 50,
+			},
+			wantErr: errors.New("model is required"),
 		},
 		{
 			name: "unhappy path: no relation found",
@@ -352,10 +377,13 @@ func Test_client_WriteModelResult(t *testing.T) {
 				},
 			},
 			args: args{
-				ctx:        context.TODO(),
-				requestID:  "693a35ba-e42c-4168-8afc-5a7c359d1d05",
-				userID:     "c40bad11-0822-4d84-9f61-44b9a97b0432",
-				prediction: `{"nodes":[{"id":"0"},{"id":"1"}]}`,
+				ctx:                    context.TODO(),
+				requestID:              "693a35ba-e42c-4168-8afc-5a7c359d1d05",
+				userID:                 "c40bad11-0822-4d84-9f61-44b9a97b0432",
+				prediction:             `{"nodes":[{"id":"0"},{"id":"1"}]}`,
+				model:                  "foobar",
+				usageTokensPrompt:      100,
+				usageTokensCompletions: 50,
 			},
 			wantErr: errors.New(`pq: relation "bar" does not exist`),
 		},
@@ -371,7 +399,10 @@ func Test_client_WriteModelResult(t *testing.T) {
 					tableWritePrompt:          "foo",
 					tableWriteModelPrediction: "bar",
 				}
-				err := c.WriteModelResult(tt.args.ctx, tt.args.requestID, tt.args.userID, tt.args.prediction)
+				err := c.WriteModelResult(
+					tt.args.ctx, tt.args.requestID, tt.args.userID, tt.args.prediction, tt.args.model,
+					tt.args.usageTokensPrompt, tt.args.usageTokensCompletions,
+				)
 				if !reflect.DeepEqual(tt.wantErr, err) {
 					t.Errorf("WriteModelResult() error = %v, wantErr %v", err, tt.wantErr)
 				}

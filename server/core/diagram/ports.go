@@ -55,7 +55,7 @@ func (m MockRepositorySecretsVault) ReadLastVersion(_ context.Context, _ string,
 // ModelInference interface to communicate with the model.
 type ModelInference interface {
 	Do(ctx context.Context, userPrompt string, systemContent string, model string) (
-		prediction []byte, usageTokensPrompt uint16, usageTokensCompletions uint16, err error,
+		predictionRaw string, prediction []byte, usageTokensPrompt uint16, usageTokensCompletions uint16, err error,
 	)
 }
 
@@ -66,11 +66,11 @@ type MockModelInference struct {
 	Err             error
 }
 
-func (m MockModelInference) Do(_ context.Context, _, _, _ string) ([]byte, uint16, uint16, error) {
+func (m MockModelInference) Do(_ context.Context, _, _, _ string) (string, []byte, uint16, uint16, error) {
 	if m.Err != nil {
-		return nil, 0, 0, m.Err
+		return "", nil, 0, 0, m.Err
 	}
-	return m.V, m.UsagePrompt, m.UsageCompletion, nil
+	return string(m.V), m.V, m.UsagePrompt, m.UsageCompletion, nil
 }
 
 // HTTPClient client to communicate over http.
