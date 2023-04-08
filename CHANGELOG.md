@@ -1,5 +1,45 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- OpenAI's prediction parsing and deserialization when the graph's JSON is surrounded by text.
+
+**_Example_**
+
+_GIVEN_: The OpenAI chat response's content below  
+
+> Here's the C4 diagram for a Python web server reading from an external Postgres database:
+> 
+> ```
+> {
+>   "title": "Python Web Server Reading from External Postgres Database",
+>   "nodes": [
+>     {"id": "0", "label": "Web Server", "technology": "Python"},
+>     {"id": "1", "label": "Postgres", "technology": "Postgres", "external": true, "is_database": true}
+>   ],
+>   "links": [
+>     {"from": "0", "to": "1", "label": "reads from Postgres", "technology": "TCP"}
+>   ],
+>   "footer": "C4 Model"
+> }
+> ```
+> 
+> The diagram shows two nodes: a Python web server and an external Postgres database. The web server reads data from the Postgres database over TCP.
+
+_WHEN_: apply new deserialization and parsing logic
+
+_THEN_: get the following graph definition:
+
+```
+{"title":"Python Web Server Reading from External Postgres Database","nodes":[{"id":"0","label":"Web Server","technology":"Python"},{"id":"1","label":"Postgres","technology":"Postgres","external":true,"is_database":true}],"links":[{"from":"0","to":"1","label":"reads from Postgres","technology":"TCP"}],"footer":"C4 Model"}
+```
+
+### Changed
+
+- OpenAI's tokens consumption tracking
+
 ## [0.0.5] - 2023-04-05
 
 ### Added
