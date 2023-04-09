@@ -14,6 +14,8 @@ import (
 	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
+const placeholderUserID = "00000000-0000-0000-0000-000000000000"
+
 func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 	type args struct {
 		clientModelInference       diagram.ModelInference
@@ -73,7 +75,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 				Prompt:    "foobar",
 				RequestID: "xxxx",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want: mustNewResult(
@@ -121,7 +123,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			input: diagram.MockInput{
 				Prompt: "foobar",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want:    nil,
@@ -139,7 +141,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			input: diagram.MockInput{
 				Prompt: "foobar",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want:    nil,
@@ -157,7 +159,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			input: diagram.MockInput{
 				Prompt: "foobar",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want:    nil,
@@ -177,7 +179,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			input: diagram.MockInput{
 				Prompt: "foobar",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want:    nil,
@@ -275,7 +277,7 @@ func Test_defineModel(t *testing.T) {
 	t.Run(
 		"not registered user", func(t *testing.T) {
 			// GIVEN
-			user := &diagram.User{ID: "NA"}
+			user := &diagram.User{ID: placeholderUserID}
 
 			// WHEN
 			got := defineModel(user)
