@@ -69,6 +69,12 @@ func NewC4ContainersHTTPHandler(
 			return nil, err
 		}
 
+		if clientRepositoryPrediction != nil {
+			_ = clientRepositoryPrediction.WriteInputPrompt(
+				ctx, input.GetRequestID(), input.GetUser().ID, input.GetPrompt(),
+			)
+		}
+
 		model := defineModel(input.GetUser())
 		predictionRaw, diagramPrediction, usageTokensPrompt, usageTokensCompletions, err := clientModelInference.Do(
 			ctx, input.GetPrompt(), contentSystem, model,
@@ -78,14 +84,10 @@ func NewC4ContainersHTTPHandler(
 		}
 
 		if clientRepositoryPrediction != nil {
-			if err := clientRepositoryPrediction.WriteInputPrompt(
-				ctx, input.GetRequestID(), input.GetUser().ID, input.GetPrompt(),
-			); err == nil {
-				_ = clientRepositoryPrediction.WriteModelResult(
-					ctx, input.GetRequestID(), input.GetUser().ID, predictionRaw, model, usageTokensPrompt,
-					usageTokensCompletions,
-				)
-			}
+			_ = clientRepositoryPrediction.WriteModelResult(
+				ctx, input.GetRequestID(), input.GetUser().ID, predictionRaw, string(diagramPrediction), model,
+				usageTokensPrompt, usageTokensCompletions,
+			)
 		}
 
 		if err := errors.NewPredictionError(diagramPrediction); err != nil {
@@ -113,11 +115,11 @@ const (
 )
 
 func defineModel(user *diagram.User) string {
-	if user.IsRegistered {
+	if user != nil && user.IsRegistered {
 		// FIXME: change for fine-tuned model after it's trained
-		return notRegisteredModel
+		return registeredModel
 	}
-	return registeredModel
+	return notRegisteredModel
 }
 
 const contentSystem =
