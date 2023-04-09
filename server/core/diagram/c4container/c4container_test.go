@@ -385,6 +385,53 @@ func Test_UnmarshalGraph(t *testing.T) {
 			}
 		},
 	)
+
+	t.Run(
+		"example: python web server reading from external mongodb", func(t *testing.T) {
+			// GIVEN
+			graphPrediction := []byte(`{"nodes":[{"id":"0","label":"Web Server","technology":"Python","description":"Reads from external MongoDB"},{"id":"1","label":"Database","technology":"MongoDB","external":true,"database":true}],"links":[{"from":"0","to":"1","direction":"LR"}]}`)
+			want := c4ContainersGraph{
+				Containers: []*container{
+					{
+						ID:          "0",
+						Label:       "Web Server",
+						Technology:  "Python",
+						Description: "Reads from external MongoDB",
+					},
+					{
+						ID:         "1",
+						Label:      "Database",
+						Technology: "MongoDB",
+						IsExternal: true,
+						IsDatabase: true,
+					},
+				},
+				Rels: []*rel{
+					{
+						From:      "0",
+						To:        "1",
+						Direction: "LR",
+					},
+				},
+				WithLegend: true,
+			}
+
+			// WHEN
+			var got c4ContainersGraph
+			err := json.Unmarshal(graphPrediction, &got)
+
+			// THEN
+			if err != nil {
+				t.Error("unexpected error")
+				return
+			}
+
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got: %+v, want: %+v", got, want)
+				return
+			}
+		},
+	)
 }
 
 type mockRepositoryPrediction struct {
