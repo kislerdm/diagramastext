@@ -118,9 +118,11 @@ func dslRelation(o *bytes.Buffer, l *rel) {
 
 	writeStrings(o, "(", l.From, ", ", l.To)
 
-	if l.Label != "" {
-		writeStrings(o, `, "`, stringCleaner(l.Label), `"`)
+	label := l.Label
+	if label == "" {
+		label = "Uses"
 	}
+	writeStrings(o, `, "`, stringCleaner(label), `"`)
 
 	if l.Technology != "" {
 		writeStrings(o, `, "`, stringCleaner(l.Technology), `"`)
