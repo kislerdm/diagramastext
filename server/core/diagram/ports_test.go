@@ -66,22 +66,29 @@ func TestMockRepositoryPrediction(t *testing.T) {
 		"happy path", func(t *testing.T) {
 			c := MockRepositoryPrediction{}
 			const (
-				requestID  = "foobar"
-				userID     = "BA"
-				prompt     = "foobar"
-				prediction = "bazqux"
+				requestID     = "foobar"
+				userID        = "BA"
+				prompt        = "foobar"
+				predictionRaw = "bazqux"
+				prediction    = "bazqux"
 			)
 
 			if err := c.WriteInputPrompt(context.TODO(), requestID, userID, prompt); err != nil {
 				t.Error("unexpected error when execute WriteInputPrompt")
 				return
 			}
-			if err := c.WriteModelResult(context.TODO(), requestID, userID, prediction, "model-foo", 0, 0); err != nil {
+			if err := c.WriteModelResult(
+				context.TODO(), requestID, userID, predictionRaw, prediction, "model-foo", 0, 0,
+			); err != nil {
 				t.Error("unexpected error when execute WriteModelResult")
 				return
 			}
 			if err := c.Close(context.TODO()); err != nil {
 				t.Error("unexpected error when execute Close")
+				return
+			}
+			if err := c.WriteSuccessFlag(context.TODO(), requestID, userID, ""); err != nil {
+				t.Error("unexpected error when execute WriteSuccessFlag")
 				return
 			}
 		},
@@ -96,11 +103,12 @@ func TestMockRepositoryPrediction(t *testing.T) {
 			}
 
 			const (
-				requestID  = "foobar"
-				userID     = "BA"
-				prompt     = "foobar"
-				prediction = "bazqux"
-				model      = "model-foo"
+				requestID     = "foobar"
+				userID        = "BA"
+				prompt        = "foobar"
+				predictionRaw = "bazqux"
+				prediction    = "bazqux"
+				model         = "model-foo"
 			)
 
 			if err := c.WriteInputPrompt(context.TODO(), requestID, userID, prompt); !reflect.DeepEqual(err, wantErr) {
@@ -108,7 +116,7 @@ func TestMockRepositoryPrediction(t *testing.T) {
 				return
 			}
 			if err := c.WriteModelResult(
-				context.TODO(), requestID, userID, prediction, model, 0, 0,
+				context.TODO(), requestID, userID, predictionRaw, prediction, model, 0, 0,
 			); !reflect.DeepEqual(
 				err, wantErr,
 			) {
@@ -117,6 +125,10 @@ func TestMockRepositoryPrediction(t *testing.T) {
 			}
 			if err := c.Close(context.TODO()); !reflect.DeepEqual(err, wantErr) {
 				t.Error("unexpected error when execute Close")
+				return
+			}
+			if err := c.WriteSuccessFlag(context.TODO(), requestID, userID, ""); !reflect.DeepEqual(err, wantErr) {
+				t.Error("unexpected error when execute WriteSuccessFlag")
 				return
 			}
 		},

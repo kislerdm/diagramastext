@@ -11,11 +11,20 @@ type HTTPHandler func(ctx context.Context, input Input) (Output, error)
 
 // RepositoryPrediction defines the interface to store prediction input (prompt) and model result.
 type RepositoryPrediction interface {
+	// WriteInputPrompt records user's input prompt.
 	WriteInputPrompt(ctx context.Context, requestID, userID, prompt string) error
+
+	// WriteModelResult records the model's prediction result and the associated costs in tokens.
 	WriteModelResult(
-		ctx context.Context, requestID, userID, prediction, model string,
+		ctx context.Context, requestID, userID, predictionRaw, prediction, model string,
 		usageTokensPrompt, usageTokensCompletions uint16,
 	) error
+
+	// WriteSuccessFlag records the instance of a successful diagram generation
+	// based on the model's prediction result.
+	WriteSuccessFlag(ctx context.Context, requestID, userID, token string) error
+
+	// Close closes connection to persistence service.
 	Close(ctx context.Context) error
 }
 
@@ -26,8 +35,11 @@ type MockRepositoryPrediction struct {
 func (m MockRepositoryPrediction) WriteInputPrompt(_ context.Context, _, _, _ string) error {
 	return m.Err
 }
+func (m MockRepositoryPrediction) WriteModelResult(_ context.Context, _, _, _, _, _ string, _, _ uint16) error {
+	return m.Err
+}
 
-func (m MockRepositoryPrediction) WriteModelResult(_ context.Context, _, _, _, _ string, _, _ uint16) error {
+func (m MockRepositoryPrediction) WriteSuccessFlag(_ context.Context, _, _, _ string) error {
 	return m.Err
 }
 
