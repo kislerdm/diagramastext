@@ -13,13 +13,14 @@ import (
 
 // Config configuration of the postgres Client.
 type Config struct {
-	DBHost          string `json:"db_host"`
-	DBName          string `json:"db_name"`
-	DBUser          string `json:"db_user"`
-	DBPassword      string `json:"db_password"`
-	TablePrompt     string `json:"table_prompt,omitempty"`
-	TablePrediction string `json:"table_prediction,omitempty"`
-	SSLMode         string `json:"ssl_mode"`
+	DBHost             string `json:"db_host"`
+	DBName             string `json:"db_name"`
+	DBUser             string `json:"db_user"`
+	DBPassword         string `json:"db_password"`
+	TablePrompt        string `json:"table_prompt,omitempty"`
+	TablePrediction    string `json:"table_prediction,omitempty"`
+	TableSuccessStatus string `json:"table_success_status,omitempty"`
+	SSLMode            string `json:"ssl_mode"`
 }
 
 func (cfg Config) Validate() error {
@@ -37,6 +38,9 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.TablePrediction == "" {
 		return errors.New("table_prediction must be provided")
+	}
+	if cfg.TableSuccessStatus == "" {
+		return errors.New("table_success_status must be provided")
 	}
 	return validateSSLMode(cfg.SSLMode)
 }
@@ -77,7 +81,7 @@ func NewPostgresClient(ctx context.Context, cfg Config) (
 	}
 
 	if cfg.DBHost == "mock" {
-		db = mockDbClient{}
+		db = &mockDbClient{}
 	}
 
 	if err := db.PingContext(ctx); err != nil {
@@ -88,6 +92,7 @@ func NewPostgresClient(ctx context.Context, cfg Config) (
 		c:                         db,
 		tableWritePrompt:          cfg.TablePrompt,
 		tableWriteModelPrediction: cfg.TablePrediction,
+		tableWriteSuccessFlag:     cfg.TableSuccessStatus,
 	}, nil
 }
 
@@ -105,6 +110,7 @@ type Client struct {
 	c                         dbClient
 	tableWritePrompt          string
 	tableWriteModelPrediction string
+	tableWriteSuccessFlag     string
 }
 
 func (c Client) Close(_ context.Context) error {
@@ -129,38 +135,91 @@ func (c Client) WriteInputPrompt(ctx context.Context, requestID, userID, prompt 
 	return err
 }
 
-func (c Client) WriteModelResult(ctx context.Context, requestID, userID, prediction string) error {
+func (c Client) WriteModelResult(
+	ctx context.Context, requestID, userID, predictionRaw, prediction, model string,
+	usageTokensPrompt, usageTokensCompletions uint16,
+) error {
 	if requestID == "" {
 		return errors.New("request_id is required")
+	}
+	if userID == "" {
+		return errors.New("user_id is required")
+	}
+	if predictionRaw == "" {
+		return errors.New("raw response is required")
 	}
 	if prediction == "" {
 		return errors.New("response is required")
 	}
+	if model == "" {
+		return errors.New("model is required")
+	}
 	_, err := c.c.ExecContext(
 		ctx, `INSERT INTO `+c.tableWriteModelPrediction+
-			` (request_id, user_id, response, timestamp) VALUES ($1, $2, $3, $4)`,
+			` (request_id, user_id, response, timestamp, model_id, prompt_tokens, completion_tokens, response_raw) 
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		requestID,
 		userID,
 		prediction,
 		time.Now().UTC(),
+		model,
+		usageTokensPrompt,
+		usageTokensCompletions,
+		predictionRaw,
 	)
 	return err
 }
 
+func (c Client) WriteSuccessFlag(ctx context.Context, requestID, userID, token string) error {
+	if requestID == "" {
+		return errors.New("request_id is required")
+	}
+	if userID == "" {
+		return errors.New("user_id is required")
+	}
+
+	if token != "" {
+		_, err := c.c.ExecContext(
+			ctx, `INSERT INTO `+c.tableWriteSuccessFlag+
+				` (request_id, user_id, token, timestamp) VALUES ($1, $2, $3, $4)`,
+			requestID,
+			userID,
+			token,
+			time.Now().UTC(),
+		)
+		return err
+	}
+
+	_, err := c.c.ExecContext(
+		ctx, `INSERT INTO `+c.tableWriteSuccessFlag+
+			` (request_id, user_id, timestamp) VALUES ($1, $2, $3)`,
+		requestID,
+		userID,
+		time.Now().UTC(),
+	)
+
+	return err
+}
+
 type mockDbClient struct {
-	err error
+	err   error
+	query string
 }
 
-func (m mockDbClient) Close() error {
+func (m *mockDbClient) Close() error {
 	return m.err
 }
 
-func (m mockDbClient) PingContext(_ context.Context) error {
+func (m *mockDbClient) PingContext(_ context.Context) error {
 	return m.err
 }
 
-func (m mockDbClient) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
-	return nil, m.err
+func (m *mockDbClient) ExecContext(_ context.Context, query string, _ ...any) (sql.Result, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	m.query = query
+	return nil, nil
 }
 
 type dbClient interface {

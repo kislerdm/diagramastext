@@ -116,7 +116,7 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 			},
 			want: &inquiry{
 				Prompt: validPrompt,
-				User:   &User{ID: "NA"},
+				User:   &User{ID: "00000000-0000-0000-0000-000000000000"},
 			},
 			wantErr: false,
 		},

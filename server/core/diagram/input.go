@@ -114,5 +114,5 @@ func NewInputDriverHTTP(body io.Reader, headers http.Header) (Input, error) {
 
 func userProfileFromHTTPHeaders(_ http.Header) *User {
 	// FIXME: change when the auth layer is implemented
-	return &User{ID: "NA"}
+	return &User{ID: "00000000-0000-0000-0000-000000000000"}
 }

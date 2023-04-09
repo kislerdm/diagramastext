@@ -9,19 +9,24 @@ import (
 )
 
 const (
-	tableWritePrompt          = "user_prompt"
-	tableWriteModelPrediction = "openai_response"
-	defaultSSLMode            = "verify-full"
+	defaultSSLMode = "verify-full"
+
+	tableWritePrompt          = "user_prompts"
+	tableWriteModelPrediction = "openai_responses"
+	tableWriteSuccessStatus   = "successful_requests"
+	//tableLookupUser            = "users"
+	//tableLookupApiTokens       = "api_tokens"
 )
 
 type repositoryPredictionConfig struct {
-	DBHost          string `json:"db_host"`
-	DBName          string `json:"db_name"`
-	DBUser          string `json:"db_user"`
-	DBPassword      string `json:"db_password"`
-	TablePrompt     string `json:"table_prompt"`
-	TablePrediction string `json:"table_prediction"`
-	SSLMode         string `json:"ssl_mode"`
+	DBHost             string `json:"db_host"`
+	DBName             string `json:"db_name"`
+	DBUser             string `json:"db_user"`
+	DBPassword         string `json:"db_password"`
+	TablePrompt        string `json:"table_prompt"`
+	TablePrediction    string `json:"table_prediction"`
+	TableSuccessStatus string `json:"table_success_status"`
+	SSLMode            string `json:"ssl_mode"`
 }
 
 type secret struct {
@@ -43,9 +48,10 @@ func LoadDefaultConfig(ctx context.Context, clientSecretsManager diagram.Reposit
 	// defaults
 	cfg := Config{
 		RepositoryPredictionConfig: repositoryPredictionConfig{
-			TablePrompt:     tableWritePrompt,
-			TablePrediction: tableWriteModelPrediction,
-			SSLMode:         defaultSSLMode,
+			TablePrompt:        tableWritePrompt,
+			TablePrediction:    tableWriteModelPrediction,
+			TableSuccessStatus: tableWriteSuccessStatus,
+			SSLMode:            defaultSSLMode,
 		},
 	}
 
@@ -85,6 +91,10 @@ func loadEnvVarConfig(cfg *Config) {
 
 	if v := os.Getenv("TABLE_PREDICTION"); v != "" {
 		cfg.RepositoryPredictionConfig.TablePrediction = v
+	}
+
+	if v := os.Getenv("TABLE_SUCCESS_STATUS"); v != "" {
+		cfg.RepositoryPredictionConfig.TableSuccessStatus = v
 	}
 
 	if v := os.Getenv("SSL_MODE"); v != "" {

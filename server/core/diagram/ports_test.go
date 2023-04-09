@@ -23,7 +23,7 @@ func TestMockModelInference(t *testing.T) {
 			}
 
 			// WHEN
-			got, err := c.Do(context.TODO(), "foobar", "quxquxx", "model-foo")
+			_, got, _, _, err := c.Do(context.TODO(), "foobar", "quxquxx", "model-foo")
 
 			// THEN
 			if err != nil {
@@ -44,7 +44,7 @@ func TestMockModelInference(t *testing.T) {
 			c := MockModelInference{Err: wantErr}
 
 			// WHEN
-			got, err := c.Do(context.TODO(), "foobar", "quxquxx", "model-foo")
+			_, got, _, _, err := c.Do(context.TODO(), "foobar", "quxquxx", "model-foo")
 
 			// THEN
 			if !reflect.DeepEqual(err, wantErr) {
@@ -66,22 +66,29 @@ func TestMockRepositoryPrediction(t *testing.T) {
 		"happy path", func(t *testing.T) {
 			c := MockRepositoryPrediction{}
 			const (
-				requestID  = "foobar"
-				userID     = "BA"
-				prompt     = "foobar"
-				prediction = "bazqux"
+				requestID     = "foobar"
+				userID        = "BA"
+				prompt        = "foobar"
+				predictionRaw = "bazqux"
+				prediction    = "bazqux"
 			)
 
 			if err := c.WriteInputPrompt(context.TODO(), requestID, userID, prompt); err != nil {
 				t.Error("unexpected error when execute WriteInputPrompt")
 				return
 			}
-			if err := c.WriteModelResult(context.TODO(), requestID, userID, prediction); err != nil {
+			if err := c.WriteModelResult(
+				context.TODO(), requestID, userID, predictionRaw, prediction, "model-foo", 0, 0,
+			); err != nil {
 				t.Error("unexpected error when execute WriteModelResult")
 				return
 			}
 			if err := c.Close(context.TODO()); err != nil {
 				t.Error("unexpected error when execute Close")
+				return
+			}
+			if err := c.WriteSuccessFlag(context.TODO(), requestID, userID, ""); err != nil {
+				t.Error("unexpected error when execute WriteSuccessFlag")
 				return
 			}
 		},
@@ -96,17 +103,21 @@ func TestMockRepositoryPrediction(t *testing.T) {
 			}
 
 			const (
-				requestID  = "foobar"
-				userID     = "BA"
-				prompt     = "foobar"
-				prediction = "bazqux"
+				requestID     = "foobar"
+				userID        = "BA"
+				prompt        = "foobar"
+				predictionRaw = "bazqux"
+				prediction    = "bazqux"
+				model         = "model-foo"
 			)
 
 			if err := c.WriteInputPrompt(context.TODO(), requestID, userID, prompt); !reflect.DeepEqual(err, wantErr) {
 				t.Error("unexpected error when execute WriteInputPrompt")
 				return
 			}
-			if err := c.WriteModelResult(context.TODO(), requestID, userID, prediction); !reflect.DeepEqual(
+			if err := c.WriteModelResult(
+				context.TODO(), requestID, userID, predictionRaw, prediction, model, 0, 0,
+			); !reflect.DeepEqual(
 				err, wantErr,
 			) {
 				t.Error("unexpected error when execute WriteModelResult")
@@ -114,6 +125,10 @@ func TestMockRepositoryPrediction(t *testing.T) {
 			}
 			if err := c.Close(context.TODO()); !reflect.DeepEqual(err, wantErr) {
 				t.Error("unexpected error when execute Close")
+				return
+			}
+			if err := c.WriteSuccessFlag(context.TODO(), requestID, userID, ""); !reflect.DeepEqual(err, wantErr) {
+				t.Error("unexpected error when execute WriteSuccessFlag")
 				return
 			}
 		},

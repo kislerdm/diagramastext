@@ -14,6 +14,8 @@ import (
 	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
+const placeholderUserID = "00000000-0000-0000-0000-000000000000"
+
 func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 	type args struct {
 		clientModelInference       diagram.ModelInference
@@ -73,7 +75,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 				Prompt:    "foobar",
 				RequestID: "xxxx",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want: mustNewResult(
@@ -121,11 +123,11 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			input: diagram.MockInput{
 				Prompt: "foobar",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want:    nil,
-			wantErr: errors.New("diagram/c4container/c4container.go:76: foobar"),
+			wantErr: errors.New("diagram/c4container/c4container.go:83: foobar"),
 		},
 		{
 			name: "unhappy path: failed to predict",
@@ -139,7 +141,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			input: diagram.MockInput{
 				Prompt: "foobar",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want:    nil,
@@ -157,7 +159,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			input: diagram.MockInput{
 				Prompt: "foobar",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want:    nil,
@@ -177,7 +179,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			input: diagram.MockInput{
 				Prompt: "foobar",
 				User: &diagram.User{
-					ID: "NA",
+					ID: placeholderUserID,
 				},
 			},
 			want:    nil,
@@ -275,7 +277,7 @@ func Test_defineModel(t *testing.T) {
 	t.Run(
 		"not registered user", func(t *testing.T) {
 			// GIVEN
-			user := &diagram.User{ID: "NA"}
+			user := &diagram.User{ID: placeholderUserID}
 
 			// WHEN
 			got := defineModel(user)
@@ -380,6 +382,257 @@ func Test_UnmarshalGraph(t *testing.T) {
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("got: %+v, want: %+v", got, want)
 				return
+			}
+		},
+	)
+
+	t.Run(
+		"example: python web server reading from external mongodb", func(t *testing.T) {
+			// GIVEN
+			graphPrediction := []byte(`{"nodes":[{"id":"0","label":"Web Server","technology":"Python","description":"Reads from external MongoDB"},{"id":"1","label":"Database","technology":"MongoDB","external":true,"database":true}],"links":[{"from":"0","to":"1","direction":"LR"}]}`)
+			want := c4ContainersGraph{
+				Containers: []*container{
+					{
+						ID:          "0",
+						Label:       "Web Server",
+						Technology:  "Python",
+						Description: "Reads from external MongoDB",
+					},
+					{
+						ID:         "1",
+						Label:      "Database",
+						Technology: "MongoDB",
+						IsExternal: true,
+						IsDatabase: true,
+					},
+				},
+				Rels: []*rel{
+					{
+						From:      "0",
+						To:        "1",
+						Direction: "LR",
+					},
+				},
+				WithLegend: true,
+			}
+
+			// WHEN
+			var got c4ContainersGraph
+			err := json.Unmarshal(graphPrediction, &got)
+
+			// THEN
+			if err != nil {
+				t.Error("unexpected error")
+				return
+			}
+
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got: %+v, want: %+v", got, want)
+				return
+			}
+		},
+	)
+}
+
+type mockRepositoryPrediction struct {
+	InputPromptWritten     uint8
+	ModelPredictionWritten uint8
+	SuccessFlagWritten     uint8
+}
+
+func (m *mockRepositoryPrediction) WriteInputPrompt(_ context.Context, _, _, _ string) error {
+	m.InputPromptWritten++
+	return nil
+}
+
+func (m *mockRepositoryPrediction) WriteModelResult(_ context.Context, _, _, _, _, _ string, _, _ uint16) error {
+	m.ModelPredictionWritten++
+	return nil
+}
+
+func (m *mockRepositoryPrediction) WriteSuccessFlag(_ context.Context, _, _, _ string) error {
+	m.SuccessFlagWritten++
+	return nil
+}
+
+func (m *mockRepositoryPrediction) Close(_ context.Context) error {
+	return nil
+}
+
+func TestC4ContainerHandlerRepositoryPredictionPersistence(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"happy path", func(t *testing.T) {
+			// GIVEN
+			repositoryPredictionClient := &mockRepositoryPrediction{}
+
+			modelInferenceClient := diagram.MockModelInference{
+				V: []byte(`{"nodes":[{"id":"0"}]}`),
+			}
+
+			httpClient := diagram.MockHTTPClient{
+				V: &http.Response{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(
+						strings.NewReader(
+							`<?xml version="1.0" encoding="us-ascii" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="100%" height="100%">
+<defs></defs><g><g id="elem_n0"><rect fill="#438DD5" width="52.5938" rx="2.5" ry="2.5"></rect></g></g></svg>`,
+						),
+					),
+				},
+			}
+
+			userInput := diagram.MockInput{
+				Prompt:    "foobar",
+				RequestID: "1410904f-f646-488f-ae08-cc341dfb321c",
+				User: &diagram.User{
+					ID: placeholderUserID,
+				},
+			}
+
+			handler, err := NewC4ContainersHTTPHandler(modelInferenceClient, repositoryPredictionClient, httpClient)
+
+			if err != nil {
+				t.Fatalf("unexpected init error")
+			}
+
+			// WHEN
+			if _, err := handler(context.TODO(), userInput); err != nil {
+				t.Errorf("unexpected handling error: %+v", err)
+			}
+
+			// THEN
+			if repositoryPredictionClient.InputPromptWritten != 1 {
+				t.Errorf(
+					"prompt persisted unexpectedly: got = %v\nwant = %v",
+					repositoryPredictionClient.InputPromptWritten, 1,
+				)
+			}
+			if repositoryPredictionClient.ModelPredictionWritten != 1 {
+				t.Errorf(
+					"model's prediction persisted unexpectedly: got = %v\nwant = %v",
+					repositoryPredictionClient.ModelPredictionWritten, 1,
+				)
+			}
+			if repositoryPredictionClient.SuccessFlagWritten != 1 {
+				t.Errorf(
+					"successful generation flag persisted unexpectedly: got = %v\nwant = %v",
+					repositoryPredictionClient.SuccessFlagWritten, 1,
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"unhappy path: model inference failed", func(t *testing.T) {
+			// GIVEN
+			repositoryPredictionClient := &mockRepositoryPrediction{}
+
+			const errMsg = "foobar"
+			modelInferenceClient := diagram.MockModelInference{
+				Err: errors.New(errMsg),
+			}
+
+			httpClient := diagram.MockHTTPClient{}
+
+			userInput := diagram.MockInput{
+				Prompt:    "foobar",
+				RequestID: "1410904f-f646-488f-ae08-cc341dfb321c",
+				User: &diagram.User{
+					ID: placeholderUserID,
+				},
+			}
+
+			handler, err := NewC4ContainersHTTPHandler(modelInferenceClient, repositoryPredictionClient, httpClient)
+
+			if err != nil {
+				t.Fatalf("unexpected init error")
+			}
+
+			// WHEN
+			if _, err := handler(context.TODO(), userInput); !diagramErrors.IsError(
+				err, err.Error(),
+			) || !strings.HasSuffix(err.Error(), errMsg) {
+				t.Error("unexpected handling error")
+			}
+
+			// THEN
+			if repositoryPredictionClient.InputPromptWritten != 1 {
+				t.Errorf(
+					"prompt persisted unexpectedly: got = %v\nwant = %v",
+					repositoryPredictionClient.InputPromptWritten, 1,
+				)
+			}
+			if repositoryPredictionClient.ModelPredictionWritten != 0 {
+				t.Errorf(
+					"model's prediction persisted unexpectedly: got = %v\nwant = %v",
+					repositoryPredictionClient.ModelPredictionWritten, 0,
+				)
+			}
+			if repositoryPredictionClient.SuccessFlagWritten != 0 {
+				t.Errorf(
+					"successful generation flag persisted unexpectedly: got = %v\nwant = %v",
+					repositoryPredictionClient.SuccessFlagWritten, 0,
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"unhappy path: diagram generation failed", func(t *testing.T) {
+			// GIVEN
+			repositoryPredictionClient := &mockRepositoryPrediction{}
+
+			modelInferenceClient := diagram.MockModelInference{
+				V: []byte(`{"nodes":[{"id":"0"}]}`),
+			}
+
+			const errMsg = "foobar"
+			httpClient := diagram.MockHTTPClient{
+				Err: errors.New(errMsg),
+			}
+
+			userInput := diagram.MockInput{
+				Prompt:    "foobar",
+				RequestID: "1410904f-f646-488f-ae08-cc341dfb321c",
+				User: &diagram.User{
+					ID: placeholderUserID,
+				},
+			}
+
+			handler, err := NewC4ContainersHTTPHandler(modelInferenceClient, repositoryPredictionClient, httpClient)
+
+			if err != nil {
+				t.Fatalf("unexpected init error")
+			}
+
+			// WHEN
+			if _, err := handler(context.TODO(), userInput); !diagramErrors.IsError(
+				err, err.Error(),
+			) || !strings.HasSuffix(err.Error(), errMsg) {
+				t.Error("unexpected handling error")
+			}
+
+			// THEN
+			if repositoryPredictionClient.InputPromptWritten != 1 {
+				t.Errorf(
+					"prompt persisted unexpectedly: got = %v\nwant = %v",
+					repositoryPredictionClient.InputPromptWritten, 1,
+				)
+			}
+			if repositoryPredictionClient.ModelPredictionWritten != 1 {
+				t.Errorf(
+					"model's prediction persisted unexpectedly: got = %v\nwant = %v",
+					repositoryPredictionClient.ModelPredictionWritten, 1,
+				)
+			}
+			if repositoryPredictionClient.SuccessFlagWritten != 0 {
+				t.Errorf(
+					"successful generation flag persisted unexpectedly: got = %v\nwant = %v",
+					repositoryPredictionClient.SuccessFlagWritten, 0,
+				)
 			}
 		},
 	)
