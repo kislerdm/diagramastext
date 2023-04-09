@@ -55,13 +55,14 @@ func init() {
 
 	postgresClient, err = postgres.NewPostgresClient(
 		context.Background(), postgres.Config{
-			DBHost:          cfg.RepositoryPredictionConfig.DBHost,
-			DBName:          cfg.RepositoryPredictionConfig.DBName,
-			DBUser:          cfg.RepositoryPredictionConfig.DBUser,
-			DBPassword:      cfg.RepositoryPredictionConfig.DBPassword,
-			TablePrompt:     cfg.RepositoryPredictionConfig.TablePrompt,
-			TablePrediction: cfg.RepositoryPredictionConfig.TablePrediction,
-			SSLMode:         cfg.RepositoryPredictionConfig.SSLMode,
+			DBHost:             cfg.RepositoryPredictionConfig.DBHost,
+			DBName:             cfg.RepositoryPredictionConfig.DBName,
+			DBUser:             cfg.RepositoryPredictionConfig.DBUser,
+			DBPassword:         cfg.RepositoryPredictionConfig.DBPassword,
+			TablePrompt:        cfg.RepositoryPredictionConfig.TablePrompt,
+			TablePrediction:    cfg.RepositoryPredictionConfig.TablePrediction,
+			TableSuccessStatus: cfg.RepositoryPredictionConfig.TableSuccessStatus,
+			SSLMode:            cfg.RepositoryPredictionConfig.SSLMode,
 		},
 	)
 	if err != nil {
