@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS users
     update_at       TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+INSERT INTO users (user_id, is_active) VALUES ('00000000-0000-0000-0000-000000000000', TRUE);
+
 CREATE TABLE IF NOT EXISTS api_tokens
 (
     token      UUID      NOT NULL PRIMARY KEY,
