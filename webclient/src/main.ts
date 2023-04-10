@@ -118,7 +118,7 @@ ${Footer(cfg.version)}
         const timeout = setTimeout(() => elapsedRequestThreshold = true, elapsedThresholdMS);
 
         Loader.show(mountPoint);
-        fetch(cfg.urlAPI, {
+        fetch(`${cfg.urlAPI}/internal/generate/c4`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

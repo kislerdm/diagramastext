@@ -30,7 +30,7 @@ func NewHTTPHandler(
 
 	return &httpHandler{
 		diagramRenderingHandler: map[string]diagram.HTTPHandler{
-			"/c4": c4DiagramHandler,
+			"/generate/c4": c4DiagramHandler,
 		},
 		corsHeaders:   corsHeaders,
 		reportErrorFn: func(err error) { l.Println(err) },
@@ -58,8 +58,11 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
 }
 
 func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch p := r.URL.Path; p {
-	case "/status":
+	const (
+		pathPrefixInternal = "/internal"
+		pathStatus         = "/status"
+	)
+	if r.URL.Path == pathStatus {
 		switch r.Method {
 		case http.MethodGet, http.MethodOptions:
 			h.response(w, nil, nil)
@@ -67,66 +70,82 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			h.response(
 				w, nil, newInvalidMethodError(
-					errors.New("method "+r.Method+" not allowed for path: "+p),
+					errors.New("method "+r.Method+" not allowed for path: "+r.URL.Path),
 				),
 			)
 			return
 		}
+	}
+
+	switch strings.HasPrefix(r.URL.Path, pathPrefixInternal) {
+	case false:
+		h.authorizationAPI(w, r)
+	default:
+		h.authorization(w, r)
+		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixInternal)
+	}
+
+	h.diagramRendering(w, r)
+}
+
+func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
+	routePath := r.URL.Path
+
+	renderingHandler, ok := h.diagramRenderingHandler[routePath]
+	if !ok {
+		h.response(
+			w, []byte(`{"error":"not exists"}`),
+			newHandlerNotExistsError(errors.New("handler not exists for path "+routePath)),
+		)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodOptions:
+		h.response(w, nil, nil)
+		return
+
+	case http.MethodPost:
+		defer func() { _ = r.Body.Close() }()
+		input, err := diagram.NewInputDriverHTTP(r.Body, r.Header)
+		if err != nil {
+			h.response(w, []byte(`{"error":"wrong request content"}`), newValidationError(err))
+			return
+		}
+
+		result, err := renderingHandler(r.Context(), input)
+		switch err.(type) {
+		case nil:
+		case diagramErrors.ModelPredictionError:
+			h.response(w, err.(diagramErrors.ModelPredictionError).RawJSON, newModelPredictionError(err))
+			return
+		default:
+			h.response(w, []byte(`{"error":"internal error"}`), newCoreLogicError(err))
+			return
+		}
+
+		bytes, err := result.Serialize()
+		if err != nil {
+			h.response(w, []byte(`{"error":"internal error"}`), newResponseSerialisationError(err))
+			return
+		}
+
+		h.response(w, bytes, nil)
+		return
 
 	default:
-		renderingHandler, ok := h.diagramRenderingHandler[p]
-		if !ok {
-			h.response(
-				w, []byte(`{"error":"not exists"}`),
-				newHandlerNotExistsError(errors.New("handler not exists for path "+p)),
-			)
-			return
-		}
-
-		switch r.Method {
-		case http.MethodOptions:
-			h.response(w, nil, nil)
-			return
-
-		case http.MethodPost:
-			defer func() { _ = r.Body.Close() }()
-			input, err := diagram.NewInputDriverHTTP(r.Body, r.Header)
-			if err != nil {
-				h.response(w, []byte(`{"error":"wrong request content"}`), newValidationError(err))
-				return
-			}
-
-			result, err := renderingHandler(r.Context(), input)
-			switch err.(type) {
-			case nil:
-			case diagramErrors.ModelPredictionError:
-				h.response(w, err.(diagramErrors.ModelPredictionError).RawJSON, newModelPredictionError(err))
-				return
-			default:
-				h.response(w, []byte(`{"error":"internal error"}`), newCoreLogicError(err))
-				return
-			}
-
-			bytes, err := result.Serialize()
-			if err != nil {
-				h.response(w, []byte(`{"error":"internal error"}`), newResponseSerialisationError(err))
-				return
-			}
-
-			h.response(w, bytes, nil)
-			return
-
-		default:
-			h.response(
-				w, nil, newInvalidMethodError(
-					errors.New("method "+r.Method+" not allowed for path: "+p),
-				),
-			)
-			return
-		}
-
+		h.response(
+			w, nil, newInvalidMethodError(
+				errors.New("method "+r.Method+" not allowed for path: "+routePath),
+			),
+		)
+		return
 	}
 }
+
+func (h httpHandler) authorization(_ http.ResponseWriter, _ *http.Request) {}
+
+func (h httpHandler) authorizationAPI(_ http.ResponseWriter, _ *http.Request) {}
 
 type corsHeaders map[string]string
 

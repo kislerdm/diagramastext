@@ -44,7 +44,7 @@ services:
       DB_DBNAME: postgres
       DB_USER: postgres
       DB_PASSWORD: postgres
-      CORS_HEADERS: '{"Access-Control-Allow-Origin":"http://localhost:${PORT_CLIENT}","Access-Control-Allow-Methods":"POST,OPTIONS","Access-Control-Allow-Headers":"Content-Type,X-Amz-Date,x-api-key,Authorization,X-Api-Key,X-Amz-Security-Token"}'
+      CORS_HEADERS: '{"Access-Control-Allow-Origin":"http://localhost:${PORT_CLIENT}","Access-Control-Allow-Methods":"POST,OPTIONS","Access-Control-Allow-Headers":"Content-Type,Authorization"}'
       PORT: 9000
       GOOGLE_APPLICATION_CREDENTIALS: '/key.json'
     ports:
@@ -56,7 +56,7 @@ services:
     image: node:current-alpine3.17
     container_name: diagranastext-webclient
     environment:
-      VITE_URL_API: "http://localhost:${PORT_SERVER}/c4"
+      VITE_URL_API: "http://localhost:${PORT_SERVER}"
       VITE_VERSION: $VERSION
     ports:
       - ${PORT_CLIENT}:9001
