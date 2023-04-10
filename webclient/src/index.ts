@@ -12,4 +12,14 @@ const cfg: Config = {
     promptMaxLengthUserRegistered: 300,
 }
 
-Main(document.querySelector<HTMLDivElement>("main")!, cfg);
+const mountPoint = document.querySelector<HTMLDivElement>("main")!;
+
+switch (window.location.pathname) {
+    case "/api-reference":
+        location.replace( `${window.location.pathname}/index.html`);
+        break;
+    default:
+        Main(mountPoint, cfg);
+        window.history.replaceState({}, document.title, "./");
+        break;
+}
