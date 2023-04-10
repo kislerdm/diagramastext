@@ -1,94 +1,115 @@
-swagger: "2.0"
+openapi: "3.0.3"
 info:
   title: "DiagramAsText API"
   description: |
-    API to generate diagrams using the <a href="https://diagramastext.dev" target="_blanck">diagramastext.dev</a> core logic.
+    API to generate diagrams using the <a href="https://diagramastext.dev" target="_blanck">diagramastext.dev</a> core.
   version: "0.0.6"
   contact:
-    email: contact@diagramastext.dec
-    name: in case of questions
+    email: contact@diagramastext.dev
+    name: to access, and to discuss usage conditions and special requests
   license:
     name: "Apache 2.0"
     url: "http://www.apache.org/licenses/LICENSE-2.0.html"
-host: api.diagramastext.dev
-basePath: /
-schemes:
-  - https
+servers:
+  - url: api.diagramastext.dev
 security:
-  - Authorization: []
+  - BearerAuth: [ ]
+tags:
+  - name: "Generate Diagram"
+    description: |
+      There methods are used to generate diagrams using description in plain English. 
+      
+      <strong>Note</strong>: the execution is <strong><i>not idempotent</i></strong>, i.e. same prompt may yield different result.
 paths:
   /generate/c4:
     post:
       tags:
-        - "Generate diagram using plain English"
+        - "Generate Diagram"
       summary: "Generates C4 Containers diagram"
-      produces:
-        - "application/json"
-      parameters:
-        - in: "body"
-          name: "body"
-          description: "Input prompt in plain English"
-          required: true
-          schema:
-            $ref: "#/definitions/RequestGenerateDiagram"
+      description: "The method generates C4 Container diagram as SVG."
+      requestBody:
+        description: "Input prompt in plain English"
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/RequestGenerateDiagram"
       responses:
         '200':
           description: OK
-          schema:
-            $ref: "#/definitions/ResponseDaigramSVG"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ResponseDaigramSVG"
         '400':
           description: Invalid request format
-          schema:
-            $ref: "#/definitions/Error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Error"
         '401':
           description: Unauthorized
-          schema:
-            $ref: "#/definitions/Error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Error"
+        '403':
+          description: Usage quota exceeded
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Error"
         '422':
           description: Invalid input prompt
-          schema:
-            $ref: "#/definitions/Error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Error"
         '429':
           description: Throttling quota exceeded
-          schema:
-            $ref: "#/definitions/Error"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Error"
         '500':
-          description: Core logic error
-          schema:
-            $ref: "#/definitions/Error"
-securityDefinitions:
-  Authorization:
-    type: "apiKey"
-    name: "Authorization"
-    in: "header"
-    description: "API access key"
-definitions:
-  RequestGenerateDiagram:
-    type: object
-    required:
-      - "prompt"
-    additionalProperties: false
-    properties:
-      prompt:
-        description: "Diagram description in plain English"
-        type: "string"
-        minLength: 3
-  ResponseDaigramSVG:
-    type: object
-    required:
-      - "svg"
-    additionalProperties: false
-    properties:
-      svg:
-        description: "Generated diagram as SVG"
-        type: "string"
-  Error:
-    type: object
-    required:
-      - "error"
-    additionalProperties: false
-    properties:
-      error:
-        description: "Error message"
-        type: "string"
-        minLength: 1
+          description: Server error
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: "The diagramastext.dev API key"
+  schemas:
+    RequestGenerateDiagram:
+      type: object
+      required:
+        - "prompt"
+      additionalProperties: false
+      properties:
+        prompt:
+          description: "Diagram description in plain English"
+          type: "string"
+          minLength: 3
+    ResponseDaigramSVG:
+      type: object
+      required:
+        - "svg"
+      additionalProperties: false
+      properties:
+        svg:
+          description: "Generated diagram as SVG"
+          type: "string"
+    Error:
+      type: object
+      required:
+        - "error"
+      additionalProperties: false
+      properties:
+        error:
+          description: "Error message"
+          type: "string"
+          minLength: 1
