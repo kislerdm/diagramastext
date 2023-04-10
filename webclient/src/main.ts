@@ -1,4 +1,3 @@
-import './global.css';
 // @ts-ignore
 import {arrow, box, boxText} from './main.module.css';
 

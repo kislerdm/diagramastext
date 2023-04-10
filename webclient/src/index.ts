@@ -1,3 +1,4 @@
+import './global.css';
 import Main from "./main";
 import {Config} from "./ports";
 
