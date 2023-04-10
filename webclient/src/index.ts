@@ -1,5 +1,6 @@
 import './global.css';
 import Main from "./main";
+import ApiReference from "./api-reference";
 import {Config} from "./ports";
 
 const cfg: Config = {
@@ -12,4 +13,14 @@ const cfg: Config = {
     promptMaxLengthUserRegistered: 300,
 }
 
-Main(document.querySelector<HTMLDivElement>("main")!, cfg);
+const mountPoint = document.querySelector<HTMLDivElement>("main")!;
+
+switch (window.location.pathname) {
+    case "/api-reference":
+        ApiReference(mountPoint);
+        break;
+    default:
+        Main(mountPoint, cfg);
+        window.history.replaceState({}, document.title, "./");
+        break;
+}
