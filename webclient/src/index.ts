@@ -1,6 +1,4 @@
-import './global.css';
 import Main from "./main";
-import ApiReference from "./api-reference";
 import {Config} from "./ports";
 
 const cfg: Config = {
@@ -17,7 +15,7 @@ const mountPoint = document.querySelector<HTMLDivElement>("main")!;
 
 switch (window.location.pathname) {
     case "/api-reference":
-        ApiReference(mountPoint);
+        location.replace( `${window.location.pathname}/index.html`);
         break;
     default:
         Main(mountPoint, cfg);

@@ -38,6 +38,8 @@ jobs:
 
   deploy-stage:
     runs-on: ubuntu-20.04
+    env:
+      VITE_URL_API: "https://api-stage.diagramastext.dev"
     needs:
       - test
     environment:
@@ -48,12 +50,14 @@ jobs:
         with:
           fetch-depth: 0
       - name: Build
-        env:
-          VITE_URL_API: "https://api-stage.diagramastext.dev/c4"
         run: |
           export VITE_VERSION=$GITHUB_SHA
           npm install
           npm run build
+      - name: Add api spec page
+        run: |
+          docker run -e SERVER=$VITE_URL_API -v ${PWD}/api-reference:/app -t hairyhenderson/gomplate:stable -f /app/api-spec.yaml -o /app/api-spec.yaml
+          cp -r api-reference dist/
       - name: Sync webclient
         uses: cpina/github-action-push-to-another-repository@v1.5.1
         env:
@@ -67,6 +71,8 @@ jobs:
 
   deploy-prod:
     runs-on: ubuntu-20.04
+    env:
+      VITE_URL_API: "https://api.diagramastext.dev"
     needs:
       - deploy-stage
     environment:
@@ -78,12 +84,15 @@ jobs:
         with:
           fetch-depth: 0
       - name: Build
-        env:
-          VITE_URL_API: "https://api.diagramastext.dev/c4"
         run: |
           export VITE_VERSION=$GITHUB_SHA
           npm install
           npm run build
+
+      - name: Add api spec page
+        run: |
+          docker run -e SERVER=$VITE_URL_API -v ${PWD}/api-reference:/app -t hairyhenderson/gomplate:stable -f /app/api-spec.yaml -o /app/api-spec.yaml
+          cp -r api-reference dist/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1

@@ -1,0 +1,30 @@
+html {
+    box-sizing: border-box;
+    overflow-y: scroll;
+    -webkit-text-size-adjust: 100%;
+    -moz-tab-size: 4;
+    tab-size: 4;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif
+}
+
+*,
+*:before,
+*:after {
+    box-sizing: border-box;
+    border: 0 solid #e5e7eb
+}
+
+body {
+    background-color: #e8e5e5;
+    margin: 0;
+}
+
+main {
+    width: 800px;
+}
+
+@media only screen and (max-width: 800px) {
+    main {
+        width: 100%;
+    }
+}
