@@ -62,6 +62,8 @@ func init() {
 			TablePrompt:        cfg.RepositoryPredictionConfig.TablePrompt,
 			TablePrediction:    cfg.RepositoryPredictionConfig.TablePrediction,
 			TableSuccessStatus: cfg.RepositoryPredictionConfig.TableSuccessStatus,
+			TableUsers:         cfg.RepositoryPredictionConfig.TableUsers,
+			TableTokens:        cfg.RepositoryPredictionConfig.TableAPITokens,
 			SSLMode:            cfg.RepositoryPredictionConfig.SSLMode,
 		},
 	)

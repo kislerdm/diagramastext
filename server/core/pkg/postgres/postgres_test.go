@@ -550,17 +550,17 @@ func TestClient_WriteSuccessFlag(t *testing.T) {
 				userID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
 				token:     "1410904f-f646-488f-ae08-cc341dfb321c",
 			},
-			wantExecutedQueryTemplate: `INSERT INTO $1 
-(
+			wantExecutedQueryTemplate: `INSERT INTO ` + table +
+				` (
 	 request_id
    , user_id
    , timestamp
    , token
  ) VALUES (
-           $2
+		   $1
+		 , $2
 	     , $3
 	     , $4
-	     , $5
 )`,
 			wantErr: nil,
 		},
@@ -572,15 +572,15 @@ func TestClient_WriteSuccessFlag(t *testing.T) {
 				requestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
 				userID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
 			},
-			wantExecutedQueryTemplate: `INSERT INTO $1 
-(
+			wantExecutedQueryTemplate: `INSERT INTO ` + table +
+				` (
 	request_id
   , user_id
   , timestamp
 ) VALUES (
-		  $2
+		  $1
+    	, $2
     	, $3
-    	, $4
 )`,
 			wantErr: nil,
 		},
@@ -676,9 +676,9 @@ func TestClient_GetActiveUserIDByActiveTokenID(t *testing.T) {
 			},
 			want: "c40bad11-0822-4d84-9f61-44b9a97b0432",
 			wantExecutedQueryTemplate: `SELECT u.user_id 
-FROM $1 AS u 
-INNER JOIN $2 AS t USING (user_id) 
-WHERE t.token = $3 AND t.is_active AND u.is_active`,
+FROM ` + tableUsers + ` AS u 
+INNER JOIN ` + tableTokens + ` AS t USING (user_id) 
+WHERE t.token = $1 AND t.is_active AND u.is_active`,
 			wantErr: nil,
 		},
 		{
@@ -693,9 +693,9 @@ WHERE t.token = $3 AND t.is_active AND u.is_active`,
 				token: "1410904f-f646-488f-ae08-cc341dfb321c",
 			},
 			wantExecutedQueryTemplate: `SELECT u.user_id 
-FROM $1 AS u 
-INNER JOIN $2 AS t USING (user_id) 
-WHERE t.token = $3 AND t.is_active AND u.is_active`,
+FROM ` + tableUsers + ` AS u 
+INNER JOIN ` + tableTokens + ` AS t USING (user_id) 
+WHERE t.token = $1 AND t.is_active AND u.is_active`,
 			wantErr: errors.New("foobar"),
 		},
 	}

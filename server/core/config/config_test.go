@@ -45,6 +45,8 @@ func Test_loadDefaultConfig(t *testing.T) {
 					TablePrompt:        tableWritePrompt,
 					TablePrediction:    tableWriteModelPrediction,
 					TableSuccessStatus: tableWriteSuccessStatus,
+					TableUsers:         tableLookupUser,
+					TableAPITokens:     tableLookupApiTokens,
 					SSLMode:            defaultSSLMode,
 				},
 				ModelInferenceConfig: modelInferenceConfig{
@@ -53,7 +55,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "load from secretsmanager, overwrite ssl mode",
+			name: "load from secretsmanager, overwrite some from env variables",
 			args: args{
 				ctx: context.TODO(),
 				clientSecretsManager: diagram.MockRepositorySecretsVault{
@@ -67,44 +69,19 @@ func Test_loadDefaultConfig(t *testing.T) {
 				},
 			},
 			envVars: map[string]string{
-				"ACCESS_CREDENTIALS_URI": "foobar",
-				"SSL_MODE":               "disable",
-			},
-			want: &Config{
-				RepositoryPredictionConfig: repositoryPredictionConfig{
-					DBHost:             "localhost",
-					DBName:             "postgres",
-					DBUser:             "postgres",
-					DBPassword:         "postgres",
-					TablePrompt:        tableWritePrompt,
-					TablePrediction:    tableWriteModelPrediction,
-					TableSuccessStatus: tableWriteSuccessStatus,
-					SSLMode:            "disable",
-				},
-				ModelInferenceConfig: modelInferenceConfig{
-					Token: "foobar",
-				},
-			},
-		},
-		{
-			name: "load from secretsmanager, tables from env variables",
-			args: args{
-				ctx: context.TODO(),
-				clientSecretsManager: diagram.MockRepositorySecretsVault{
-					V: []byte(`{
-"db_host": "localhost",
-"db_name": "postgres",
-"db_user": "postgres",
-"db_password": "postgres",
-"model_api_key": "foobar"
-}`),
-				},
-			},
-			envVars: map[string]string{
-				"ACCESS_CREDENTIALS_URI": "foobar",
+				"ACCESS_CREDENTIALS_URI": "bazz",
+				"MODEL_API_KEY":          "key",
+				"DB_HOST":                "dbh",
+				"DB_DBNAME":              "dbn",
+				"DB_USER":                "dbu",
+				"DB_PASSWORD":            "dbpass",
+				"MODEL_MAX_TOKENS":       "100",
 				"TABLE_PROMPT":           "foo",
 				"TABLE_PREDICTION":       "bar",
-				"MODEL_MAX_TOKENS":       "100",
+				"TABLE_SUCCESS_STATUS":   "qux",
+				"TABLE_USERS":            "u",
+				"TABLE_API_TOKENS":       "t",
+				"SSL_MODE":               "disable",
 			},
 			want: &Config{
 				RepositoryPredictionConfig: repositoryPredictionConfig{
@@ -114,8 +91,10 @@ func Test_loadDefaultConfig(t *testing.T) {
 					DBPassword:         "postgres",
 					TablePrompt:        "foo",
 					TablePrediction:    "bar",
-					TableSuccessStatus: tableWriteSuccessStatus,
-					SSLMode:            defaultSSLMode,
+					TableSuccessStatus: "qux",
+					TableUsers:         "u",
+					TableAPITokens:     "t",
+					SSLMode:            "disable",
 				},
 				ModelInferenceConfig: modelInferenceConfig{
 					Token:     "foobar",
@@ -124,7 +103,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "env variables",
+			name: "env variables only",
 			args: args{
 				ctx: context.TODO(),
 			},
@@ -138,6 +117,8 @@ func Test_loadDefaultConfig(t *testing.T) {
 				"TABLE_PROMPT":         "foo",
 				"TABLE_PREDICTION":     "bar",
 				"TABLE_SUCCESS_STATUS": "qux",
+				"TABLE_USERS":          "u",
+				"TABLE_API_TOKENS":     "t",
 			},
 			want: &Config{
 				RepositoryPredictionConfig: repositoryPredictionConfig{
@@ -148,6 +129,8 @@ func Test_loadDefaultConfig(t *testing.T) {
 					TablePrompt:        "foo",
 					TablePrediction:    "bar",
 					TableSuccessStatus: "qux",
+					TableUsers:         "u",
+					TableAPITokens:     "t",
 					SSLMode:            defaultSSLMode,
 				},
 				ModelInferenceConfig: modelInferenceConfig{

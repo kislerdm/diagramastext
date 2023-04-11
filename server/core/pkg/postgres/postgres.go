@@ -119,12 +119,10 @@ type Client struct {
 
 func (c Client) GetActiveUserIDByActiveTokenID(ctx context.Context, id string) (string, error) {
 	rows, err := c.c.Query(
-		ctx,
-		`SELECT u.user_id 
-FROM $1 AS u 
-INNER JOIN $2 AS t USING (user_id) 
-WHERE t.token = $3 AND t.is_active AND u.is_active`,
-		c.tableUsers, c.tableTokens, id,
+		ctx, `SELECT u.user_id 
+FROM `+c.tableUsers+` AS u 
+INNER JOIN `+c.tableTokens+` AS t USING (user_id) 
+WHERE t.token = $1 AND t.is_active AND u.is_active`, id,
 	)
 	if err != nil {
 		return "", err
@@ -147,8 +145,8 @@ func (c Client) WriteInputPrompt(ctx context.Context, requestID, userID, prompt 
 		return errors.New("prompt is required")
 	}
 	_, err := c.c.Exec(
-		ctx, `INSERT INTO $1 (request_id, user_id, prompt, timestamp) VALUES ($2, $3, $4, $5)`,
-		c.tableWritePrompt,
+		ctx, `INSERT INTO `+c.tableWritePrompt+
+			` (request_id, user_id, prompt, timestamp) VALUES ($1, $2, $3, $4)`,
 		requestID,
 		userID,
 		prompt,
@@ -177,8 +175,8 @@ func (c Client) WriteModelResult(
 		return errors.New("model is required")
 	}
 	_, err := c.c.Exec(
-		ctx, `INSERT INTO $1 
-(
+		ctx, `INSERT INTO `+c.tableWriteModelPrediction+
+			` (
 	 request_id
    , user_id
    , response
@@ -188,16 +186,15 @@ func (c Client) WriteModelResult(
    , completion_tokens
    , response_raw
 ) VALUES (
-          $2
+		  $1
+		, $2
 		, $3
 		, $4
 		, $5
 		, $6
 		, $7
 		, $8
-		, $9
 )`,
-		c.tableWriteModelPrediction,
 		requestID,
 		userID,
 		prediction,
@@ -220,19 +217,18 @@ func (c Client) WriteSuccessFlag(ctx context.Context, requestID, userID, token s
 
 	if token != "" {
 		_, err := c.c.Exec(
-			ctx, `INSERT INTO $1 
-(
+			ctx, `INSERT INTO `+c.tableWriteSuccessFlag+
+				` (
 	 request_id
    , user_id
    , timestamp
    , token
  ) VALUES (
-           $2
+		   $1
+		 , $2
 	     , $3
 	     , $4
-	     , $5
 )`,
-			c.tableWriteSuccessFlag,
 			requestID,
 			userID,
 			time.Now().UTC(),
@@ -242,17 +238,16 @@ func (c Client) WriteSuccessFlag(ctx context.Context, requestID, userID, token s
 	}
 
 	_, err := c.c.Exec(
-		ctx, `INSERT INTO $1 
-(
+		ctx, `INSERT INTO `+c.tableWriteSuccessFlag+
+			` (
 	request_id
   , user_id
   , timestamp
 ) VALUES (
-		  $2
+		  $1
+    	, $2
     	, $3
-    	, $4
 )`,
-		c.tableWriteSuccessFlag,
 		requestID,
 		userID,
 		time.Now().UTC(),
