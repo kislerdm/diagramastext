@@ -32,7 +32,13 @@ CREATE TABLE IF NOT EXISTS users
     update_at       TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO users (user_id, is_active) VALUES ('00000000-0000-0000-0000-000000000000', TRUE);
+INSERT INTO users (user_id, is_active)
+VALUES ('00000000-0000-0000-0000-000000000000', TRUE);
+
+INSERT INTO users (user_id, is_active, email, email_verified, is_premium)
+VALUES ('47a87ca5-e00f-4075-af68-1ef2caba30ce', TRUE, 'tech@diagramastext.dev', TRUE, FALSE),
+       ('49d52e3f-ebeb-42af-925d-e69114ed8c5f', TRUE, 'tech.premium@diagramastext.dev', TRUE, TRUE)
+;
 
 CREATE TABLE IF NOT EXISTS api_tokens
 (
@@ -44,6 +50,11 @@ CREATE TABLE IF NOT EXISTS api_tokens
 );
 
 CREATE INDEX IF NOT EXISTS ind_user_api_tokens_user_id ON api_tokens (user_id);
+
+INSERT INTO api_tokens (user_id, is_active, token)
+VALUES ('47a87ca5-e00f-4075-af68-1ef2caba30ce', TRUE, 'd3d7ad4b-7c6f-4317-a99d-ae3067d01a4f'),
+       ('49d52e3f-ebeb-42af-925d-e69114ed8c5f', TRUE, '6ef38e15-0437-43f7-83dc-03771fb2b600')
+;
 
 CREATE TABLE IF NOT EXISTS successful_requests
 (
