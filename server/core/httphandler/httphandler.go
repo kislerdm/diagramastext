@@ -1,6 +1,7 @@
 package httphandler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -34,6 +35,8 @@ func NewHTTPHandler(
 		},
 		corsHeaders:   corsHeaders,
 		reportErrorFn: func(err error) { l.Println(err) },
+		// TODO: add implementation
+		repositoryAPITokens: RepositoryToken(nil),
 	}, nil
 }
 
@@ -41,6 +44,7 @@ type httpHandler struct {
 	diagramRenderingHandler map[string]diagram.HTTPHandler
 	reportErrorFn           func(err error)
 	corsHeaders             corsHeaders
+	repositoryAPITokens     RepositoryToken
 }
 
 func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
@@ -165,9 +169,58 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h httpHandler) authorization(_ http.ResponseWriter, _ *http.Request) {}
+func (h httpHandler) authorization(_ http.ResponseWriter, _ *http.Request) {
+	//	TODO: add JWT authN
+}
 
-func (h httpHandler) authorizationAPI(_ http.ResponseWriter, _ *http.Request) {}
+func (h httpHandler) authorizationAPI(w http.ResponseWriter, r *http.Request) {
+	authToken := readAuthHeaderValue(r.Header)
+	if authToken == "" {
+		const msg = "no authorization token provided"
+		h.response(
+			w, []byte(`{"error":"`+msg+`"}`), httpHandlerError{
+				Msg:      msg,
+				Type:     errorNotAuthorizedNoToken,
+				HTTPCode: http.StatusUnauthorized,
+			},
+		)
+		return
+	}
+	userID, err := h.repositoryAPITokens.GetActiveUserIDByActiveTokenID(r.Context(), authToken)
+	if err != nil {
+		h.response(
+			w, []byte(`{"error":"internal error"}`),
+			httpHandlerError{
+				Msg:      err.Error(),
+				Type:     errorRepositoryToken,
+				HTTPCode: http.StatusInternalServerError,
+			},
+		)
+		return
+	}
+	if userID == "" {
+		const msg = "the authorization token does not exist, or not active, or account is suspended"
+		h.response(
+			w, []byte(`{"error":"`+msg+`"}`),
+			httpHandlerError{
+				Msg:      msg,
+				Type:     errorNotAuthorizedNoToken,
+				HTTPCode: http.StatusUnauthorized,
+			},
+		)
+		return
+	}
+}
+
+func readAuthHeaderValue(header http.Header) string {
+	const authorizationHeaderName = "Authorization"
+	authHeader := header.Get(authorizationHeaderName)
+	if authHeader == "" {
+		authHeader = header.Get(strings.ToLower(authorizationHeaderName))
+	}
+	_, v, _ := strings.Cut(authHeader, "Bearer ")
+	return v
+}
 
 type corsHeaders map[string]string
 
@@ -184,10 +237,12 @@ func (h corsHeaders) setHeaders(header http.Header) {
 const (
 	errorInvalidMethod         = "Request:InvalidMethod"
 	errorNotExists             = "Request:HandlerNotExists"
+	errorNotAuthorizedNoToken  = "Request:AccessDenied:NoAPIToken"
 	errorInvalidRequest        = "InputValidation:InvalidContent"
 	errorInvalidPrompt         = "InputValidation:InvalidPrompt"
 	errorCoreLogic             = "Core:DiagramRendering"
 	errorResponseSerialisation = "Response:DiagramSerialisation"
+	errorRepositoryToken       = "DrivenInterface:RepositoryToken"
 )
 
 func newResponseSerialisationError(err error) error {
@@ -274,4 +329,20 @@ func writeStrings(o *strings.Builder, text ...string) {
 func userProfileFromHTTPHeaders(_ http.Header) *diagram.User {
 	// FIXME: change when the auth layer is implemented
 	return &diagram.User{ID: "00000000-0000-0000-0000-000000000000"}
+}
+
+// RepositoryToken defines the communication port to persistence layer hosting API access tokens.
+type RepositoryToken interface {
+	// GetActiveUserIDByActiveTokenID reads userID from the repository given the tokenID.
+	// It returns a non-empty value if and only if the token and user are active.
+	GetActiveUserIDByActiveTokenID(ctx context.Context, id string) (string, error)
+}
+
+type mockRepositoryToken struct {
+	v   string
+	err error
+}
+
+func (m mockRepositoryToken) GetActiveUserIDByActiveTokenID(_ context.Context, _ string) (string, error) {
+	return m.v, m.err
 }

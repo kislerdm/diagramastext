@@ -41,7 +41,7 @@ func (c *errCollector) Err(err error) {
 	c.V = err
 }
 
-func Test_httpHandler_ServeHTTP(t *testing.T) {
+func Test_httpHandler_ServeHTTPStatus(t *testing.T) {
 	type fields struct {
 		diagramRenderingHandler map[string]diagram.HTTPHandler
 		corsHeaders             corsHeaders
@@ -49,15 +49,6 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 
 	corsHeaders := map[string]string{
 		"Access-Control-Allow-Origin": "https://diagramastext.dev",
-	}
-
-	var httpHeaders = func(h map[string]string) http.Header {
-		o := http.Header{}
-		o.Add("Content-Type", "application/json")
-		for k, v := range h {
-			o.Add(k, v)
-		}
-		return o
 	}
 
 	type args struct {
@@ -159,6 +150,190 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				errors.New("method " + http.MethodPost + " not allowed for path: /status"),
 			),
 		},
+	}
+
+	t.Parallel()
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				h := httpHandler{
+					diagramRenderingHandler: tt.fields.diagramRenderingHandler,
+					reportErrorFn:           tt.errorsCollector.Err,
+					corsHeaders:             tt.fields.corsHeaders,
+				}
+				h.ServeHTTP(tt.args.w, tt.args.r)
+
+				if tt.args.w.(*mockWriter).StatusCode != tt.wantW.(*mockWriter).StatusCode {
+					t.Errorf("unexpected response status code")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.w.Header(), tt.wantW.Header()) {
+					t.Errorf("unexpected response header")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.w.(*mockWriter).V, tt.wantW.(*mockWriter).V) {
+					t.Errorf("unexpected response content")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.errorsCollector.V, tt.wantErr) {
+					t.Errorf("unexpected error message collected")
+					return
+				}
+			},
+		)
+	}
+}
+
+func httpHeaders(h map[string]string) http.Header {
+	o := http.Header{}
+	o.Add("Content-Type", "application/json")
+	for k, v := range h {
+		o.Add(k, v)
+	}
+	return o
+}
+
+func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
+	corsHeaders := map[string]string{
+		"Access-Control-Allow-Origin": "https://diagramastext.dev",
+	}
+
+	diagramRenderingHandler := map[string]diagram.HTTPHandler{
+		"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+			return diagram.MockOutput{
+				V: []byte(`{"svg":"foo"}`),
+			}, nil
+		},
+	}
+
+	wantW := mockWriter{
+		Headers:    httpHeaders(corsHeaders),
+		StatusCode: http.StatusOK,
+		V:          []byte(`{"svg":"foo"}`),
+	}
+
+	type args struct {
+		w          http.ResponseWriter
+		path       string
+		authHeader string
+	}
+	tests := []struct {
+		name            string
+		args            args
+		errorsCollector *errCollector
+	}{
+		{
+
+			name: "webclient",
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				path:       "/internal/generate/c4",
+				authHeader: "foobar",
+			},
+			errorsCollector: &errCollector{},
+		},
+		{
+
+			name: "api",
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				path:       "/generate/c4",
+				authHeader: "Bearer 1410904f-f646-488f-ae08-cc341dfb321c",
+			},
+			errorsCollector: &errCollector{},
+		},
+	}
+
+	t.Parallel()
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				h := httpHandler{
+					diagramRenderingHandler: diagramRenderingHandler,
+					corsHeaders:             corsHeaders,
+					repositoryAPITokens: &mockRepositoryToken{
+						v: "c40bad11-0822-4d84-9f61-44b9a97b0432",
+					},
+				}
+				h.ServeHTTP(
+					tt.args.w, &http.Request{
+						Method: http.MethodPost,
+						URL: &url.URL{
+							Path: tt.args.path,
+						},
+						Header: httpHeaders(
+							map[string]string{
+								"Authorization": tt.args.authHeader,
+							},
+						),
+						Body: io.NopCloser(strings.NewReader(`{"prompt":"foobar"}`)),
+					},
+				)
+
+				if tt.args.w.(*mockWriter).StatusCode != wantW.StatusCode {
+					t.Errorf("unexpected response status code")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.w.Header(), wantW.Header()) {
+					t.Errorf("unexpected response header")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.w.(*mockWriter).V, wantW.V) {
+					t.Errorf("unexpected response content")
+					return
+				}
+
+				if tt.errorsCollector.V != nil {
+					t.Errorf("unexpected error message collected")
+					return
+				}
+			},
+		)
+	}
+}
+
+func Test_httpHandler_diagramRendering(t *testing.T) {
+	type fields struct {
+		diagramRenderingHandler map[string]diagram.HTTPHandler
+		corsHeaders             corsHeaders
+	}
+
+	corsHeaders := map[string]string{
+		"Access-Control-Allow-Origin": "https://diagramastext.dev",
+	}
+
+	var httpHeaders = func(h map[string]string) http.Header {
+		o := http.Header{}
+		o.Add("Content-Type", "application/json")
+		for k, v := range h {
+			o.Add(k, v)
+		}
+		return o
+	}
+
+	type args struct {
+		w http.ResponseWriter
+		r *http.Request
+	}
+	tests := []struct {
+		name            string
+		fields          fields
+		args            args
+		errorsCollector *errCollector
+		wantW           http.ResponseWriter
+		wantErr         error
+	}{
 		{
 
 			name:            "happy path: POST /c4",
@@ -181,38 +356,6 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 					Method: http.MethodPost,
 					URL: &url.URL{
 						Path: "/c4",
-					},
-					Body: io.NopCloser(strings.NewReader(`{"prompt":"foobar"}`)),
-				},
-			},
-			wantW: &mockWriter{
-				Headers:    httpHeaders(corsHeaders),
-				StatusCode: http.StatusOK,
-				V:          []byte(`{"svg":"foo"}`),
-			},
-		},
-		{
-
-			name:            "happy path: POST /c4, webclient",
-			errorsCollector: &errCollector{},
-			fields: fields{
-				diagramRenderingHandler: map[string]diagram.HTTPHandler{
-					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
-						return diagram.MockOutput{
-							V: []byte(`{"svg":"foo"}`),
-						}, nil
-					},
-				},
-				corsHeaders: corsHeaders,
-			},
-			args: args{
-				w: &mockWriter{
-					Headers: http.Header{},
-				},
-				r: &http.Request{
-					Method: http.MethodPost,
-					URL: &url.URL{
-						Path: "/internal/c4",
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt":"foobar"}`)),
 				},
@@ -467,7 +610,6 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 	}
 
 	t.Parallel()
-
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
@@ -476,7 +618,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 					reportErrorFn:           tt.errorsCollector.Err,
 					corsHeaders:             tt.fields.corsHeaders,
 				}
-				h.ServeHTTP(tt.args.w, tt.args.r)
+				h.diagramRendering(tt.args.w, tt.args.r)
 
 				if tt.args.w.(*mockWriter).StatusCode != tt.wantW.(*mockWriter).StatusCode {
 					t.Errorf("unexpected response status code")
@@ -522,4 +664,192 @@ func Test_httpHandlerError_Error(t *testing.T) {
 			}
 		},
 	)
+}
+
+func Test_httpHandler_authorizationAPI(t *testing.T) {
+	type fields struct {
+		repositoryAPITokens RepositoryToken
+	}
+	type args struct {
+		w http.ResponseWriter
+		r *http.Request
+	}
+	tests := []struct {
+		name            string
+		fields          fields
+		errorsCollector *errCollector
+		args            args
+		wantErr         error
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				repositoryAPITokens: &mockRepositoryToken{
+					v: "bar",
+				},
+			},
+			errorsCollector: &errCollector{},
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				r: &http.Request{
+					Header: httpHeaders(
+						map[string]string{
+							"Authorization": "Bearer foo",
+						},
+					),
+				},
+			},
+		},
+		{
+			name: "unhappy path: no auth token found",
+			fields: fields{
+				repositoryAPITokens: &mockRepositoryToken{
+					v: "bar",
+				},
+			},
+			errorsCollector: &errCollector{},
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				r: &http.Request{
+					Header: http.Header{},
+				},
+			},
+			wantErr: httpHandlerError{
+				Msg:      "no authorization token provided",
+				Type:     errorNotAuthorizedNoToken,
+				HTTPCode: http.StatusUnauthorized,
+			},
+		},
+		{
+			name: "unhappy path: failed to interact with the repository",
+			fields: fields{
+				repositoryAPITokens: &mockRepositoryToken{
+					err: errors.New("foobar"),
+				},
+			},
+			errorsCollector: &errCollector{},
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				r: &http.Request{
+					Header: httpHeaders(
+						map[string]string{
+							"Authorization": "Bearer foo",
+						},
+					),
+				},
+			},
+			wantErr: httpHandlerError{
+				Msg:      "foobar",
+				Type:     errorRepositoryToken,
+				HTTPCode: http.StatusInternalServerError,
+			},
+		},
+		{
+			name: "unhappy path: failed to find token",
+			fields: fields{
+				repositoryAPITokens: &mockRepositoryToken{},
+			},
+			errorsCollector: &errCollector{},
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				r: &http.Request{
+					Header: httpHeaders(
+						map[string]string{
+							"Authorization": "Bearer foo",
+						},
+					),
+				},
+			},
+			wantErr: httpHandlerError{
+				Msg:      "the authorization token does not exist, or not active, or account is suspended",
+				Type:     errorNotAuthorizedNoToken,
+				HTTPCode: http.StatusUnauthorized,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				h := httpHandler{
+					reportErrorFn:       tt.errorsCollector.Err,
+					repositoryAPITokens: tt.fields.repositoryAPITokens,
+				}
+				h.authorizationAPI(tt.args.w, tt.args.r)
+
+				if !reflect.DeepEqual(tt.errorsCollector.V, tt.wantErr) {
+					t.Errorf("unexpected error message collected")
+					return
+				}
+			},
+		)
+	}
+}
+
+func Test_readAuthHeaderValue(t *testing.T) {
+	type args struct {
+		header http.Header
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "extract Bearer token",
+			args: args{
+				header: httpHeaders(
+					map[string]string{
+						"Authorization": "Bearer foo",
+					},
+				),
+			},
+			want: "foo",
+		},
+		{
+			name: "extract Bearer token - lower case",
+			args: args{
+				header: httpHeaders(
+					map[string]string{
+						"authorization": "Bearer foo",
+					},
+				),
+			},
+			want: "foo",
+		},
+		{
+			name: "no token header found",
+			args: args{
+				header: httpHeaders(nil),
+			},
+			want: "",
+		},
+		{
+			name: "token is present in headers, but wrong format",
+			args: args{
+				header: httpHeaders(
+					map[string]string{
+						"Authorization": "foo",
+					},
+				),
+			},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := readAuthHeaderValue(tt.args.header); got != tt.want {
+					t.Errorf("readAuthHeaderValue() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
 }
