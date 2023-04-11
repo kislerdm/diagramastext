@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func TestConfig_Validate(t *testing.T) {
@@ -16,6 +19,8 @@ func TestConfig_Validate(t *testing.T) {
 		TablePrompt        string
 		TablePrediction    string
 		TableSuccessStatus string
+		TableUsers         string
+		TableTokens        string
 		SSLMode            string
 	}
 	tests := []struct {
@@ -33,6 +38,8 @@ func TestConfig_Validate(t *testing.T) {
 				TablePrompt:        "foo",
 				TablePrediction:    "bar",
 				TableSuccessStatus: "qux",
+				TableUsers:         "quxx",
+				TableTokens:        "baz",
 			},
 			wantErr: nil,
 		},
@@ -46,6 +53,8 @@ func TestConfig_Validate(t *testing.T) {
 				TablePrompt:        "foo",
 				TablePrediction:    "bar",
 				TableSuccessStatus: "qux",
+				TableUsers:         "quxx",
+				TableTokens:        "baz",
 				SSLMode:            "verify-full",
 			},
 			wantErr: nil,
@@ -139,6 +148,8 @@ func TestConfig_Validate(t *testing.T) {
 				TablePrediction:    "bar",
 				SSLMode:            "qux",
 				TableSuccessStatus: "quxx",
+				TableUsers:         "quxx",
+				TableTokens:        "baz",
 			},
 			wantErr: errors.New("ssl mode qux is not supported"),
 		},
@@ -157,6 +168,8 @@ func TestConfig_Validate(t *testing.T) {
 					TablePrompt:        tt.fields.TablePrompt,
 					TablePrediction:    tt.fields.TablePrediction,
 					TableSuccessStatus: tt.fields.TableSuccessStatus,
+					TableUsers:         tt.fields.TableUsers,
+					TableTokens:        tt.fields.TableTokens,
 					SSLMode:            tt.fields.SSLMode,
 				}
 				err := cfg.Validate()
@@ -191,6 +204,8 @@ func TestNewRepositoryPostgres(t *testing.T) {
 					TablePrompt:        "bar",
 					TablePrediction:    "baz",
 					TableSuccessStatus: "qux",
+					TableUsers:         "quxx",
+					TableTokens:        "baz",
 				},
 			},
 			want: &Client{
@@ -198,6 +213,8 @@ func TestNewRepositoryPostgres(t *testing.T) {
 				tableWritePrompt:          "bar",
 				tableWriteModelPrediction: "baz",
 				tableWriteSuccessFlag:     "qux",
+				tableUsers:                "quxx",
+				tableTokens:               "baz",
 			},
 			wantErr: false,
 		},
@@ -236,7 +253,7 @@ func TestNewRepositoryPostgres(t *testing.T) {
 	}
 }
 
-func Test_client_WritePrompt(t *testing.T) {
+func TestClient_WritePrompt(t *testing.T) {
 	type fields struct {
 		c dbClient
 	}
@@ -318,7 +335,7 @@ func Test_client_WritePrompt(t *testing.T) {
 	}
 }
 
-func Test_client_WriteModelResult(t *testing.T) {
+func TestClient_WriteModelResult(t *testing.T) {
 	type fields struct {
 		c dbClient
 	}
@@ -506,59 +523,6 @@ func TestClient_Close(t *testing.T) {
 	)
 }
 
-func Test_host(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"with port", func(t *testing.T) {
-			// GIVEN
-			hosts := []string{
-				"localhost",
-				"127.0.0.1",
-			}
-			ports := []string{"5432", "15342", "1213"}
-
-			for _, hostStr := range hosts {
-				for _, port := range ports {
-					// WHEN
-					hostInput := hostStr + ":" + port
-					gotHostPsqlStr := host(hostInput)
-
-					// THEN
-					wantPsqlStr := " host=" + hostStr + " port=" + port
-					if gotHostPsqlStr != wantPsqlStr {
-						t.Errorf("unexpected result for input host " + hostStr + ":" + port)
-						return
-					}
-				}
-			}
-		},
-	)
-
-	t.Run(
-		"without port", func(t *testing.T) {
-			// GIVEN
-			hosts := []string{
-				"ep-fragrant-mouse-914820.us-east-2.aws.neon.tech",
-			}
-
-			// WHEN
-			for _, hostStr := range hosts {
-				// WHEN
-				hostInput := hostStr
-				gotHostPsqlStr := host(hostInput)
-
-				// THEN
-				wantPsqlStr := " host=" + hostStr
-				if gotHostPsqlStr != wantPsqlStr {
-					t.Errorf("unexpected result for input host " + hostStr)
-					return
-				}
-			}
-		},
-	)
-}
-
 func TestClient_WriteSuccessFlag(t *testing.T) {
 	type fields struct {
 		c dbClient
@@ -586,8 +550,18 @@ func TestClient_WriteSuccessFlag(t *testing.T) {
 				userID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
 				token:     "1410904f-f646-488f-ae08-cc341dfb321c",
 			},
-			wantExecutedQueryTemplate: `INSERT INTO ` + table +
-				` (request_id, user_id, token, timestamp) VALUES ($1, $2, $3, $4)`,
+			wantExecutedQueryTemplate: `INSERT INTO $1 
+(
+	 request_id
+   , user_id
+   , timestamp
+   , token
+ ) VALUES (
+           $2
+	     , $3
+	     , $4
+	     , $5
+)`,
 			wantErr: nil,
 		},
 		{
@@ -598,8 +572,17 @@ func TestClient_WriteSuccessFlag(t *testing.T) {
 				requestID: "693a35ba-e42c-4168-8afc-5a7c359d1d05",
 				userID:    "c40bad11-0822-4d84-9f61-44b9a97b0432",
 			},
-			wantExecutedQueryTemplate: `INSERT INTO ` + table + ` (request_id, user_id, timestamp) VALUES ($1, $2, $3)`,
-			wantErr:                   nil,
+			wantExecutedQueryTemplate: `INSERT INTO $1 
+(
+	request_id
+  , user_id
+  , timestamp
+) VALUES (
+		  $2
+    	, $3
+    	, $4
+)`,
+			wantErr: nil,
 		},
 		{
 			name: "unhappy path: no request id",
@@ -648,6 +631,163 @@ func TestClient_WriteSuccessFlag(t *testing.T) {
 						"WriteSuccessFlag() executes wrong query = %s, want = %s",
 						gotQueryExecuted, tt.wantExecutedQueryTemplate,
 					)
+				}
+			},
+		)
+	}
+}
+
+func TestClient_GetActiveUserIDByActiveTokenID(t *testing.T) {
+	type fields struct {
+		c dbClient
+	}
+	type args struct {
+		ctx   context.Context
+		token string
+	}
+
+	const (
+		tableUsers  = "foo"
+		tableTokens = "bar"
+	)
+
+	tests := []struct {
+		name                      string
+		fields                    fields
+		args                      args
+		wantExecutedQueryTemplate string
+		want                      string
+		wantErr                   error
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				&mockDbClient{
+					v: &mockRows{
+						tag: pgconn.NewCommandTag("SELECT"),
+						v:   [][]any{{"c40bad11-0822-4d84-9f61-44b9a97b0432"}},
+						s:   &sync.RWMutex{},
+					},
+				},
+			},
+			args: args{
+				ctx:   context.TODO(),
+				token: "1410904f-f646-488f-ae08-cc341dfb321c",
+			},
+			want: "c40bad11-0822-4d84-9f61-44b9a97b0432",
+			wantExecutedQueryTemplate: `SELECT u.user_id 
+FROM $1 AS u 
+INNER JOIN $2 AS t USING (user_id) 
+WHERE t.token = $3 AND t.is_active AND u.is_active`,
+			wantErr: nil,
+		},
+		{
+			name: "unhappy path: table not found",
+			fields: fields{
+				&mockDbClient{
+					err: errors.New("foobar"),
+				},
+			},
+			args: args{
+				ctx:   context.TODO(),
+				token: "1410904f-f646-488f-ae08-cc341dfb321c",
+			},
+			wantExecutedQueryTemplate: `SELECT u.user_id 
+FROM $1 AS u 
+INNER JOIN $2 AS t USING (user_id) 
+WHERE t.token = $3 AND t.is_active AND u.is_active`,
+			wantErr: errors.New("foobar"),
+		},
+	}
+
+	t.Parallel()
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := Client{
+					c:           tt.fields.c,
+					tableUsers:  tableUsers,
+					tableTokens: tableTokens,
+				}
+				got, err := c.GetActiveUserIDByActiveTokenID(
+					tt.args.ctx, tt.args.token,
+				)
+				if !reflect.DeepEqual(err, tt.wantErr) {
+					t.Errorf("WriteSuccessFlag() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				gotQueryExecuted := c.c.(*mockDbClient).query
+				if gotQueryExecuted != tt.wantExecutedQueryTemplate {
+					t.Errorf(
+						"GetActiveUserIDByActiveTokenID() executes wrong query = %s, want = %s",
+						gotQueryExecuted, tt.wantExecutedQueryTemplate,
+					)
+				}
+				if got != tt.want {
+					t.Errorf("GetActiveUserIDByActiveTokenID() unexpected result = %s, want = %s", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func TestConfig_ConnectionString(t *testing.T) {
+	type fields struct {
+		DBHost             string
+		DBName             string
+		DBUser             string
+		DBPassword         string
+		TablePrompt        string
+		TablePrediction    string
+		TableSuccessStatus string
+		TableUsers         string
+		TableTokens        string
+		SSLMode            string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{
+			name: "neon-like example",
+			fields: fields{
+				DBHost:     "aa-foobar-quxquxx-123456.us-east-2.aws.neon.tech",
+				DBName:     "foo",
+				DBUser:     "bar",
+				DBPassword: "baz",
+				SSLMode:    "verify-full",
+			},
+			want: "postgres://bar:baz@aa-foobar-quxquxx-123456.us-east-2.aws.neon.tech/foo?sslmode=verify-full",
+		},
+		{
+			name: "localenv",
+			fields: fields{
+				DBHost:     "localhost:5432",
+				DBName:     "postgres",
+				DBUser:     "postgres",
+				DBPassword: "postgres",
+			},
+			want: "postgres://postgres:postgres@localhost:5432/postgres",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				cfg := Config{
+					DBHost:             tt.fields.DBHost,
+					DBName:             tt.fields.DBName,
+					DBUser:             tt.fields.DBUser,
+					DBPassword:         tt.fields.DBPassword,
+					TablePrompt:        tt.fields.TablePrompt,
+					TablePrediction:    tt.fields.TablePrediction,
+					TableSuccessStatus: tt.fields.TableSuccessStatus,
+					TableUsers:         tt.fields.TableUsers,
+					TableTokens:        tt.fields.TableTokens,
+					SSLMode:            tt.fields.SSLMode,
+				}
+				if got := cfg.ConnectionString(); got != tt.want {
+					t.Errorf("ConnectionString() = %v, want %v", got, tt.want)
 				}
 			},
 		)
