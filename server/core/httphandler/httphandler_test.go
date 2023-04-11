@@ -193,6 +193,38 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 		},
 		{
 
+			name:            "happy path: POST /c4, webclient",
+			errorsCollector: &errCollector{},
+			fields: fields{
+				diagramRenderingHandler: map[string]diagram.HTTPHandler{
+					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+						return diagram.MockOutput{
+							V: []byte(`{"svg":"foo"}`),
+						}, nil
+					},
+				},
+				corsHeaders: corsHeaders,
+			},
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				r: &http.Request{
+					Method: http.MethodPost,
+					URL: &url.URL{
+						Path: "/internal/c4",
+					},
+					Body: io.NopCloser(strings.NewReader(`{"prompt":"foobar"}`)),
+				},
+			},
+			wantW: &mockWriter{
+				Headers:    httpHeaders(corsHeaders),
+				StatusCode: http.StatusOK,
+				V:          []byte(`{"svg":"foo"}`),
+			},
+		},
+		{
+
 			name:            "happy path: OPTIONS /c4",
 			errorsCollector: &errCollector{},
 			fields: fields{
@@ -275,7 +307,9 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				StatusCode: http.StatusUnprocessableEntity,
 				V:          []byte(`{"error":"wrong request content"}`),
 			},
-			wantErr: newInputFormatValidationError(errors.New("prompt length must be between 3 and 100 characters")),
+			wantErr: newInputContentValidationError(
+				errors.New("prompt length must be between 3 and 100 characters"),
+			),
 		},
 		{
 			name:            "unhappy path: POST /c4, faulty input JSON deserialization error",
@@ -302,13 +336,13 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			},
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
-				StatusCode: http.StatusUnprocessableEntity,
-				V:          []byte(`{"error":"wrong request content"}`),
+				StatusCode: http.StatusBadRequest,
+				V:          []byte(`{"error":"wrong request format"}`),
 			},
 			wantErr: httpHandlerError{
 				Msg:      "faulty JSON",
 				Type:     errorInvalidRequest,
-				HTTPCode: http.StatusUnprocessableEntity,
+				HTTPCode: http.StatusBadRequest,
 			},
 		},
 		{
