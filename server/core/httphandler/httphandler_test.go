@@ -702,6 +702,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 			wantUser: &diagram.User{
 				ID:           "bar",
 				IsRegistered: true,
+				APIToken:     "foo",
 			},
 		},
 		{
@@ -810,7 +811,7 @@ func Test_readAuthHeaderValue(t *testing.T) {
 			args: args{
 				header: httpHeaders(
 					map[string]string{
-						"authorizationWebclient": "Bearer foo",
+						"authorization": "Bearer foo",
 					},
 				),
 			},

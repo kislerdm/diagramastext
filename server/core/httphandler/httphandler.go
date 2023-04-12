@@ -202,6 +202,7 @@ func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error
 
 	user.ID = userID
 	user.IsRegistered = true
+	user.APIToken = authToken
 
 	return nil
 }

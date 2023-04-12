@@ -10,6 +10,7 @@ import (
 
 type User struct {
 	ID           string
+	APIToken     string
 	IsRegistered bool
 }
 
