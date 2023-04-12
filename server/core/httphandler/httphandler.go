@@ -83,14 +83,15 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var user diagram.User
 	switch strings.HasPrefix(r.URL.Path, pathPrefixInternal) {
 	case false:
-		if err := h.authorizationAPI(r); err != nil {
+		if err := h.authorizationAPI(r, &user); err != nil {
 			h.response(w, []byte(`{"error":"`+err.(httpHandlerError).Msg+`"}`), err)
 			return
 		}
 	default:
-		if err := h.authorization(r); err != nil {
+		if err := h.authorizationWebclient(r, &user); err != nil {
 			h.response(w, []byte(`{"error":"`+err.(httpHandlerError).Msg+`"}`), err)
 			return
 		}
@@ -100,11 +101,11 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch strings.HasPrefix(r.URL.Path, pathPrefixDiagramGeneration) {
 	case true:
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixDiagramGeneration)
-		h.diagramRendering(w, r)
+		h.diagramRendering(w, r, &user)
 	}
 }
 
-func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
+func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request, user *diagram.User) {
 	routePath := r.URL.Path
 
 	renderingHandler, ok := h.diagramRenderingHandler[routePath]
@@ -132,7 +133,7 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		input, err := diagram.NewInput(requestContract.Prompt, userProfileFromHTTPHeaders(r.Header))
+		input, err := diagram.NewInput(requestContract.Prompt, user)
 		if err != nil {
 			h.response(w, []byte(`{"error":"wrong request content"}`), newInputContentValidationError(err))
 			return
@@ -168,16 +169,17 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h httpHandler) authorization(_ *http.Request) error {
-	//	TODO: add JWT authN
+func (h httpHandler) authorizationWebclient(_ *http.Request, user *diagram.User) error {
+	user.ID = "00000000-0000-0000-0000-000000000000"
+	// TODO: add JWT authN
 	return nil
 }
 
-func (h httpHandler) authorizationAPI(r *http.Request) error {
+func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error {
 	authToken := readAuthHeaderValue(r.Header)
 	if authToken == "" {
 		return httpHandlerError{
-			Msg:      "no authorization token provided",
+			Msg:      "no authorizationWebclient token provided",
 			Type:     errorNotAuthorizedNoToken,
 			HTTPCode: http.StatusUnauthorized,
 		}
@@ -192,11 +194,15 @@ func (h httpHandler) authorizationAPI(r *http.Request) error {
 	}
 	if userID == "" {
 		return httpHandlerError{
-			Msg:      "the authorization token does not exist, or not active, or account is suspended",
+			Msg:      "the authorizationWebclient token does not exist, or not active, or account is suspended",
 			Type:     errorNotAuthorizedNoToken,
 			HTTPCode: http.StatusUnauthorized,
 		}
 	}
+
+	user.ID = userID
+	user.IsRegistered = true
+
 	return nil
 }
 
@@ -312,9 +318,4 @@ func writeStrings(o *strings.Builder, text ...string) {
 	for _, s := range text {
 		_, _ = o.WriteString(s)
 	}
-}
-
-func userProfileFromHTTPHeaders(_ http.Header) *diagram.User {
-	// FIXME: change when the auth layer is implemented
-	return &diagram.User{ID: "00000000-0000-0000-0000-000000000000"}
 }

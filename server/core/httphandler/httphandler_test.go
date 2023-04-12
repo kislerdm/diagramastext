@@ -618,7 +618,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 					reportErrorFn:           tt.errorsCollector.Err,
 					corsHeaders:             tt.fields.corsHeaders,
 				}
-				h.diagramRendering(tt.args.w, tt.args.r)
+				h.diagramRendering(tt.args.w, tt.args.r, &diagram.User{})
 
 				if tt.args.w.(*mockWriter).StatusCode != tt.wantW.(*mockWriter).StatusCode {
 					t.Errorf("unexpected response status code")
@@ -671,13 +671,15 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 		repositoryAPITokens diagram.RepositoryToken
 	}
 	type args struct {
-		r *http.Request
+		r    *http.Request
+		user *diagram.User
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   error
+		name     string
+		fields   fields
+		args     args
+		want     error
+		wantUser *diagram.User
 	}{
 		{
 			name: "happy path",
@@ -694,8 +696,13 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 						},
 					),
 				},
+				user: &diagram.User{},
 			},
 			want: nil,
+			wantUser: &diagram.User{
+				ID:           "bar",
+				IsRegistered: true,
+			},
 		},
 		{
 			name: "unhappy path: no auth token found",
@@ -710,7 +717,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 				},
 			},
 			want: httpHandlerError{
-				Msg:      "no authorization token provided",
+				Msg:      "no authorizationWebclient token provided",
 				Type:     errorNotAuthorizedNoToken,
 				HTTPCode: http.StatusUnauthorized,
 			},
@@ -752,7 +759,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 				},
 			},
 			want: httpHandlerError{
-				Msg:      "the authorization token does not exist, or not active, or account is suspended",
+				Msg:      "the authorizationWebclient token does not exist, or not active, or account is suspended",
 				Type:     errorNotAuthorizedNoToken,
 				HTTPCode: http.StatusUnauthorized,
 			},
@@ -765,9 +772,13 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 					repositoryAPITokens: tt.fields.repositoryAPITokens,
 				}
 
-				if got := h.authorizationAPI(tt.args.r); !reflect.DeepEqual(got, tt.want) {
+				if got := h.authorizationAPI(tt.args.r, tt.args.user); !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("unexpected error message collected")
 					return
+				}
+
+				if !reflect.DeepEqual(tt.args.user, tt.wantUser) {
+					t.Errorf("unexpected user data fetched")
 				}
 			},
 		)
@@ -799,7 +810,7 @@ func Test_readAuthHeaderValue(t *testing.T) {
 			args: args{
 				header: httpHeaders(
 					map[string]string{
-						"authorization": "Bearer foo",
+						"authorizationWebclient": "Bearer foo",
 					},
 				),
 			},

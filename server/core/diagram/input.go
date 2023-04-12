@@ -9,9 +9,8 @@ import (
 )
 
 type User struct {
-	ID                     string
-	IsRegistered           bool
-	OptOutFromSavingPrompt bool
+	ID           string
+	IsRegistered bool
 }
 
 // Input defines the entrypoint interface.
