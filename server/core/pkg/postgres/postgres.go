@@ -117,6 +117,28 @@ type Client struct {
 	tableTokens               string
 }
 
+func (c Client) GetDailySuccessfulResultsTimestampsByUserID(ctx context.Context, userID string) ([]time.Time, error) {
+	rows, err := c.c.Query(
+		ctx, `SELECT timestamp FROM `+c.tableWriteSuccessFlag+
+			` WHERE timestamp::date = current_date AND user_id = $1`, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var o []time.Time
+	var ts time.Time
+	defer rows.Close()
+	for rows.Next() {
+		if err := rows.Scan(&ts); err != nil {
+			return nil, err
+		}
+		o = append(o, ts)
+	}
+
+	return o, nil
+}
+
 func (c Client) GetActiveUserIDByActiveTokenID(ctx context.Context, id string) (string, error) {
 	rows, err := c.c.Query(
 		ctx, `SELECT u.user_id 
@@ -326,6 +348,10 @@ func (m *mockRows) Next() bool {
 }
 
 func (m *mockRows) Scan(dest ...any) error {
+	if m.err != nil {
+		return m.err
+	}
+
 	m.s.Lock()
 	defer m.s.Unlock()
 	if len(m.v[m.rowCnt]) != len(dest) {
@@ -342,6 +368,8 @@ func (m *mockRows) Scan(dest ...any) error {
 			*dest[i].(*bool) = el.(bool)
 		case *int:
 			*dest[i].(*int) = el.(int)
+		case *time.Time:
+			*dest[i].(*time.Time) = el.(time.Time)
 		}
 	}
 	m.rowCnt++

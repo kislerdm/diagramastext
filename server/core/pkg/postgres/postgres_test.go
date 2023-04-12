@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -788,6 +789,141 @@ func TestConfig_ConnectionString(t *testing.T) {
 				}
 				if got := cfg.ConnectionString(); got != tt.want {
 					t.Errorf("ConnectionString() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func TestClient_GetDailySuccessfulResultsTimestampsByUserID(t *testing.T) {
+	type fields struct {
+		c                         dbClient
+		tableWritePrompt          string
+		tableWriteModelPrediction string
+		tableWriteSuccessFlag     string
+		tableUsers                string
+		tableTokens               string
+	}
+	type args struct {
+		ctx    context.Context
+		userID string
+	}
+	tests := []struct {
+		name                      string
+		fields                    fields
+		args                      args
+		want                      []time.Time
+		wantErr                   bool
+		wantExecutedQueryTemplate string
+	}{
+		{
+			name: "empty array",
+			fields: fields{
+				c: &mockDbClient{
+					query: "",
+					v: &mockRows{
+						tag: pgconn.NewCommandTag("SELECT"),
+						s:   &sync.RWMutex{},
+						v:   nil,
+					},
+				},
+				tableWriteSuccessFlag: "foo",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				userID: "",
+			},
+			want:                      nil,
+			wantErr:                   false,
+			wantExecutedQueryTemplate: `SELECT timestamp FROM foo WHERE timestamp::date = current_date AND user_id = $1`,
+		},
+		{
+			name: "array with two elements",
+			fields: fields{
+				c: &mockDbClient{
+					query: "",
+					v: &mockRows{
+						tag: pgconn.NewCommandTag("SELECT"),
+						s:   &sync.RWMutex{},
+						v: [][]any{
+							{time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)},
+							{time.Date(2023, 1, 1, 0, 10, 0, 0, time.UTC)},
+						},
+					},
+				},
+				tableWriteSuccessFlag: "foo",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				userID: "",
+			},
+			want: []time.Time{
+				time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
+				time.Date(2023, 1, 1, 0, 10, 0, 0, time.UTC),
+			},
+			wantErr:                   false,
+			wantExecutedQueryTemplate: `SELECT timestamp FROM foo WHERE timestamp::date = current_date AND user_id = $1`,
+		},
+		{
+			name: "unhappy path",
+			fields: fields{
+				c: &mockDbClient{
+					err: errors.New("foobat"),
+				},
+				tableWriteSuccessFlag: "foo",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				userID: "",
+			},
+			wantErr:                   true,
+			wantExecutedQueryTemplate: `SELECT timestamp FROM foo WHERE timestamp::date = current_date AND user_id = $1`,
+		},
+		{
+			name: "unhappy path: while reading a raw",
+			fields: fields{
+				c: &mockDbClient{
+					query: "",
+					v: &mockRows{
+						tag: pgconn.NewCommandTag("SELECT"),
+						s:   &sync.RWMutex{},
+						err: errors.New("foobar"),
+						v: [][]any{
+							{time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)},
+						},
+					},
+				},
+				tableWriteSuccessFlag: "foo",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				userID: "",
+			},
+			wantErr:                   true,
+			wantExecutedQueryTemplate: `SELECT timestamp FROM foo WHERE timestamp::date = current_date AND user_id = $1`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := Client{
+					c:                     tt.fields.c,
+					tableWriteSuccessFlag: tt.fields.tableWriteSuccessFlag,
+				}
+				got, err := c.GetDailySuccessfulResultsTimestampsByUserID(tt.args.ctx, tt.args.userID)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("GetDailySuccessfulResultsTimestampsByUserID() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("GetDailySuccessfulResultsTimestampsByUserID() got = %v, want %v", got, tt.want)
+				}
+				gotQueryExecuted := c.c.(*mockDbClient).query
+				if gotQueryExecuted != tt.wantExecutedQueryTemplate {
+					t.Errorf(
+						"GetDailySuccessfulResultsTimestampsByUserID() executes wrong query = %s, want = %s",
+						gotQueryExecuted, tt.wantExecutedQueryTemplate,
+					)
 				}
 			},
 		)
