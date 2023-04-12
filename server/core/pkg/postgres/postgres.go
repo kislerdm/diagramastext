@@ -318,8 +318,7 @@ func (m *mockRows) FieldDescriptions() []pgconn.FieldDescription {
 func (m *mockRows) Next() bool {
 	m.s.Lock()
 	var f bool
-	m.rowCnt++
-	if len(m.v) > m.rowCnt-1 {
+	if len(m.v) > m.rowCnt {
 		f = true
 	}
 	m.s.Unlock()
@@ -345,6 +344,7 @@ func (m *mockRows) Scan(dest ...any) error {
 			*dest[i].(*int) = el.(int)
 		}
 	}
+	m.rowCnt++
 	return nil
 }
 
