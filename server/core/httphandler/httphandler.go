@@ -36,15 +36,17 @@ func NewHTTPHandler(
 		corsHeaders:   corsHeaders,
 		reportErrorFn: func(err error) { l.Println(err) },
 		// FIXME: add caching layer
-		repositoryAPITokens: apiTokensRepository,
+		repositoryAPITokens:       apiTokensRepository,
+		repositoryRequestsHistory: clientRepositoryPrediction,
 	}, nil
 }
 
 type httpHandler struct {
-	diagramRenderingHandler map[string]diagram.HTTPHandler
-	reportErrorFn           func(err error)
-	corsHeaders             corsHeaders
-	repositoryAPITokens     diagram.RepositoryToken
+	diagramRenderingHandler   map[string]diagram.HTTPHandler
+	reportErrorFn             func(err error)
+	corsHeaders               corsHeaders
+	repositoryAPITokens       diagram.RepositoryToken
+	repositoryRequestsHistory diagram.RepositoryPrediction
 }
 
 func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
@@ -204,6 +206,32 @@ func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error
 	user.IsRegistered = true
 	user.APIToken = authToken
 
+	return h.checkQuota(r, user)
+}
+
+func (h httpHandler) checkQuota(r *http.Request, user *diagram.User) error {
+	throttling, quotaExceeded, err := diagram.ValidateRequestsQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
+	if err != nil {
+		return httpHandlerError{
+			Msg:      "internal error",
+			Type:     errorQuotaValidation,
+			HTTPCode: http.StatusInternalServerError,
+		}
+	}
+	if throttling {
+		return httpHandlerError{
+			Msg:      "throttling quota exceed",
+			Type:     errorQuotaExceeded,
+			HTTPCode: http.StatusTooManyRequests,
+		}
+	}
+	if quotaExceeded {
+		return httpHandlerError{
+			Msg:      "quota exceed",
+			Type:     errorQuotaExceeded,
+			HTTPCode: http.StatusForbidden,
+		}
+	}
 	return nil
 }
 
@@ -238,6 +266,8 @@ const (
 	errorCoreLogic             = "Core:DiagramRendering"
 	errorResponseSerialisation = "Response:DiagramSerialisation"
 	errorRepositoryToken       = "DrivenInterface:RepositoryToken"
+	errorQuotaValidation       = "Quota:ValidationError"
+	errorQuotaExceeded         = "Quota:Excess"
 )
 
 func newResponseSerialisationError(err error) error {

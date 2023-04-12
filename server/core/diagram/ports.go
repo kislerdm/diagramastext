@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 )
 
 // HTTPHandler handler to generate a diagram given the input.
@@ -24,12 +25,26 @@ type RepositoryPrediction interface {
 	// based on the model's prediction result.
 	WriteSuccessFlag(ctx context.Context, requestID, userID, token string) error
 
+	// GetDailySuccessfulResultsTimestampsByUserID reads the timestamps of all user's successful requests
+	// which led to successful diagrams generation over the last 24 hours / day.
+	GetDailySuccessfulResultsTimestampsByUserID(ctx context.Context, userID string) ([]time.Time, error)
+
 	// Close closes connection to persistence service.
 	Close(ctx context.Context) error
 }
 
 type MockRepositoryPrediction struct {
-	Err error
+	Timestamps []time.Time
+	Err        error
+}
+
+func (m MockRepositoryPrediction) GetDailySuccessfulResultsTimestampsByUserID(_ context.Context, _ string) (
+	[]time.Time, error,
+) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return m.Timestamps, nil
 }
 
 func (m MockRepositoryPrediction) WriteInputPrompt(_ context.Context, _, _, _ string) error {

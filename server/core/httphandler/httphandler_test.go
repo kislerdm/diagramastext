@@ -263,6 +263,7 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 					repositoryAPITokens: &diagram.MockRepositoryToken{
 						V: "c40bad11-0822-4d84-9f61-44b9a97b0432",
 					},
+					repositoryRequestsHistory: &diagram.MockRepositoryPrediction{},
 				}
 				h.ServeHTTP(
 					tt.args.w, &http.Request{
@@ -668,7 +669,8 @@ func Test_httpHandlerError_Error(t *testing.T) {
 
 func Test_httpHandler_authorizationAPI(t *testing.T) {
 	type fields struct {
-		repositoryAPITokens diagram.RepositoryToken
+		repositoryAPITokens       diagram.RepositoryToken
+		repositoryRequestsHistory diagram.RepositoryPrediction
 	}
 	type args struct {
 		r    *http.Request
@@ -687,6 +689,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 				repositoryAPITokens: &diagram.MockRepositoryToken{
 					V: "bar",
 				},
+				repositoryRequestsHistory: &diagram.MockRepositoryPrediction{},
 			},
 			args: args{
 				r: &http.Request{
@@ -770,7 +773,8 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				h := httpHandler{
-					repositoryAPITokens: tt.fields.repositoryAPITokens,
+					repositoryAPITokens:       tt.fields.repositoryAPITokens,
+					repositoryRequestsHistory: tt.fields.repositoryRequestsHistory,
 				}
 
 				if got := h.authorizationAPI(tt.args.r, tt.args.user); !reflect.DeepEqual(got, tt.want) {
