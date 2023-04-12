@@ -265,15 +265,39 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: mustGenerateTimestamps(
-						repeatStr("2023-01-01T00:00:00Z", quotaRegisteredUserRPM+1)...,
-					),
+					Timestamps: repeatTimestamp(nowMinute, quotaRegisteredUserRPM),
+				},
+				user: &User{IsRegistered: true},
+			},
+			wantThrottling:    true,
+			wantQuotaExceeded: false,
+			wantErr:           false,
+		},
+		{
+			name: "daily quota exceeded",
+			args: args{
+				ctx: context.TODO(),
+				clientRepository: MockRepositoryPrediction{
+					Timestamps: repeatTimestamp(today, quotaRegisteredUserRPD),
+				},
+				user: &User{IsRegistered: true},
+			},
+			wantThrottling:    true,
+			wantQuotaExceeded: true,
+			wantErr:           false,
+		},
+		{
+			name: "unhappy path",
+			args: args{
+				ctx: context.TODO(),
+				clientRepository: MockRepositoryPrediction{
+					Err: errors.New("foo"),
 				},
 				user: &User{IsRegistered: true},
 			},
 			wantThrottling:    false,
 			wantQuotaExceeded: false,
-			wantErr:           false,
+			wantErr:           true,
 		},
 	}
 	for _, tt := range tests {
@@ -302,12 +326,293 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 	}
 }
 
-func repeatStr(s string, nElements int) []string {
-	o := make([]string, nElements)
+func repeatTimestamp(ts time.Time, nElements int) []time.Time {
+	o := make([]time.Time, nElements)
 	var i int
 	for i < nElements {
-		o[i] = s
+		o[i] = ts
 		i++
 	}
 	return o
+}
+
+func Test_sliceWithinWindow(t *testing.T) {
+	type args struct {
+		ts    []time.Time
+		tsMin time.Time
+		tsMax time.Time
+	}
+	tests := []struct {
+		name string
+		args args
+		want []time.Time
+	}{
+		{
+			name: "non-empty slice",
+			args: args{
+				ts: mustGenerateTimestamps(
+					"2023-01-01T00:00:00Z", "2023-01-01T10:00:00Z", "2023-01-01T11:00:00Z", "2023-01-02T00:00:00Z",
+					"2023-01-04T00:00:00Z",
+				),
+				tsMin: mustGenerateTimestamps("2023-01-01T00:00:00Z")[0],
+				tsMax: mustGenerateTimestamps("2023-01-02T00:00:00Z")[0],
+			},
+			want: mustGenerateTimestamps(
+				"2023-01-01T00:00:00Z", "2023-01-01T10:00:00Z", "2023-01-01T11:00:00Z", "2023-01-02T00:00:00Z",
+			),
+		},
+		{
+			name: "input empty slice",
+			args: args{
+				ts:    nil,
+				tsMin: mustGenerateTimestamps("2023-01-01T00:00:00Z")[0],
+				tsMax: mustGenerateTimestamps("2023-01-02T00:00:00Z")[0],
+			},
+			want: nil,
+		},
+		{
+			name: "non-empty input, empty output",
+			args: args{
+				ts: mustGenerateTimestamps(
+					"2023-01-01T00:00:00Z", "2023-01-01T01:00:00Z", "2023-01-01T02:00:00Z",
+				),
+				tsMin: mustGenerateTimestamps("2023-01-02T00:00:00Z")[0],
+				tsMax: mustGenerateTimestamps("2023-01-03T00:00:00Z")[0],
+			},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := sliceWithinWindow(tt.args.ts, tt.args.tsMin, tt.args.tsMax); !reflect.DeepEqual(
+					got, tt.want,
+				) {
+					t.Errorf("sliceWithinWindow() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func TestGetQuotaUsageBaseUser(t *testing.T) {
+	type args struct {
+		ctx              context.Context
+		clientRepository RepositoryPrediction
+	}
+	user := &User{}
+	tests := []struct {
+		name    string
+		args    args
+		want    QuotasUsage
+		wantErr bool
+	}{
+		{
+			name: "no previous requests",
+			args: args{
+				ctx:              context.TODO(),
+				clientRepository: MockRepositoryPrediction{},
+			},
+			want: QuotasUsage{
+				PromptLengthMax: quotaPromptLengthMax(user),
+				RateMinute:      quotaRPM(user),
+				RateDay:         quotaRPD(user),
+			},
+			wantErr: false,
+		},
+		{
+			name: "a single requests",
+			args: args{
+				ctx: context.TODO(),
+				clientRepository: MockRepositoryPrediction{
+					Timestamps: repeatTimestamp(nowMinute, 1),
+				},
+			},
+			want: QuotasUsage{
+				PromptLengthMax: quotaPromptLengthMax(user),
+				RateMinute: QuotaRequestsConsumption{
+					Limit: quotaBaseUserRPM,
+					Used:  1,
+					Reset: nowMinute.Add(minute).Unix(),
+				},
+				RateDay: QuotaRequestsConsumption{
+					Limit: quotaBaseUserRPD,
+					Used:  1,
+					Reset: today.Add(day).Unix(),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "daily quota exceeded",
+			args: args{
+				ctx: context.TODO(),
+				clientRepository: MockRepositoryPrediction{
+					Timestamps: repeatTimestamp(nowMinute, quotaBaseUserRPD),
+				},
+			},
+			want: QuotasUsage{
+				PromptLengthMax: quotaPromptLengthMax(user),
+				RateMinute: QuotaRequestsConsumption{
+					Limit: quotaBaseUserRPM,
+					Used:  quotaBaseUserRPM,
+					Reset: today.Add(day).Unix(),
+				},
+				RateDay: QuotaRequestsConsumption{
+					Limit: quotaBaseUserRPD,
+					Used:  quotaBaseUserRPD,
+					Reset: today.Add(day).Unix(),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "throttling quota exceeded",
+			args: args{
+				ctx: context.TODO(),
+				clientRepository: MockRepositoryPrediction{
+					Timestamps: repeatTimestamp(nowMinute, quotaBaseUserRPM),
+				},
+			},
+			want: QuotasUsage{
+				PromptLengthMax: quotaPromptLengthMax(user),
+				RateMinute: QuotaRequestsConsumption{
+					Limit: quotaBaseUserRPM,
+					Used:  quotaBaseUserRPM,
+					Reset: nowMinute.Add(minute).Unix(),
+				},
+				RateDay: QuotaRequestsConsumption{
+					Limit: quotaBaseUserRPD,
+					Used:  quotaBaseUserRPM,
+					Reset: today.Add(day).Unix(),
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				got, err := GetQuotaUsage(tt.args.ctx, tt.args.clientRepository, user)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("GetQuotaUsage() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("GetQuotaUsage() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func TestGetQuotaUsageRegisteredUser(t *testing.T) {
+	type args struct {
+		ctx              context.Context
+		clientRepository RepositoryPrediction
+	}
+	user := &User{IsRegistered: true}
+	tests := []struct {
+		name    string
+		args    args
+		want    QuotasUsage
+		wantErr bool
+	}{
+		{
+			name: "no previous requests",
+			args: args{
+				ctx:              context.TODO(),
+				clientRepository: MockRepositoryPrediction{},
+			},
+			want: QuotasUsage{
+				PromptLengthMax: quotaPromptLengthMax(user),
+				RateMinute:      quotaRPM(user),
+				RateDay:         quotaRPD(user),
+			},
+			wantErr: false,
+		},
+		{
+			name: "a single requests",
+			args: args{
+				ctx: context.TODO(),
+				clientRepository: MockRepositoryPrediction{
+					Timestamps: repeatTimestamp(nowMinute, 1),
+				},
+			},
+			want: QuotasUsage{
+				PromptLengthMax: quotaPromptLengthMax(user),
+				RateMinute: QuotaRequestsConsumption{
+					Limit: quotaRegisteredUserRPM,
+					Used:  1,
+					Reset: nowMinute.Add(minute).Unix(),
+				},
+				RateDay: QuotaRequestsConsumption{
+					Limit: quotaRegisteredUserRPD,
+					Used:  1,
+					Reset: today.Add(day).Unix(),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "daily quota exceeded",
+			args: args{
+				ctx: context.TODO(),
+				clientRepository: MockRepositoryPrediction{
+					Timestamps: repeatTimestamp(nowMinute, quotaRegisteredUserRPD),
+				},
+			},
+			want: QuotasUsage{
+				PromptLengthMax: quotaPromptLengthMax(user),
+				RateMinute: QuotaRequestsConsumption{
+					Limit: quotaRegisteredUserRPM,
+					Used:  quotaRegisteredUserRPM,
+					Reset: today.Add(day).Unix(),
+				},
+				RateDay: QuotaRequestsConsumption{
+					Limit: quotaRegisteredUserRPD,
+					Used:  quotaRegisteredUserRPD,
+					Reset: today.Add(day).Unix(),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "throttling quota exceeded",
+			args: args{
+				ctx: context.TODO(),
+				clientRepository: MockRepositoryPrediction{
+					Timestamps: repeatTimestamp(nowMinute, quotaRegisteredUserRPM),
+				},
+			},
+			want: QuotasUsage{
+				PromptLengthMax: quotaPromptLengthMax(user),
+				RateMinute: QuotaRequestsConsumption{
+					Limit: quotaRegisteredUserRPM,
+					Used:  quotaRegisteredUserRPM,
+					Reset: nowMinute.Add(minute).Unix(),
+				},
+				RateDay: QuotaRequestsConsumption{
+					Limit: quotaRegisteredUserRPD,
+					Used:  quotaRegisteredUserRPM,
+					Reset: today.Add(day).Unix(),
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				got, err := GetQuotaUsage(tt.args.ctx, tt.args.clientRepository, user)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("GetQuotaUsage() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("GetQuotaUsage() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
 }
