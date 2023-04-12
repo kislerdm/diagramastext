@@ -129,7 +129,10 @@ WHERE t.token = $1 AND t.is_active AND u.is_active`, id,
 	}
 
 	var userID string
-	_ = rows.Scan(&userID)
+	defer rows.Close()
+	if rows.Next() {
+		_ = rows.Scan(&userID)
+	}
 	return userID, nil
 }
 

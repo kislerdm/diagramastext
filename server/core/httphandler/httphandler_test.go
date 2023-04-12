@@ -260,8 +260,8 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 				h := httpHandler{
 					diagramRenderingHandler: diagramRenderingHandler,
 					corsHeaders:             corsHeaders,
-					repositoryAPITokens: &mockRepositoryToken{
-						v: "c40bad11-0822-4d84-9f61-44b9a97b0432",
+					repositoryAPITokens: &diagram.MockRepositoryToken{
+						V: "c40bad11-0822-4d84-9f61-44b9a97b0432",
 					},
 				}
 				h.ServeHTTP(
@@ -668,31 +668,25 @@ func Test_httpHandlerError_Error(t *testing.T) {
 
 func Test_httpHandler_authorizationAPI(t *testing.T) {
 	type fields struct {
-		repositoryAPITokens RepositoryToken
+		repositoryAPITokens diagram.RepositoryToken
 	}
 	type args struct {
-		w http.ResponseWriter
 		r *http.Request
 	}
 	tests := []struct {
-		name            string
-		fields          fields
-		errorsCollector *errCollector
-		args            args
-		wantErr         error
+		name   string
+		fields fields
+		args   args
+		want   error
 	}{
 		{
 			name: "happy path",
 			fields: fields{
-				repositoryAPITokens: &mockRepositoryToken{
-					v: "bar",
+				repositoryAPITokens: &diagram.MockRepositoryToken{
+					V: "bar",
 				},
 			},
-			errorsCollector: &errCollector{},
 			args: args{
-				w: &mockWriter{
-					Headers: http.Header{},
-				},
 				r: &http.Request{
 					Header: httpHeaders(
 						map[string]string{
@@ -701,24 +695,21 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 					),
 				},
 			},
+			want: nil,
 		},
 		{
 			name: "unhappy path: no auth token found",
 			fields: fields{
-				repositoryAPITokens: &mockRepositoryToken{
-					v: "bar",
+				repositoryAPITokens: &diagram.MockRepositoryToken{
+					V: "bar",
 				},
 			},
-			errorsCollector: &errCollector{},
 			args: args{
-				w: &mockWriter{
-					Headers: http.Header{},
-				},
 				r: &http.Request{
 					Header: http.Header{},
 				},
 			},
-			wantErr: httpHandlerError{
+			want: httpHandlerError{
 				Msg:      "no authorization token provided",
 				Type:     errorNotAuthorizedNoToken,
 				HTTPCode: http.StatusUnauthorized,
@@ -727,15 +718,11 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 		{
 			name: "unhappy path: failed to interact with the repository",
 			fields: fields{
-				repositoryAPITokens: &mockRepositoryToken{
-					err: errors.New("foobar"),
+				repositoryAPITokens: &diagram.MockRepositoryToken{
+					Err: errors.New("foobar"),
 				},
 			},
-			errorsCollector: &errCollector{},
 			args: args{
-				w: &mockWriter{
-					Headers: http.Header{},
-				},
 				r: &http.Request{
 					Header: httpHeaders(
 						map[string]string{
@@ -744,8 +731,8 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 					),
 				},
 			},
-			wantErr: httpHandlerError{
-				Msg:      "foobar",
+			want: httpHandlerError{
+				Msg:      "internal error",
 				Type:     errorRepositoryToken,
 				HTTPCode: http.StatusInternalServerError,
 			},
@@ -753,13 +740,9 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 		{
 			name: "unhappy path: failed to find token",
 			fields: fields{
-				repositoryAPITokens: &mockRepositoryToken{},
+				repositoryAPITokens: &diagram.MockRepositoryToken{},
 			},
-			errorsCollector: &errCollector{},
 			args: args{
-				w: &mockWriter{
-					Headers: http.Header{},
-				},
 				r: &http.Request{
 					Header: httpHeaders(
 						map[string]string{
@@ -768,7 +751,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 					),
 				},
 			},
-			wantErr: httpHandlerError{
+			want: httpHandlerError{
 				Msg:      "the authorization token does not exist, or not active, or account is suspended",
 				Type:     errorNotAuthorizedNoToken,
 				HTTPCode: http.StatusUnauthorized,
@@ -779,12 +762,10 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				h := httpHandler{
-					reportErrorFn:       tt.errorsCollector.Err,
 					repositoryAPITokens: tt.fields.repositoryAPITokens,
 				}
-				h.authorizationAPI(tt.args.w, tt.args.r)
 
-				if !reflect.DeepEqual(tt.errorsCollector.V, tt.wantErr) {
+				if got := h.authorizationAPI(tt.args.r); !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("unexpected error message collected")
 					return
 				}

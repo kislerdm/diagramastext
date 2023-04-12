@@ -101,3 +101,19 @@ func (m MockHTTPClient) Do(_ *http.Request) (*http.Response, error) {
 	}
 	return m.V, nil
 }
+
+// RepositoryToken defines the communication port to persistence layer hosting API access tokens.
+type RepositoryToken interface {
+	// GetActiveUserIDByActiveTokenID reads userID from the repository given the tokenID.
+	// It returns a non-empty value if and only if the token and user are active.
+	GetActiveUserIDByActiveTokenID(ctx context.Context, id string) (string, error)
+}
+
+type MockRepositoryToken struct {
+	V   string
+	Err error
+}
+
+func (m MockRepositoryToken) GetActiveUserIDByActiveTokenID(_ context.Context, _ string) (string, error) {
+	return m.V, m.Err
+}

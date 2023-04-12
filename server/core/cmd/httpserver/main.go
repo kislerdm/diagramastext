@@ -92,6 +92,7 @@ func init() {
 			},
 		),
 		corsHeaders,
+		postgresClient,
 	)
 	if err != nil {
 		log.Fatal(err)
