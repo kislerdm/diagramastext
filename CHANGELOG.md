@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- Authentication and authorization layer to use the Rest API
+
+### Changed
+
+- OpenAI's tokens consumption tracking
+
+## [0.0.6beta] - 2023-04-12
+
+### Added
+
+- Rest API interface to the core logic. Find the specification [here](https://diagramastext.dev/api-reference/).
+
 ### Fixed
 
 - OpenAI's prediction parsing and deserialization when the graph's JSON is surrounded by text.
@@ -35,10 +49,6 @@ _THEN_: get the following graph definition:
 ```
 {"title":"Python Web Server Reading from External Postgres Database","nodes":[{"id":"0","label":"Web Server","technology":"Python"},{"id":"1","label":"Postgres","technology":"Postgres","external":true,"is_database":true}],"links":[{"from":"0","to":"1","label":"reads from Postgres","technology":"TCP"}],"footer":"C4 Model"}
 ```
-
-### Changed
-
-- OpenAI's tokens consumption tracking
 
 ## [0.0.5] - 2023-04-05
 

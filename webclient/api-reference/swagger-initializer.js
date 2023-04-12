@@ -10,6 +10,7 @@ window.onload = function() {
     },
     displayRequestDuration: true,
     defaultModelRendering: "example",
+    supportedSubmitMethods: [],
     defaultModelsExpandDepth: -1,
     request: {
       curlOptions: ["--limit-rate 1"],

@@ -41,7 +41,7 @@ func (c *errCollector) Err(err error) {
 	c.V = err
 }
 
-func Test_httpHandler_ServeHTTP(t *testing.T) {
+func Test_httpHandler_ServeHTTPStatus(t *testing.T) {
 	type fields struct {
 		diagramRenderingHandler map[string]diagram.HTTPHandler
 		corsHeaders             corsHeaders
@@ -159,6 +159,199 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				errors.New("method " + http.MethodPost + " not allowed for path: /status"),
 			),
 		},
+	}
+
+	t.Parallel()
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				h := httpHandler{
+					diagramRenderingHandler: tt.fields.diagramRenderingHandler,
+					reportErrorFn:           tt.errorsCollector.Err,
+					corsHeaders:             tt.fields.corsHeaders,
+				}
+				h.ServeHTTP(tt.args.w, tt.args.r)
+
+				if tt.args.w.(*mockWriter).StatusCode != tt.wantW.(*mockWriter).StatusCode {
+					t.Errorf("unexpected response status code")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.w.Header(), tt.wantW.Header()) {
+					t.Errorf("unexpected response header")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.w.(*mockWriter).V, tt.wantW.(*mockWriter).V) {
+					t.Errorf("unexpected response content")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.errorsCollector.V, tt.wantErr) {
+					t.Errorf("unexpected error message collected")
+					return
+				}
+			},
+		)
+	}
+}
+
+func httpHeaders(h map[string]string) http.Header {
+	o := http.Header{}
+	o.Add("Content-Type", "application/json")
+	for k, v := range h {
+		o.Add(k, v)
+	}
+	return o
+}
+
+func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
+	corsHeaders := map[string]string{
+		"Access-Control-Allow-Origin": "https://diagramastext.dev",
+	}
+
+	diagramRenderingHandler := map[string]diagram.HTTPHandler{
+		"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
+			return diagram.MockOutput{
+				V: []byte(`{"svg":"foo"}`),
+			}, nil
+		},
+	}
+
+	type args struct {
+		w          http.ResponseWriter
+		path       string
+		authHeader string
+	}
+	tests := []struct {
+		name            string
+		args            args
+		errorsCollector *errCollector
+		wantW           http.ResponseWriter
+		wantErr         error
+	}{
+		{
+
+			name: "webclient",
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				path:       "/internal/generate/c4",
+				authHeader: "foobar",
+			},
+			wantW: &mockWriter{
+				Headers:    httpHeaders(corsHeaders),
+				StatusCode: http.StatusOK,
+				V:          []byte(`{"svg":"foo"}`),
+			},
+			errorsCollector: &errCollector{},
+		},
+		{
+
+			name: "api",
+			args: args{
+				w: &mockWriter{
+					Headers: http.Header{},
+				},
+				path:       "/generate/c4",
+				authHeader: "Bearer 1410904f-f646-488f-ae08-cc341dfb321c",
+			},
+			wantW: &mockWriter{
+				Headers:    httpHeaders(corsHeaders),
+				StatusCode: http.StatusNotImplemented,
+				V:          []byte(`{"error":"The Rest API will be supported in the upcoming release v0.0.6"}`),
+			},
+			errorsCollector: &errCollector{},
+			wantErr: httpHandlerError{
+				Msg:      "Rest API call attempt",
+				Type:     "NotImplemented",
+				HTTPCode: http.StatusNotImplemented,
+			},
+		},
+	}
+
+	t.Parallel()
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				h := httpHandler{
+					diagramRenderingHandler: diagramRenderingHandler,
+					reportErrorFn:           tt.errorsCollector.Err,
+					corsHeaders:             corsHeaders,
+				}
+				h.ServeHTTP(
+					tt.args.w, &http.Request{
+						Method: http.MethodPost,
+						URL: &url.URL{
+							Path: tt.args.path,
+						},
+						Header: httpHeaders(
+							map[string]string{
+								"Authorization": tt.args.authHeader,
+							},
+						),
+						Body: io.NopCloser(strings.NewReader(`{"prompt":"foobar"}`)),
+					},
+				)
+
+				if tt.args.w.(*mockWriter).StatusCode != tt.wantW.(*mockWriter).StatusCode {
+					t.Errorf("unexpected response status code")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.w.Header(), tt.wantW.(*mockWriter).Header()) {
+					t.Errorf("unexpected response header")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.w.(*mockWriter).V, tt.wantW.(*mockWriter).V) {
+					t.Errorf("unexpected response content")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.errorsCollector.V, tt.wantErr) {
+					t.Errorf("unexpected error message collected")
+					return
+				}
+			},
+		)
+	}
+}
+
+func Test_httpHandler_diagramRendering(t *testing.T) {
+	type fields struct {
+		diagramRenderingHandler map[string]diagram.HTTPHandler
+		corsHeaders             corsHeaders
+	}
+
+	corsHeaders := map[string]string{
+		"Access-Control-Allow-Origin": "https://diagramastext.dev",
+	}
+
+	var httpHeaders = func(h map[string]string) http.Header {
+		o := http.Header{}
+		o.Add("Content-Type", "application/json")
+		for k, v := range h {
+			o.Add(k, v)
+		}
+		return o
+	}
+
+	type args struct {
+		w http.ResponseWriter
+		r *http.Request
+	}
+	tests := []struct {
+		name            string
+		fields          fields
+		args            args
+		errorsCollector *errCollector
+		wantW           http.ResponseWriter
+		wantErr         error
+	}{
 		{
 
 			name:            "happy path: POST /c4",
@@ -275,7 +468,9 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 				StatusCode: http.StatusUnprocessableEntity,
 				V:          []byte(`{"error":"wrong request content"}`),
 			},
-			wantErr: newValidationError(errors.New("prompt length must be between 3 and 100 characters")),
+			wantErr: newInputContentValidationError(
+				errors.New("prompt length must be between 3 and 100 characters"),
+			),
 		},
 		{
 			name:            "unhappy path: POST /c4, faulty input JSON deserialization error",
@@ -302,13 +497,13 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 			},
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
-				StatusCode: http.StatusUnprocessableEntity,
-				V:          []byte(`{"error":"wrong request content"}`),
+				StatusCode: http.StatusBadRequest,
+				V:          []byte(`{"error":"wrong request format"}`),
 			},
 			wantErr: httpHandlerError{
 				Msg:      "faulty JSON",
-				Type:     errorInvalidContent,
-				HTTPCode: http.StatusUnprocessableEntity,
+				Type:     errorInvalidRequest,
+				HTTPCode: http.StatusBadRequest,
 			},
 		},
 		{
@@ -442,7 +637,7 @@ func Test_httpHandler_ServeHTTP(t *testing.T) {
 					reportErrorFn:           tt.errorsCollector.Err,
 					corsHeaders:             tt.fields.corsHeaders,
 				}
-				h.ServeHTTP(tt.args.w, tt.args.r)
+				h.diagramRendering(tt.args.w, tt.args.r)
 
 				if tt.args.w.(*mockWriter).StatusCode != tt.wantW.(*mockWriter).StatusCode {
 					t.Errorf("unexpected response status code")

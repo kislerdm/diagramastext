@@ -3,7 +3,7 @@ info:
   title: "DiagramAsText API"
   description: |
     API to generate diagrams programmatically.
-  version: "0.0.6"
+  version: "0.0.6beta"
   contact:
     email: contact@diagramastext.dev
     name: to access, and to discuss usage conditions and special requests
@@ -20,8 +20,8 @@ tags:
       The API methods to generate diagrams using description in English. 
       
       <strong>Note</strong>: <strong><i>not idempotent</i></strong>, the same prompt may yield different results.
-  - name: "Operations"
-    description: The API methods to access API usage quotas and configurations.
+#  - name: "Operations"
+#    description: The API methods to access API usage quotas and configurations.
 paths:
   # diagram generation methods
   /generate/c4:
@@ -81,37 +81,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
   # operations
-  /quotas_limit:
-    get:
-      tags:
-        - "Operations"
-      summary: "Fetches usage quotas"
-      description: "The method to fetch current usage status and the quotas limits left"
-      responses:
-          "200":
-            description: OK
-            content: 
-              "application/json":
-                  schema:
-                    $ref: "#/components/schemas/Quotas"
-          "401":
-            description: Unauthorized
-            content:
-              "application/json":
-                schema:
-                  $ref: "#/components/schemas/Error"
-          "429":
-            description: Throttling quota exceeded
-            content:
-              "application/json":
-                schema:
-                  $ref: "#/components/schemas/Error"
-          "500":
-            description: Server error
-            content:
-              "application/json":
-                schema:
-                  $ref: "#/components/schemas/Error"
+#  /quotas_limit:
+#    get:
+#      tags:
+#        - "Operations"
+#      summary: "Fetches usage quotas"
+#      description: "The method to fetch current usage status and the quotas limits left"
+#      responses:
+#          "200":
+#            description: OK
+#            content:
+#              "application/json":
+#                  schema:
+#                    $ref: "#/components/schemas/Quotas"
+#          "401":
+#            description: Unauthorized
+#            content:
+#              "application/json":
+#                schema:
+#                  $ref: "#/components/schemas/Error"
+#          "429":
+#            description: Throttling quota exceeded
+#            content:
+#              "application/json":
+#                schema:
+#                  $ref: "#/components/schemas/Error"
+#          "500":
+#            description: Server error
+#            content:
+#              "application/json":
+#                schema:
+#                  $ref: "#/components/schemas/Error"
       
 components:
   securitySchemes:
@@ -151,53 +151,53 @@ components:
           description: "Error message"
           type: "string"
           minLength: 1
-    Quotas:
-      example: {
-        prompt_length_max: 300,
-        rate_minute: {
-          limit: 3,
-          used: 1,
-          reset: 1681123672
-        },
-        rate_day: {
-          limit: 20,
-          used: 1,
-          reset: 1681210072
-        }
-      }
-      type: object
-      required:
-        - rate_minute
-        - rate_day
-        - prompt_length_max
-      additionalProperties: false
-      properties:
-        prompt_length_max:
-          description: "Maximum prompt length allowed"
-          type: "number"
-        rate_minute:
-          description: "Rate Per Minute limit"
-          $ref: "#/components/schemas/QuotasRate"
-        rate_day:
-          description: "Rate Per Day limit"
-          $ref: "#/components/schemas/QuotasRate"
-    QuotasRate:
-      type: object
-      required:
-        - limit
-        - used
-        - reset
-      additionalProperties: false
-      properties:
-        limit:
-          description: "Quota's maximal limit"
-          type: "integer"
-          minimum: 1
-        used:
-          description: "Quota used since previous reset"
-          type: "integer"
-          minimum: 0
-        reset:
-          description: "The timestamp of upcoming quota rest in unix epochs"
-          type: "integer"
-          minimum: 0
+#    Quotas:
+#      example: {
+#        prompt_length_max: 300,
+#        rate_minute: {
+#          limit: 3,
+#          used: 1,
+#          reset: 1681123672
+#        },
+#        rate_day: {
+#          limit: 20,
+#          used: 1,
+#          reset: 1681210072
+#        }
+#      }
+#      type: object
+#      required:
+#        - rate_minute
+#        - rate_day
+#        - prompt_length_max
+#      additionalProperties: false
+#      properties:
+#        prompt_length_max:
+#          description: "Maximum prompt length allowed"
+#          type: "number"
+#        rate_minute:
+#          description: "Rate Per Minute limit"
+#          $ref: "#/components/schemas/QuotasRate"
+#        rate_day:
+#          description: "Rate Per Day limit"
+#          $ref: "#/components/schemas/QuotasRate"
+#    QuotasRate:
+#      type: object
+#      required:
+#        - limit
+#        - used
+#        - reset
+#      additionalProperties: false
+#      properties:
+#        limit:
+#          description: "Quota's maximal limit"
+#          type: "integer"
+#          minimum: 1
+#        used:
+#          description: "Quota used since previous reset"
+#          type: "integer"
+#          minimum: 0
+#        reset:
+#          description: "The timestamp of upcoming quota rest in unix epochs"
+#          type: "integer"
+#          minimum: 0

@@ -2,11 +2,8 @@ package diagram
 
 import (
 	"errors"
-	"io"
 	"math/rand"
-	"net/http"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -95,10 +92,10 @@ func Test_inquiry_Validate(t *testing.T) {
 	}
 }
 
-func TestNewInquiryDriverHTTP(t *testing.T) {
+func TestNewInput(t *testing.T) {
 	type args struct {
-		body    io.Reader
-		headers http.Header
+		prompt string
+		user   *User
 	}
 
 	validPrompt := randomString(promptLengthMaxBaseUser - 1)
@@ -112,30 +109,20 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 		{
 			name: "happy path",
 			args: args{
-				body: strings.NewReader(`{"prompt":"` + validPrompt + `"}`),
+				prompt: validPrompt,
+				user:   &User{ID: "00000000-0000-0000-0000-000000000000", IsRegistered: false},
 			},
 			want: &inquiry{
 				Prompt: validPrompt,
-				User:   &User{ID: "00000000-0000-0000-0000-000000000000"},
+				User:   &User{ID: "00000000-0000-0000-0000-000000000000", IsRegistered: false},
 			},
 			wantErr: false,
 		},
 		{
-			name: "unhappy path: invalid json",
-			args: args{
-				body: io.NopCloser(
-					strings.NewReader(`{"prompt":`),
-				),
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
 			name: "unhappy path: invalid prompt",
 			args: args{
-				body: io.NopCloser(
-					strings.NewReader(`{"prompt":"` + randomString(promptLengthMin-1) + `"}`),
-				),
+				prompt: randomString(promptLengthMin - 1),
+				user:   &User{ID: "00000000-0000-0000-0000-000000000000", IsRegistered: false},
 			},
 			want:    nil,
 			wantErr: true,
@@ -144,7 +131,7 @@ func TestNewInquiryDriverHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := NewInputDriverHTTP(tt.args.body, tt.args.headers)
+				got, err := NewInput(tt.args.prompt, tt.args.user)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("NewInputDriverHTTP() error = %v, wantErr %v", err, tt.wantErr)
 					return

@@ -30,7 +30,7 @@ func NewHTTPHandler(
 
 	return &httpHandler{
 		diagramRenderingHandler: map[string]diagram.HTTPHandler{
-			"/generate/c4": c4DiagramHandler,
+			"/c4": c4DiagramHandler,
 		},
 		corsHeaders:   corsHeaders,
 		reportErrorFn: func(err error) { l.Println(err) },
@@ -59,8 +59,10 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
 
 func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	const (
-		pathPrefixInternal = "/internal"
-		pathStatus         = "/status"
+		pathPrefixInternal          = "/internal"
+		pathPrefixDiagramGeneration = "/generate"
+
+		pathStatus = "/status"
 	)
 	if r.URL.Path == pathStatus {
 		switch r.Method {
@@ -77,15 +79,26 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	switch strings.HasPrefix(r.URL.Path, pathPrefixInternal) {
-	case false:
-		h.authorizationAPI(w, r)
-	default:
+	if strings.HasPrefix(r.URL.Path, pathPrefixInternal) {
 		h.authorization(w, r)
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixInternal)
+	} else {
+		h.response(
+			w, []byte(`{"error":"The Rest API will be supported in the upcoming release v0.0.6"}`), httpHandlerError{
+				Msg:      "Rest API call attempt",
+				Type:     "NotImplemented",
+				HTTPCode: http.StatusNotImplemented,
+			},
+		)
+		return
+		//h.authorizationAPI(w, r)
 	}
 
-	h.diagramRendering(w, r)
+	switch strings.HasPrefix(r.URL.Path, pathPrefixDiagramGeneration) {
+	case true:
+		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixDiagramGeneration)
+		h.diagramRendering(w, r)
+	}
 }
 
 func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
@@ -106,10 +119,19 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case http.MethodPost:
+		var requestContract struct {
+			Prompt string `json:"prompt"`
+		}
+
 		defer func() { _ = r.Body.Close() }()
-		input, err := diagram.NewInputDriverHTTP(r.Body, r.Header)
+		if err := json.NewDecoder(r.Body).Decode(&requestContract); err != nil {
+			h.response(w, []byte(`{"error":"wrong request format"}`), newInputFormatValidationError(err))
+			return
+		}
+
+		input, err := diagram.NewInput(requestContract.Prompt, userProfileFromHTTPHeaders(r.Header))
 		if err != nil {
-			h.response(w, []byte(`{"error":"wrong request content"}`), newValidationError(err))
+			h.response(w, []byte(`{"error":"wrong request content"}`), newInputContentValidationError(err))
 			return
 		}
 
@@ -162,7 +184,8 @@ func (h corsHeaders) setHeaders(header http.Header) {
 const (
 	errorInvalidMethod         = "Request:InvalidMethod"
 	errorNotExists             = "Request:HandlerNotExists"
-	errorInvalidContent        = "InputValidation:InvalidContent"
+	errorInvalidRequest        = "InputValidation:InvalidContent"
+	errorInvalidPrompt         = "InputValidation:InvalidPrompt"
 	errorCoreLogic             = "Core:DiagramRendering"
 	errorResponseSerialisation = "Response:DiagramSerialisation"
 )
@@ -207,18 +230,25 @@ func newInvalidMethodError(err error) error {
 	}
 }
 
-func newValidationError(err error) error {
+func newInputFormatValidationError(err error) error {
 	msg := err.Error()
 
 	switch err.(type) {
 	case *json.SyntaxError:
 		msg = "faulty JSON"
-	default:
 	}
 
 	return httpHandlerError{
 		Msg:      msg,
-		Type:     errorInvalidContent,
+		Type:     errorInvalidRequest,
+		HTTPCode: http.StatusBadRequest,
+	}
+}
+
+func newInputContentValidationError(err error) error {
+	return httpHandlerError{
+		Msg:      err.Error(),
+		Type:     errorInvalidPrompt,
 		HTTPCode: http.StatusUnprocessableEntity,
 	}
 }
@@ -239,4 +269,9 @@ func writeStrings(o *strings.Builder, text ...string) {
 	for _, s := range text {
 		_, _ = o.WriteString(s)
 	}
+}
+
+func userProfileFromHTTPHeaders(_ http.Header) *diagram.User {
+	// FIXME: change when the auth layer is implemented
+	return &diagram.User{ID: "00000000-0000-0000-0000-000000000000"}
 }

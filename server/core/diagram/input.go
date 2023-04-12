@@ -1,10 +1,7 @@
 package diagram
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -90,18 +87,11 @@ func validatePromptLength(prompt string, max int) error {
 	return nil
 }
 
-// NewInputDriverHTTP creates the inquiry to be processed using the input from a http request.
-func NewInputDriverHTTP(body io.Reader, headers http.Header) (Input, error) {
-	var req struct {
-		Prompt string `json:"prompt"`
-	}
-	if err := json.NewDecoder(body).Decode(&req); err != nil {
-		return nil, err
-	}
-
+// NewInput initialises the `Input` object.
+func NewInput(prompt string, user *User) (Input, error) {
 	o := &inquiry{
-		Prompt:    req.Prompt,
-		User:      userProfileFromHTTPHeaders(headers),
+		Prompt:    prompt,
+		User:      user,
 		RequestID: utils.NewUUID(),
 	}
 
@@ -110,9 +100,4 @@ func NewInputDriverHTTP(body io.Reader, headers http.Header) (Input, error) {
 	}
 
 	return o, nil
-}
-
-func userProfileFromHTTPHeaders(_ http.Header) *User {
-	// FIXME: change when the auth layer is implemented
-	return &User{ID: "00000000-0000-0000-0000-000000000000"}
 }
