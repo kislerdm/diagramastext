@@ -2,7 +2,21 @@ openapi: "3.0.3"
 info:
   title: "DiagramAsText API"
   description: |
-    API to generate diagrams programmatically.
+    API to generate diagrams based on their description in plain English.
+    
+    ## Headers
+    
+    Make sure that the request headers are set properly: 
+      - `Authorization: Bearer ${DIAGRAMASTEXT_API_TOKEN}`
+      - `Accept: application/json`
+      - `Content-Type: application/json`
+    
+    ## API Requests 
+    
+    Trial requests can be issued from this page:
+      1. Click the **Authorize** button and enter an API key;
+      2. Select the method and click the **Try it out** button next to its description.  
+
   version: "0.0.6"
   contact:
     email: contact@diagramastext.dev
