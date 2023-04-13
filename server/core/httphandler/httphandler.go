@@ -69,7 +69,9 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		pathPrefixDiagramGeneration = "/generate"
 
 		pathStatus = "/status"
+		pathQuotas = "/quotas_limit"
 	)
+
 	if r.URL.Path == pathStatus {
 		switch r.Method {
 		case http.MethodGet, http.MethodOptions:
@@ -100,11 +102,80 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixInternal)
 	}
 
-	switch strings.HasPrefix(r.URL.Path, pathPrefixDiagramGeneration) {
-	case true:
+	if strings.HasPrefix(r.URL.Path, pathPrefixDiagramGeneration) {
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixDiagramGeneration)
 		h.diagramRendering(w, r, &user)
+		return
 	}
+
+	if r.URL.Path == pathQuotas {
+		h.getQuotasUsage(w, r, &user)
+		return
+	}
+}
+
+func (h httpHandler) authorizationWebclient(_ *http.Request, user *diagram.User) error {
+	user.ID = "00000000-0000-0000-0000-000000000000"
+	// TODO: add JWT authN
+	return nil
+}
+
+func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error {
+	authToken := readAuthHeaderValue(r.Header)
+	if authToken == "" {
+		return httpHandlerError{
+			Msg:      "no authorizationWebclient token provided",
+			Type:     errorNotAuthorizedNoToken,
+			HTTPCode: http.StatusUnauthorized,
+		}
+	}
+	userID, err := h.repositoryAPITokens.GetActiveUserIDByActiveTokenID(r.Context(), authToken)
+	if err != nil {
+		return httpHandlerError{
+			Msg:      "internal error",
+			Type:     errorRepositoryToken,
+			HTTPCode: http.StatusInternalServerError,
+		}
+	}
+	if userID == "" {
+		return httpHandlerError{
+			Msg:      "the authorizationWebclient token does not exist, or not active, or account is suspended",
+			Type:     errorNotAuthorizedNoToken,
+			HTTPCode: http.StatusUnauthorized,
+		}
+	}
+
+	user.ID = userID
+	user.IsRegistered = true
+	user.APIToken = authToken
+
+	return h.checkQuota(r, user)
+}
+
+func (h httpHandler) checkQuota(r *http.Request, user *diagram.User) error {
+	throttling, quotaExceeded, err := diagram.ValidateRequestsQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
+	if err != nil {
+		return httpHandlerError{
+			Msg:      "internal error",
+			Type:     errorQuotaValidation,
+			HTTPCode: http.StatusInternalServerError,
+		}
+	}
+	if throttling {
+		return httpHandlerError{
+			Msg:      "throttling quota exceeded",
+			Type:     errorQuotaExceeded,
+			HTTPCode: http.StatusTooManyRequests,
+		}
+	}
+	if quotaExceeded {
+		return httpHandlerError{
+			Msg:      "quota exceeded",
+			Type:     errorQuotaExceeded,
+			HTTPCode: http.StatusForbidden,
+		}
+	}
+	return nil
 }
 
 func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request, user *diagram.User) {
@@ -171,68 +242,46 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request, us
 	}
 }
 
-func (h httpHandler) authorizationWebclient(_ *http.Request, user *diagram.User) error {
-	user.ID = "00000000-0000-0000-0000-000000000000"
-	// TODO: add JWT authN
-	return nil
-}
+func (h httpHandler) getQuotasUsage(w http.ResponseWriter, r *http.Request, user *diagram.User) {
+	switch r.Method {
+	case http.MethodOptions:
+		h.response(w, nil, nil)
+		return
+	case http.MethodGet:
+		quotasUsage, err := diagram.GetQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
+		if err != nil {
+			h.response(
+				w, []byte(`{"error":"internal error"}`), httpHandlerError{
+					Msg:      err.Error(),
+					Type:     errorQuotaFetching,
+					HTTPCode: http.StatusInternalServerError,
+				},
+			)
+			return
+		}
 
-func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error {
-	authToken := readAuthHeaderValue(r.Header)
-	if authToken == "" {
-		return httpHandlerError{
-			Msg:      "no authorizationWebclient token provided",
-			Type:     errorNotAuthorizedNoToken,
-			HTTPCode: http.StatusUnauthorized,
+		oBytes, err := json.Marshal(quotasUsage)
+		if err != nil {
+			h.response(
+				w, []byte(`{"error":"internal error"}`), httpHandlerError{
+					Msg:      err.Error(),
+					Type:     errorQuotaDataSerialization,
+					HTTPCode: http.StatusInternalServerError,
+				},
+			)
+			return
 		}
-	}
-	userID, err := h.repositoryAPITokens.GetActiveUserIDByActiveTokenID(r.Context(), authToken)
-	if err != nil {
-		return httpHandlerError{
-			Msg:      "internal error",
-			Type:     errorRepositoryToken,
-			HTTPCode: http.StatusInternalServerError,
-		}
-	}
-	if userID == "" {
-		return httpHandlerError{
-			Msg:      "the authorizationWebclient token does not exist, or not active, or account is suspended",
-			Type:     errorNotAuthorizedNoToken,
-			HTTPCode: http.StatusUnauthorized,
-		}
-	}
 
-	user.ID = userID
-	user.IsRegistered = true
-	user.APIToken = authToken
-
-	return h.checkQuota(r, user)
-}
-
-func (h httpHandler) checkQuota(r *http.Request, user *diagram.User) error {
-	throttling, quotaExceeded, err := diagram.ValidateRequestsQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
-	if err != nil {
-		return httpHandlerError{
-			Msg:      "internal error",
-			Type:     errorQuotaValidation,
-			HTTPCode: http.StatusInternalServerError,
-		}
+		h.response(w, oBytes, nil)
+		return
+	default:
+		h.response(
+			w, nil, newInvalidMethodError(
+				errors.New("method "+r.Method+" not allowed for path: "+r.URL.Path),
+			),
+		)
+		return
 	}
-	if throttling {
-		return httpHandlerError{
-			Msg:      "throttling quota exceed",
-			Type:     errorQuotaExceeded,
-			HTTPCode: http.StatusTooManyRequests,
-		}
-	}
-	if quotaExceeded {
-		return httpHandlerError{
-			Msg:      "quota exceed",
-			Type:     errorQuotaExceeded,
-			HTTPCode: http.StatusForbidden,
-		}
-	}
-	return nil
 }
 
 func readAuthHeaderValue(header http.Header) string {
@@ -258,16 +307,18 @@ func (h corsHeaders) setHeaders(header http.Header) {
 }
 
 const (
-	errorInvalidMethod         = "Request:InvalidMethod"
-	errorNotExists             = "Request:HandlerNotExists"
-	errorNotAuthorizedNoToken  = "Request:AccessDenied:NoAPIToken"
-	errorInvalidRequest        = "InputValidation:InvalidContent"
-	errorInvalidPrompt         = "InputValidation:InvalidPrompt"
-	errorCoreLogic             = "Core:DiagramRendering"
-	errorResponseSerialisation = "Response:DiagramSerialisation"
-	errorRepositoryToken       = "DrivenInterface:RepositoryToken"
-	errorQuotaValidation       = "Quota:ValidationError"
-	errorQuotaExceeded         = "Quota:Excess"
+	errorInvalidMethod          = "Request:InvalidMethod"
+	errorNotExists              = "Request:HandlerNotExists"
+	errorNotAuthorizedNoToken   = "Request:AccessDenied:NoAPIToken"
+	errorInvalidRequest         = "InputValidation:InvalidContent"
+	errorInvalidPrompt          = "InputValidation:InvalidPrompt"
+	errorCoreLogic              = "Core:DiagramRendering"
+	errorResponseSerialisation  = "Response:DiagramSerialisation"
+	errorRepositoryToken        = "DrivenInterface:RepositoryToken"
+	errorQuotaValidation        = "Quota:ValidationError"
+	errorQuotaExceeded          = "Quota:Excess"
+	errorQuotaFetching          = "Quota:ReadingError"
+	errorQuotaDataSerialization = "Quota:SerializationError"
 )
 
 func newResponseSerialisationError(err error) error {
