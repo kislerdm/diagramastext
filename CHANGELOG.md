@@ -4,11 +4,17 @@
 
 ### Added
 
-- Authentication and authorization layer to use the Rest API
+- Authentication and authorization layer to use the Rest API.
+- `/quotas` endpoint to fetch the service usage
+
+### Fixed
+
+- CORS: validation of preflight calls.
+- Response's content-type header value.
 
 ### Changed
 
-- OpenAI's tokens consumption tracking
+- OpenAI's tokens consumption tracking.
 
 ## [0.0.6beta] - 2023-04-12
 
@@ -49,6 +55,10 @@ _THEN_: get the following graph definition:
 ```
 {"title":"Python Web Server Reading from External Postgres Database","nodes":[{"id":"0","label":"Web Server","technology":"Python"},{"id":"1","label":"Postgres","technology":"Postgres","external":true,"is_database":true}],"links":[{"from":"0","to":"1","label":"reads from Postgres","technology":"TCP"}],"footer":"C4 Model"}
 ```
+
+### Changed
+
+- Migrated to [pgx](https://github.com/jackc/pgx) from [lib/pq](https://github.com/lib/pq). 
 
 ## [0.0.5] - 2023-04-05
 
