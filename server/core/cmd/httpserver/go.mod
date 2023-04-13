@@ -3,11 +3,11 @@ module httpserver
 go 1.19
 
 require (
-	github.com/kislerdm/diagramastext/server/core v0.0.4
+	github.com/kislerdm/diagramastext/server/core v0.0.6
 	github.com/kislerdm/diagramastext/server/core/pkg/gcpsecretsmanager v0.0.1
 	github.com/kislerdm/diagramastext/server/core/pkg/httpclient v0.0.1
 	github.com/kislerdm/diagramastext/server/core/pkg/openai v0.0.2
-	github.com/kislerdm/diagramastext/server/core/pkg/postgres v0.0.1
+	github.com/kislerdm/diagramastext/server/core/pkg/postgres v0.0.2
 )
 
 require (
@@ -21,9 +21,12 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.7.0 // indirect
-	github.com/lib/pq v1.10.7 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgx/v5 v5.3.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/net v0.0.0-20221014081412-f15817d10f9b // indirect
+	golang.org/x/crypto v0.6.0 // indirect
+	golang.org/x/net v0.6.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
@@ -35,9 +38,9 @@ require (
 )
 
 replace (
-	github.com/kislerdm/diagramastext/server/core v0.0.4 => ../../
+	github.com/kislerdm/diagramastext/server/core v0.0.6 => ../../
 	github.com/kislerdm/diagramastext/server/core/pkg/gcpsecretsmanager v0.0.1 => ../../pkg/gcpsecretsmanager
 	github.com/kislerdm/diagramastext/server/core/pkg/httpclient v0.0.1 => ../../pkg/httpclient
 	github.com/kislerdm/diagramastext/server/core/pkg/openai v0.0.2 => ../../pkg/openai
-	github.com/kislerdm/diagramastext/server/core/pkg/postgres v0.0.1 => ../../pkg/postgres
+	github.com/kislerdm/diagramastext/server/core/pkg/postgres v0.0.2 => ../../pkg/postgres
 )

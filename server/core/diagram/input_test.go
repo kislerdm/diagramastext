@@ -265,7 +265,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(nowMinute, quotaRegisteredUserRPM),
+					Timestamps: repeatTimestamp(genNowMinute(), quotaRegisteredUserRPM),
 				},
 				user: &User{IsRegistered: true},
 			},
@@ -278,7 +278,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(today, quotaRegisteredUserRPD),
+					Timestamps: repeatTimestamp(genNowDate(), quotaRegisteredUserRPD),
 				},
 				user: &User{IsRegistered: true},
 			},
@@ -395,6 +395,8 @@ func Test_sliceWithinWindow(t *testing.T) {
 	}
 }
 
+var quotasController = newQuotaIssuer()
+
 func TestGetQuotaUsageBaseUser(t *testing.T) {
 	type args struct {
 		ctx              context.Context
@@ -413,11 +415,7 @@ func TestGetQuotaUsageBaseUser(t *testing.T) {
 				ctx:              context.TODO(),
 				clientRepository: MockRepositoryPrediction{},
 			},
-			want: QuotasUsage{
-				PromptLengthMax: quotaPromptLengthMax(user),
-				RateMinute:      quotaRPM(user),
-				RateDay:         quotaRPD(user),
-			},
+			want:    quotasController.quotaUsage(user),
 			wantErr: false,
 		},
 		{
@@ -425,7 +423,7 @@ func TestGetQuotaUsageBaseUser(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(nowMinute, 1),
+					Timestamps: repeatTimestamp(quotasController.minuteNow, 1),
 				},
 			},
 			want: QuotasUsage{
@@ -433,12 +431,12 @@ func TestGetQuotaUsageBaseUser(t *testing.T) {
 				RateMinute: QuotaRequestsConsumption{
 					Limit: quotaBaseUserRPM,
 					Used:  1,
-					Reset: nowMinute.Add(minute).Unix(),
+					Reset: quotasController.minuteNext.Unix(),
 				},
 				RateDay: QuotaRequestsConsumption{
 					Limit: quotaBaseUserRPD,
 					Used:  1,
-					Reset: today.Add(day).Unix(),
+					Reset: quotasController.dayNext.Unix(),
 				},
 			},
 			wantErr: false,
@@ -448,7 +446,7 @@ func TestGetQuotaUsageBaseUser(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(nowMinute, quotaBaseUserRPD),
+					Timestamps: repeatTimestamp(quotasController.minuteNow, quotaBaseUserRPD),
 				},
 			},
 			want: QuotasUsage{
@@ -456,12 +454,12 @@ func TestGetQuotaUsageBaseUser(t *testing.T) {
 				RateMinute: QuotaRequestsConsumption{
 					Limit: quotaBaseUserRPM,
 					Used:  quotaBaseUserRPM,
-					Reset: today.Add(day).Unix(),
+					Reset: quotasController.dayNext.Unix(),
 				},
 				RateDay: QuotaRequestsConsumption{
 					Limit: quotaBaseUserRPD,
 					Used:  quotaBaseUserRPD,
-					Reset: today.Add(day).Unix(),
+					Reset: quotasController.dayNext.Unix(),
 				},
 			},
 			wantErr: false,
@@ -471,7 +469,7 @@ func TestGetQuotaUsageBaseUser(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(nowMinute, quotaBaseUserRPM),
+					Timestamps: repeatTimestamp(quotasController.minuteNow, quotaBaseUserRPM),
 				},
 			},
 			want: QuotasUsage{
@@ -479,12 +477,12 @@ func TestGetQuotaUsageBaseUser(t *testing.T) {
 				RateMinute: QuotaRequestsConsumption{
 					Limit: quotaBaseUserRPM,
 					Used:  quotaBaseUserRPM,
-					Reset: nowMinute.Add(minute).Unix(),
+					Reset: quotasController.minuteNext.Unix(),
 				},
 				RateDay: QuotaRequestsConsumption{
 					Limit: quotaBaseUserRPD,
 					Used:  quotaBaseUserRPM,
-					Reset: today.Add(day).Unix(),
+					Reset: quotasController.dayNext.Unix(),
 				},
 			},
 			wantErr: false,
@@ -524,11 +522,7 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 				ctx:              context.TODO(),
 				clientRepository: MockRepositoryPrediction{},
 			},
-			want: QuotasUsage{
-				PromptLengthMax: quotaPromptLengthMax(user),
-				RateMinute:      quotaRPM(user),
-				RateDay:         quotaRPD(user),
-			},
+			want:    quotasController.quotaUsage(user),
 			wantErr: false,
 		},
 		{
@@ -536,7 +530,7 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(nowMinute, 1),
+					Timestamps: repeatTimestamp(quotasController.minuteNow, 1),
 				},
 			},
 			want: QuotasUsage{
@@ -544,12 +538,12 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 				RateMinute: QuotaRequestsConsumption{
 					Limit: quotaRegisteredUserRPM,
 					Used:  1,
-					Reset: nowMinute.Add(minute).Unix(),
+					Reset: quotasController.minuteNext.Unix(),
 				},
 				RateDay: QuotaRequestsConsumption{
 					Limit: quotaRegisteredUserRPD,
 					Used:  1,
-					Reset: today.Add(day).Unix(),
+					Reset: quotasController.dayNext.Unix(),
 				},
 			},
 			wantErr: false,
@@ -559,7 +553,7 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(nowMinute, quotaRegisteredUserRPD),
+					Timestamps: repeatTimestamp(quotasController.minuteNow, quotaRegisteredUserRPD),
 				},
 			},
 			want: QuotasUsage{
@@ -567,12 +561,12 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 				RateMinute: QuotaRequestsConsumption{
 					Limit: quotaRegisteredUserRPM,
 					Used:  quotaRegisteredUserRPM,
-					Reset: today.Add(day).Unix(),
+					Reset: quotasController.dayNext.Unix(),
 				},
 				RateDay: QuotaRequestsConsumption{
 					Limit: quotaRegisteredUserRPD,
 					Used:  quotaRegisteredUserRPD,
-					Reset: today.Add(day).Unix(),
+					Reset: quotasController.dayNext.Unix(),
 				},
 			},
 			wantErr: false,
@@ -582,7 +576,7 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(nowMinute, quotaRegisteredUserRPM),
+					Timestamps: repeatTimestamp(quotasController.minuteNow, quotaRegisteredUserRPM),
 				},
 			},
 			want: QuotasUsage{
@@ -590,12 +584,12 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 				RateMinute: QuotaRequestsConsumption{
 					Limit: quotaRegisteredUserRPM,
 					Used:  quotaRegisteredUserRPM,
-					Reset: nowMinute.Add(minute).Unix(),
+					Reset: quotasController.minuteNext.Unix(),
 				},
 				RateDay: QuotaRequestsConsumption{
 					Limit: quotaRegisteredUserRPD,
 					Used:  quotaRegisteredUserRPM,
-					Reset: today.Add(day).Unix(),
+					Reset: quotasController.dayNext.Unix(),
 				},
 			},
 			wantErr: false,

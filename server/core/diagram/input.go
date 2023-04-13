@@ -123,10 +123,10 @@ type QuotaRequestsConsumption struct {
 	Reset int64 `json:"reset"`
 }
 
-func quotaRPM(user *User) QuotaRequestsConsumption {
+func (v quotaIssuer) quotaRPM(user *User) QuotaRequestsConsumption {
 	o := QuotaRequestsConsumption{
 		Limit: quotaBaseUserRPM,
-		Reset: nowMinute.Add(minute).Unix(),
+		Reset: v.minuteNext.Unix(),
 	}
 	if user.IsRegistered {
 		o.Limit = quotaRegisteredUserRPM
@@ -134,15 +134,53 @@ func quotaRPM(user *User) QuotaRequestsConsumption {
 	return o
 }
 
-func quotaRPD(user *User) QuotaRequestsConsumption {
+func (v quotaIssuer) quotaRPD(user *User) QuotaRequestsConsumption {
 	o := QuotaRequestsConsumption{
 		Limit: quotaBaseUserRPD,
-		Reset: today.Add(day).Unix(),
+		Reset: v.dayNext.Unix(),
 	}
 	if user.IsRegistered {
 		o.Limit = quotaRegisteredUserRPD
 	}
 	return o
+}
+
+func (v quotaIssuer) quotaUsage(user *User) QuotasUsage {
+	return QuotasUsage{
+		PromptLengthMax: quotaPromptLengthMax(user),
+		RateMinute:      v.quotaRPM(user),
+		RateDay:         v.quotaRPD(user),
+	}
+}
+
+type quotaIssuer struct {
+	dayNow     time.Time
+	dayNext    time.Time
+	minuteNow  time.Time
+	minuteNext time.Time
+}
+
+func genNowDate() time.Time {
+	now := time.Now().UTC()
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func genNowMinute() time.Time {
+	now := time.Now().UTC()
+	return time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, time.UTC)
+}
+
+func newQuotaIssuer() quotaIssuer {
+	const (
+		day    = 24 * time.Hour
+		minute = 1 * time.Minute
+	)
+	return quotaIssuer{
+		dayNow:     genNowDate(),
+		dayNext:    genNowDate().Add(day),
+		minuteNow:  genNowMinute(),
+		minuteNext: genNowMinute().Add(minute),
+	}
 }
 
 // ValidateRequestsQuotaUsage checks if the requests' quota was exceeded.
@@ -181,26 +219,6 @@ func sliceWithinWindow(ts []time.Time, tsMin, tsMax time.Time) []time.Time {
 	return o
 }
 
-const (
-	day    = 24 * time.Hour
-	minute = 1 * time.Minute
-)
-
-func genNowDate() time.Time {
-	now := time.Now().UTC()
-	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-}
-
-func genNowMinute() time.Time {
-	now := time.Now().UTC()
-	return time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, time.UTC)
-}
-
-var (
-	today     = genNowDate()
-	nowMinute = genNowMinute()
-)
-
 // GetQuotaUsage read current usage of the quota.
 func GetQuotaUsage(ctx context.Context, clientRepository RepositoryPrediction, user *User) (QuotasUsage, error) {
 	requestsTimestamps, err := clientRepository.GetDailySuccessfulResultsTimestampsByUserID(ctx, user.ID)
@@ -208,20 +226,18 @@ func GetQuotaUsage(ctx context.Context, clientRepository RepositoryPrediction, u
 		return QuotasUsage{}, err
 	}
 
-	quotas := QuotasUsage{
-		PromptLengthMax: quotaPromptLengthMax(user),
-		RateMinute:      quotaRPM(user),
-		RateDay:         quotaRPD(user),
-	}
+	quotasController := newQuotaIssuer()
+
+	quotas := quotasController.quotaUsage(user)
 
 	if len(requestsTimestamps) == 0 {
 		return quotas, nil
 	}
 
-	requestsDaily := sliceWithinWindow(requestsTimestamps, today, today.Add(day))
+	requestsDaily := sliceWithinWindow(requestsTimestamps, quotasController.dayNow, quotasController.dayNext)
 	quotas.RateDay.Used = len(requestsDaily)
 
-	requestsMinute := sliceWithinWindow(requestsTimestamps, nowMinute, nowMinute.Add(minute))
+	requestsMinute := sliceWithinWindow(requestsTimestamps, quotasController.minuteNow, quotasController.minuteNext)
 	quotas.RateMinute.Used = len(requestsMinute)
 
 	// by transitivity, the RPM/throttling quota is exceeded if the daily quota is exceeded

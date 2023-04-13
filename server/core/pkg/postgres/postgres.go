@@ -128,14 +128,13 @@ func (c Client) GetDailySuccessfulResultsTimestampsByUserID(ctx context.Context,
 
 	var o []time.Time
 	var ts time.Time
-	defer rows.Close()
 	for rows.Next() {
 		if err := rows.Scan(&ts); err != nil {
 			return nil, err
 		}
 		o = append(o, ts)
 	}
-
+	rows.Close()
 	return o, nil
 }
 
