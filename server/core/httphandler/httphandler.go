@@ -18,6 +18,7 @@ import (
 func NewHTTPHandler(
 	clientModel diagram.ModelInference, clientRepositoryPrediction diagram.RepositoryPrediction,
 	httpClientDiagramRendering diagram.HTTPClient, corsHeaders map[string]string,
+	apiTokensRepository diagram.RepositoryToken,
 ) (http.Handler, error) {
 	var l = log.New(os.Stderr, "", log.Lmicroseconds|log.LUTC|log.Lshortfile)
 
@@ -34,13 +35,18 @@ func NewHTTPHandler(
 		},
 		corsHeaders:   corsHeaders,
 		reportErrorFn: func(err error) { l.Println(err) },
+		// FIXME: add caching layer
+		repositoryAPITokens:       apiTokensRepository,
+		repositoryRequestsHistory: clientRepositoryPrediction,
 	}, nil
 }
 
 type httpHandler struct {
-	diagramRenderingHandler map[string]diagram.HTTPHandler
-	reportErrorFn           func(err error)
-	corsHeaders             corsHeaders
+	diagramRenderingHandler   map[string]diagram.HTTPHandler
+	reportErrorFn             func(err error)
+	corsHeaders               corsHeaders
+	repositoryAPITokens       diagram.RepositoryToken
+	repositoryRequestsHistory diagram.RepositoryPrediction
 }
 
 func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
@@ -63,7 +69,9 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		pathPrefixDiagramGeneration = "/generate"
 
 		pathStatus = "/status"
+		pathQuotas = "/quotas"
 	)
+
 	if r.URL.Path == pathStatus {
 		switch r.Method {
 		case http.MethodGet, http.MethodOptions:
@@ -79,29 +87,98 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if strings.HasPrefix(r.URL.Path, pathPrefixInternal) {
-		h.authorization(w, r)
+	var user diagram.User
+	switch strings.HasPrefix(r.URL.Path, pathPrefixInternal) {
+	case false:
+		if err := h.authorizationAPI(r, &user); err != nil {
+			h.response(w, []byte(`{"error":"`+err.(httpHandlerError).Msg+`"}`), err)
+			return
+		}
+	default:
+		if err := h.authorizationWebclient(r, &user); err != nil {
+			h.response(w, []byte(`{"error":"`+err.(httpHandlerError).Msg+`"}`), err)
+			return
+		}
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixInternal)
-	} else {
-		h.response(
-			w, []byte(`{"error":"The Rest API will be supported in the upcoming release v0.0.6"}`), httpHandlerError{
-				Msg:      "Rest API call attempt",
-				Type:     "NotImplemented",
-				HTTPCode: http.StatusNotImplemented,
-			},
-		)
-		return
-		//h.authorizationAPI(w, r)
 	}
 
-	switch strings.HasPrefix(r.URL.Path, pathPrefixDiagramGeneration) {
-	case true:
+	if strings.HasPrefix(r.URL.Path, pathPrefixDiagramGeneration) {
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixDiagramGeneration)
-		h.diagramRendering(w, r)
+		h.diagramRendering(w, r, &user)
+		return
+	}
+
+	if r.URL.Path == pathQuotas {
+		h.getQuotasUsage(w, r, &user)
+		return
 	}
 }
 
-func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
+func (h httpHandler) authorizationWebclient(_ *http.Request, user *diagram.User) error {
+	user.ID = "00000000-0000-0000-0000-000000000000"
+	// TODO: add JWT authN
+	return nil
+}
+
+func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error {
+	authToken := readAuthHeaderValue(r.Header)
+	if authToken == "" {
+		return httpHandlerError{
+			Msg:      "no authorizationWebclient token provided",
+			Type:     errorNotAuthorizedNoToken,
+			HTTPCode: http.StatusUnauthorized,
+		}
+	}
+	userID, err := h.repositoryAPITokens.GetActiveUserIDByActiveTokenID(r.Context(), authToken)
+	if err != nil {
+		return httpHandlerError{
+			Msg:      "internal error",
+			Type:     errorRepositoryToken,
+			HTTPCode: http.StatusInternalServerError,
+		}
+	}
+	if userID == "" {
+		return httpHandlerError{
+			Msg:      "the authorizationWebclient token does not exist, or not active, or account is suspended",
+			Type:     errorNotAuthorizedNoToken,
+			HTTPCode: http.StatusUnauthorized,
+		}
+	}
+
+	user.ID = userID
+	user.IsRegistered = true
+	user.APIToken = authToken
+
+	return h.checkQuota(r, user)
+}
+
+func (h httpHandler) checkQuota(r *http.Request, user *diagram.User) error {
+	throttling, quotaExceeded, err := diagram.ValidateRequestsQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
+	if err != nil {
+		return httpHandlerError{
+			Msg:      "internal error",
+			Type:     errorQuotaValidation,
+			HTTPCode: http.StatusInternalServerError,
+		}
+	}
+	if throttling {
+		return httpHandlerError{
+			Msg:      "throttling quota exceeded",
+			Type:     errorQuotaExceeded,
+			HTTPCode: http.StatusTooManyRequests,
+		}
+	}
+	if quotaExceeded {
+		return httpHandlerError{
+			Msg:      "quota exceeded",
+			Type:     errorQuotaExceeded,
+			HTTPCode: http.StatusForbidden,
+		}
+	}
+	return nil
+}
+
+func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request, user *diagram.User) {
 	routePath := r.URL.Path
 
 	renderingHandler, ok := h.diagramRenderingHandler[routePath]
@@ -129,7 +206,7 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		input, err := diagram.NewInput(requestContract.Prompt, userProfileFromHTTPHeaders(r.Header))
+		input, err := diagram.NewInput(requestContract.Prompt, user)
 		if err != nil {
 			h.response(w, []byte(`{"error":"wrong request content"}`), newInputContentValidationError(err))
 			return
@@ -165,9 +242,57 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h httpHandler) authorization(_ http.ResponseWriter, _ *http.Request) {}
+func (h httpHandler) getQuotasUsage(w http.ResponseWriter, r *http.Request, user *diagram.User) {
+	switch r.Method {
+	case http.MethodOptions:
+		h.response(w, nil, nil)
+		return
+	case http.MethodGet:
+		quotasUsage, err := diagram.GetQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
+		if err != nil {
+			h.response(
+				w, []byte(`{"error":"internal error"}`), httpHandlerError{
+					Msg:      err.Error(),
+					Type:     errorQuotaFetching,
+					HTTPCode: http.StatusInternalServerError,
+				},
+			)
+			return
+		}
 
-func (h httpHandler) authorizationAPI(_ http.ResponseWriter, _ *http.Request) {}
+		oBytes, err := json.Marshal(quotasUsage)
+		if err != nil {
+			h.response(
+				w, []byte(`{"error":"internal error"}`), httpHandlerError{
+					Msg:      err.Error(),
+					Type:     errorQuotaDataSerialization,
+					HTTPCode: http.StatusInternalServerError,
+				},
+			)
+			return
+		}
+
+		h.response(w, oBytes, nil)
+		return
+	default:
+		h.response(
+			w, nil, newInvalidMethodError(
+				errors.New("method "+r.Method+" not allowed for path: "+r.URL.Path),
+			),
+		)
+		return
+	}
+}
+
+func readAuthHeaderValue(header http.Header) string {
+	const authorizationHeaderName = "Authorization"
+	authHeader := header.Get(authorizationHeaderName)
+	if authHeader == "" {
+		authHeader = header.Get(strings.ToLower(authorizationHeaderName))
+	}
+	_, v, _ := strings.Cut(authHeader, "Bearer ")
+	return v
+}
 
 type corsHeaders map[string]string
 
@@ -182,12 +307,18 @@ func (h corsHeaders) setHeaders(header http.Header) {
 }
 
 const (
-	errorInvalidMethod         = "Request:InvalidMethod"
-	errorNotExists             = "Request:HandlerNotExists"
-	errorInvalidRequest        = "InputValidation:InvalidContent"
-	errorInvalidPrompt         = "InputValidation:InvalidPrompt"
-	errorCoreLogic             = "Core:DiagramRendering"
-	errorResponseSerialisation = "Response:DiagramSerialisation"
+	errorInvalidMethod          = "Request:InvalidMethod"
+	errorNotExists              = "Request:HandlerNotExists"
+	errorNotAuthorizedNoToken   = "Request:AccessDenied:NoAPIToken"
+	errorInvalidRequest         = "InputValidation:InvalidContent"
+	errorInvalidPrompt          = "InputValidation:InvalidPrompt"
+	errorCoreLogic              = "Core:DiagramRendering"
+	errorResponseSerialisation  = "Response:DiagramSerialisation"
+	errorRepositoryToken        = "DrivenInterface:RepositoryToken"
+	errorQuotaValidation        = "Quota:ValidationError"
+	errorQuotaExceeded          = "Quota:Excess"
+	errorQuotaFetching          = "Quota:ReadingError"
+	errorQuotaDataSerialization = "Quota:SerializationError"
 )
 
 func newResponseSerialisationError(err error) error {
@@ -269,9 +400,4 @@ func writeStrings(o *strings.Builder, text ...string) {
 	for _, s := range text {
 		_, _ = o.WriteString(s)
 	}
-}
-
-func userProfileFromHTTPHeaders(_ http.Header) *diagram.User {
-	// FIXME: change when the auth layer is implemented
-	return &diagram.User{ID: "00000000-0000-0000-0000-000000000000"}
 }

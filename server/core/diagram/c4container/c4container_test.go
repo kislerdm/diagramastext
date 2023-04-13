@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
@@ -438,6 +439,12 @@ type mockRepositoryPrediction struct {
 	InputPromptWritten     uint8
 	ModelPredictionWritten uint8
 	SuccessFlagWritten     uint8
+}
+
+func (m *mockRepositoryPrediction) GetDailySuccessfulResultsTimestampsByUserID(
+	_ context.Context, _ string,
+) ([]time.Time, error) {
+	return nil, nil
 }
 
 func (m *mockRepositoryPrediction) WriteInputPrompt(_ context.Context, _, _, _ string) error {

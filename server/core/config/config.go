@@ -14,8 +14,8 @@ const (
 	tableWritePrompt          = "user_prompts"
 	tableWriteModelPrediction = "openai_responses"
 	tableWriteSuccessStatus   = "successful_requests"
-	//tableLookupUser            = "users"
-	//tableLookupApiTokens       = "api_tokens"
+	tableLookupUser           = "users"
+	tableLookupApiTokens      = "api_tokens"
 )
 
 type repositoryPredictionConfig struct {
@@ -26,6 +26,8 @@ type repositoryPredictionConfig struct {
 	TablePrompt        string `json:"table_prompt"`
 	TablePrediction    string `json:"table_prediction"`
 	TableSuccessStatus string `json:"table_success_status"`
+	TableUsers         string `json:"table_users"`
+	TableAPITokens     string `json:"table_api_tokens"`
 	SSLMode            string `json:"ssl_mode"`
 }
 
@@ -51,6 +53,8 @@ func LoadDefaultConfig(ctx context.Context, clientSecretsManager diagram.Reposit
 			TablePrompt:        tableWritePrompt,
 			TablePrediction:    tableWriteModelPrediction,
 			TableSuccessStatus: tableWriteSuccessStatus,
+			TableUsers:         tableLookupUser,
+			TableAPITokens:     tableLookupApiTokens,
 			SSLMode:            defaultSSLMode,
 		},
 	}
@@ -78,12 +82,16 @@ func loadFromSecretsManager(
 }
 
 func loadEnvVarConfig(cfg *Config) {
-	cfg.ModelInferenceConfig.Token = os.Getenv("MODEL_API_KEY")
 	cfg.ModelInferenceConfig.MaxTokens = utils.MustParseInt(os.Getenv("MODEL_MAX_TOKENS"))
+	cfg.ModelInferenceConfig.Token = os.Getenv("MODEL_API_KEY")
 	cfg.RepositoryPredictionConfig.DBHost = os.Getenv("DB_HOST")
 	cfg.RepositoryPredictionConfig.DBName = os.Getenv("DB_DBNAME")
 	cfg.RepositoryPredictionConfig.DBUser = os.Getenv("DB_USER")
 	cfg.RepositoryPredictionConfig.DBPassword = os.Getenv("DB_PASSWORD")
+
+	if v := os.Getenv("SSL_MODE"); v != "" {
+		cfg.RepositoryPredictionConfig.SSLMode = v
+	}
 
 	if v := os.Getenv("TABLE_PROMPT"); v != "" {
 		cfg.RepositoryPredictionConfig.TablePrompt = v
@@ -97,7 +105,11 @@ func loadEnvVarConfig(cfg *Config) {
 		cfg.RepositoryPredictionConfig.TableSuccessStatus = v
 	}
 
-	if v := os.Getenv("SSL_MODE"); v != "" {
-		cfg.RepositoryPredictionConfig.SSLMode = v
+	if v := os.Getenv("TABLE_USERS"); v != "" {
+		cfg.RepositoryPredictionConfig.TableUsers = v
+	}
+
+	if v := os.Getenv("TABLE_API_TOKENS"); v != "" {
+		cfg.RepositoryPredictionConfig.TableAPITokens = v
 	}
 }

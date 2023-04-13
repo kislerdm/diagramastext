@@ -51,15 +51,6 @@ func Test_httpHandler_ServeHTTPStatus(t *testing.T) {
 		"Access-Control-Allow-Origin": "https://diagramastext.dev",
 	}
 
-	var httpHeaders = func(h map[string]string) http.Header {
-		o := http.Header{}
-		o.Add("Content-Type", "application/json")
-		for k, v := range h {
-			o.Add(k, v)
-		}
-		return o
-	}
-
 	type args struct {
 		w http.ResponseWriter
 		r *http.Request
@@ -219,6 +210,12 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 		},
 	}
 
+	wantW := mockWriter{
+		Headers:    httpHeaders(corsHeaders),
+		StatusCode: http.StatusOK,
+		V:          []byte(`{"svg":"foo"}`),
+	}
+
 	type args struct {
 		w          http.ResponseWriter
 		path       string
@@ -228,8 +225,6 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 		name            string
 		args            args
 		errorsCollector *errCollector
-		wantW           http.ResponseWriter
-		wantErr         error
 	}{
 		{
 
@@ -240,11 +235,6 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 				},
 				path:       "/internal/generate/c4",
 				authHeader: "foobar",
-			},
-			wantW: &mockWriter{
-				Headers:    httpHeaders(corsHeaders),
-				StatusCode: http.StatusOK,
-				V:          []byte(`{"svg":"foo"}`),
 			},
 			errorsCollector: &errCollector{},
 		},
@@ -258,17 +248,7 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 				path:       "/generate/c4",
 				authHeader: "Bearer 1410904f-f646-488f-ae08-cc341dfb321c",
 			},
-			wantW: &mockWriter{
-				Headers:    httpHeaders(corsHeaders),
-				StatusCode: http.StatusNotImplemented,
-				V:          []byte(`{"error":"The Rest API will be supported in the upcoming release v0.0.6"}`),
-			},
 			errorsCollector: &errCollector{},
-			wantErr: httpHandlerError{
-				Msg:      "Rest API call attempt",
-				Type:     "NotImplemented",
-				HTTPCode: http.StatusNotImplemented,
-			},
 		},
 	}
 
@@ -279,8 +259,11 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				h := httpHandler{
 					diagramRenderingHandler: diagramRenderingHandler,
-					reportErrorFn:           tt.errorsCollector.Err,
 					corsHeaders:             corsHeaders,
+					repositoryAPITokens: &diagram.MockRepositoryToken{
+						V: "c40bad11-0822-4d84-9f61-44b9a97b0432",
+					},
+					repositoryRequestsHistory: &diagram.MockRepositoryPrediction{},
 				}
 				h.ServeHTTP(
 					tt.args.w, &http.Request{
@@ -297,22 +280,22 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 					},
 				)
 
-				if tt.args.w.(*mockWriter).StatusCode != tt.wantW.(*mockWriter).StatusCode {
+				if tt.args.w.(*mockWriter).StatusCode != wantW.StatusCode {
 					t.Errorf("unexpected response status code")
 					return
 				}
 
-				if !reflect.DeepEqual(tt.args.w.Header(), tt.wantW.(*mockWriter).Header()) {
+				if !reflect.DeepEqual(tt.args.w.Header(), wantW.Header()) {
 					t.Errorf("unexpected response header")
 					return
 				}
 
-				if !reflect.DeepEqual(tt.args.w.(*mockWriter).V, tt.wantW.(*mockWriter).V) {
+				if !reflect.DeepEqual(tt.args.w.(*mockWriter).V, wantW.V) {
 					t.Errorf("unexpected response content")
 					return
 				}
 
-				if !reflect.DeepEqual(tt.errorsCollector.V, tt.wantErr) {
+				if tt.errorsCollector.V != nil {
 					t.Errorf("unexpected error message collected")
 					return
 				}
@@ -628,7 +611,6 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 	}
 
 	t.Parallel()
-
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
@@ -637,7 +619,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 					reportErrorFn:           tt.errorsCollector.Err,
 					corsHeaders:             tt.fields.corsHeaders,
 				}
-				h.diagramRendering(tt.args.w, tt.args.r)
+				h.diagramRendering(tt.args.w, tt.args.r, &diagram.User{})
 
 				if tt.args.w.(*mockWriter).StatusCode != tt.wantW.(*mockWriter).StatusCode {
 					t.Errorf("unexpected response status code")
@@ -683,4 +665,188 @@ func Test_httpHandlerError_Error(t *testing.T) {
 			}
 		},
 	)
+}
+
+func Test_httpHandler_authorizationAPI(t *testing.T) {
+	type fields struct {
+		repositoryAPITokens       diagram.RepositoryToken
+		repositoryRequestsHistory diagram.RepositoryPrediction
+	}
+	type args struct {
+		r    *http.Request
+		user *diagram.User
+	}
+	tests := []struct {
+		name     string
+		fields   fields
+		args     args
+		want     error
+		wantUser *diagram.User
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				repositoryAPITokens: &diagram.MockRepositoryToken{
+					V: "bar",
+				},
+				repositoryRequestsHistory: &diagram.MockRepositoryPrediction{},
+			},
+			args: args{
+				r: &http.Request{
+					Header: httpHeaders(
+						map[string]string{
+							"Authorization": "Bearer foo",
+						},
+					),
+				},
+				user: &diagram.User{},
+			},
+			want: nil,
+			wantUser: &diagram.User{
+				ID:           "bar",
+				IsRegistered: true,
+				APIToken:     "foo",
+			},
+		},
+		{
+			name: "unhappy path: no auth token found",
+			fields: fields{
+				repositoryAPITokens: &diagram.MockRepositoryToken{
+					V: "bar",
+				},
+			},
+			args: args{
+				r: &http.Request{
+					Header: http.Header{},
+				},
+			},
+			want: httpHandlerError{
+				Msg:      "no authorizationWebclient token provided",
+				Type:     errorNotAuthorizedNoToken,
+				HTTPCode: http.StatusUnauthorized,
+			},
+		},
+		{
+			name: "unhappy path: failed to interact with the repository",
+			fields: fields{
+				repositoryAPITokens: &diagram.MockRepositoryToken{
+					Err: errors.New("foobar"),
+				},
+			},
+			args: args{
+				r: &http.Request{
+					Header: httpHeaders(
+						map[string]string{
+							"Authorization": "Bearer foo",
+						},
+					),
+				},
+			},
+			want: httpHandlerError{
+				Msg:      "internal error",
+				Type:     errorRepositoryToken,
+				HTTPCode: http.StatusInternalServerError,
+			},
+		},
+		{
+			name: "unhappy path: failed to find token",
+			fields: fields{
+				repositoryAPITokens: &diagram.MockRepositoryToken{},
+			},
+			args: args{
+				r: &http.Request{
+					Header: httpHeaders(
+						map[string]string{
+							"Authorization": "Bearer foo",
+						},
+					),
+				},
+			},
+			want: httpHandlerError{
+				Msg:      "the authorizationWebclient token does not exist, or not active, or account is suspended",
+				Type:     errorNotAuthorizedNoToken,
+				HTTPCode: http.StatusUnauthorized,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				h := httpHandler{
+					repositoryAPITokens:       tt.fields.repositoryAPITokens,
+					repositoryRequestsHistory: tt.fields.repositoryRequestsHistory,
+				}
+
+				if got := h.authorizationAPI(tt.args.r, tt.args.user); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("unexpected error message collected")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.user, tt.wantUser) {
+					t.Errorf("unexpected user data fetched")
+				}
+			},
+		)
+	}
+}
+
+func Test_readAuthHeaderValue(t *testing.T) {
+	type args struct {
+		header http.Header
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "extract Bearer token",
+			args: args{
+				header: httpHeaders(
+					map[string]string{
+						"Authorization": "Bearer foo",
+					},
+				),
+			},
+			want: "foo",
+		},
+		{
+			name: "extract Bearer token - lower case",
+			args: args{
+				header: httpHeaders(
+					map[string]string{
+						"authorization": "Bearer foo",
+					},
+				),
+			},
+			want: "foo",
+		},
+		{
+			name: "no token header found",
+			args: args{
+				header: httpHeaders(nil),
+			},
+			want: "",
+		},
+		{
+			name: "token is present in headers, but wrong format",
+			args: args{
+				header: httpHeaders(
+					map[string]string{
+						"Authorization": "foo",
+					},
+				),
+			},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := readAuthHeaderValue(tt.args.header); got != tt.want {
+					t.Errorf("readAuthHeaderValue() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
 }

@@ -105,7 +105,9 @@ func NewC4ContainersHTTPHandler(
 		}
 
 		if clientRepositoryPrediction != nil {
-			_ = clientRepositoryPrediction.WriteSuccessFlag(ctx, input.GetRequestID(), input.GetUser().ID, "")
+			_ = clientRepositoryPrediction.WriteSuccessFlag(
+				ctx, input.GetRequestID(), input.GetUser().ID, input.GetUser().APIToken,
+			)
 		}
 
 		return diagram.NewResultSVG(diagramPostRendering)
