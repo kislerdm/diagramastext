@@ -69,7 +69,7 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		pathPrefixDiagramGeneration = "/generate"
 
 		pathStatus = "/status"
-		pathQuotas = "/quotas_limit"
+		pathQuotas = "/quotas"
 	)
 
 	if r.URL.Path == pathStatus {
