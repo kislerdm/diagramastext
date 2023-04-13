@@ -86,7 +86,7 @@ paths:
       tags:
         - "Operations"
       summary: "Fetches usage quotas"
-      description: "The method to fetch current usage status and the quotas limits left"
+      description: "The method to fetch current usage status and the quotas limits left."
       responses:
           "200":
             description: OK
@@ -96,12 +96,6 @@ paths:
                     $ref: "#/components/schemas/Quotas"
           "401":
             description: Unauthorized
-            content:
-              "application/json":
-                schema:
-                  $ref: "#/components/schemas/Error"
-          "429":
-            description: Throttling quota exceeded
             content:
               "application/json":
                 schema:
