@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/errors"
@@ -70,9 +71,12 @@ func NewC4ContainersHTTPHandler(
 		}
 
 		if clientRepositoryPrediction != nil {
-			_ = clientRepositoryPrediction.WriteInputPrompt(
+			if err := clientRepositoryPrediction.WriteInputPrompt(
 				ctx, input.GetRequestID(), input.GetUser().ID, input.GetPrompt(),
-			)
+			); err != nil {
+				// FIXME: add proper logging
+				log.Printf("clientRepositoryPrediction.WriteInputPrompt err: %+v", err)
+			}
 		}
 
 		model := defineModel(input.GetUser())
@@ -84,10 +88,13 @@ func NewC4ContainersHTTPHandler(
 		}
 
 		if clientRepositoryPrediction != nil {
-			_ = clientRepositoryPrediction.WriteModelResult(
+			if err := clientRepositoryPrediction.WriteModelResult(
 				ctx, input.GetRequestID(), input.GetUser().ID, predictionRaw, string(diagramPrediction), model,
 				usageTokensPrompt, usageTokensCompletions,
-			)
+			); err != nil {
+				// FIXME: add proper logging
+				log.Printf("clientRepositoryPrediction.WriteModelResult err: %+v", err)
+			}
 		}
 
 		if err := errors.NewPredictionError(diagramPrediction); err != nil {
@@ -105,9 +112,12 @@ func NewC4ContainersHTTPHandler(
 		}
 
 		if clientRepositoryPrediction != nil {
-			_ = clientRepositoryPrediction.WriteSuccessFlag(
+			if err := clientRepositoryPrediction.WriteSuccessFlag(
 				ctx, input.GetRequestID(), input.GetUser().ID, input.GetUser().APIToken,
-			)
+			); err != nil {
+				// FIXME: add proper logging
+				log.Printf("clientRepositoryPrediction.WriteSuccessFlag err: %+v", err)
+			}
 		}
 
 		return diagram.NewResultSVG(diagramPostRendering)

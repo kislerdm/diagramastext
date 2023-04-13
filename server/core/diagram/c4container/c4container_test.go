@@ -128,7 +128,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 				},
 			},
 			want:    nil,
-			wantErr: errors.New("diagram/c4container/c4container.go:83: foobar"),
+			wantErr: errors.New("diagram/c4container/c4container.go:87: foobar"),
 		},
 		{
 			name: "unhappy path: failed to predict",
@@ -244,7 +244,7 @@ func TestNewC4ContainersHandlerInitUnhappyPath(t *testing.T) {
 			}
 
 			if err == nil || err.Error() !=
-				"diagram/c4container/c4container.go:62: model inference client must be provided" {
+				"diagram/c4container/c4container.go:63: model inference client must be provided" {
 				t.Fatalf("unexpected error")
 			}
 		},
@@ -265,7 +265,7 @@ func TestNewC4ContainersHandlerInitUnhappyPath(t *testing.T) {
 				t.Fatalf("unexpected client")
 			}
 
-			if err == nil || err.Error() != "diagram/c4container/c4container.go:65: http client must be provided" {
+			if err == nil || err.Error() != "diagram/c4container/c4container.go:66: http client must be provided" {
 				t.Fatalf("unexpected error")
 			}
 		},

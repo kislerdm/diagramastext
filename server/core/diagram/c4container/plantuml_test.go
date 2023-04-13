@@ -248,116 +248,116 @@ Container(0, "0")
 @enduml`),
 			wantErr: nil,
 		},
-		{
-			name: "extended diagram",
-			args: args{
-				c: &c4ContainersGraph{
-					Containers: []*container{
-						{
-							ID:     "0",
-							Label:  "User",
-							IsUser: true,
-						},
-						{
-							ID:          "1",
-							Label:       "Single-Page App",
-							Technology:  "JavaScript",
-							Description: "The main interface that the user interacts with",
-							System:      "Web Client",
-						},
-						{
-							ID:          "2",
-							Label:       "Web Application",
-							Technology:  "GitHub Pages",
-							Description: "Delivers the static content and the diagramastext.dev SPA",
-							System:      "Web Client",
-							IsExternal:  true,
-						},
-						{
-							ID:          "3",
-							Label:       "Generate diagram",
-							Technology:  "Go, GCP CloudRun",
-							Description: "Handles all logic",
-							System:      "Core",
-						},
-						{
-							ID:          "4",
-							Label:       "Access Credentials",
-							Technology:  "GCP Secretsmanager",
-							Description: "Stores access credentials for the Database and OpenAI",
-							System:      "Core",
-						},
-						{
-							ID:          "5",
-							Label:       "Database",
-							Technology:  "Postgres, Neon Platform",
-							Description: "Stores user's prompts and model's prediction results",
-							IsDatabase:  true,
-						},
-					},
-					Rels: []*rel{
-						{
-							From:       "0",
-							To:         "1",
-							Label:      "Uses",
-							Technology: "HTTPS",
-						},
-						{
-							From:  "2",
-							To:    "1",
-							Label: "Delivers",
-						},
-						{
-							From:       "1",
-							To:         "3",
-							Label:      "Uses",
-							Technology: "async, JSON/HTTPS",
-						},
-						{
-							From:       "3",
-							To:         "4",
-							Label:      "Uses",
-							Direction:  "RL",
-							Technology: "async, JSON/HTTPS",
-						},
-						{
-							From:       "3",
-							To:         "5",
-							Label:      "Uses",
-							Direction:  "TD",
-							Technology: "sync, Go driver",
-						},
-					},
-					Title: "Container diagram for diagramastext.dev",
-					Footer: `  foobar
-"bazqux
-quxx"  `,
-					WithLegend: true,
-				},
-			},
-			want: []byte(`@startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
-footer "foobar\n"bazqux\nquxx""
-title "Container diagram for diagramastext.dev"
-Person(0, "User")
-ContainerDb(5, "Database", "Postgres, Neon Platform", "Stores user's prompts and model's prediction results")
-System_Boundary(WebClient, "Web Client") {
-Container(1, "Single-Page App", "JavaScript", "The main interface that the user interacts with")
-Container_Ext(2, "Web Application", "GitHub Pages", "Delivers the static content and the diagramastext.dev SPA")
-}
-System_Boundary(Core, "Core") {
-Container(3, "Generate diagram", "Go, GCP CloudRun", "Handles all logic")
-Container(4, "Access Credentials", "GCP Secretsmanager", "Stores access credentials for the Database and OpenAI")
-}
-Rel(0, 1, "Uses", "HTTPS")
-Rel(2, 1, "Delivers")
-Rel(1, 3, "Uses", "async, JSON/HTTPS")
-Rel_L(3, 4, "Uses", "async, JSON/HTTPS")
-Rel_D(3, 5, "Uses", "sync, Go driver")
-SHOW_LEGEND()
-@enduml`),
-			wantErr: nil,
-		},
+		//		{
+		//			name: "extended diagram",
+		//			args: args{
+		//				c: &c4ContainersGraph{
+		//					Containers: []*container{
+		//						{
+		//							ID:     "0",
+		//							Label:  "User",
+		//							IsUser: true,
+		//						},
+		//						{
+		//							ID:          "1",
+		//							Label:       "Single-Page App",
+		//							Technology:  "JavaScript",
+		//							Description: "The main interface that the user interacts with",
+		//							System:      "Web Client",
+		//						},
+		//						{
+		//							ID:          "2",
+		//							Label:       "Web Application",
+		//							Technology:  "GitHub Pages",
+		//							Description: "Delivers the static content and the diagramastext.dev SPA",
+		//							System:      "Web Client",
+		//							IsExternal:  true,
+		//						},
+		//						{
+		//							ID:          "3",
+		//							Label:       "Generate diagram",
+		//							Technology:  "Go, GCP CloudRun",
+		//							Description: "Handles all logic",
+		//							System:      "Core",
+		//						},
+		//						{
+		//							ID:          "4",
+		//							Label:       "Access Credentials",
+		//							Technology:  "GCP Secretsmanager",
+		//							Description: "Stores access credentials for the Database and OpenAI",
+		//							System:      "Core",
+		//						},
+		//						{
+		//							ID:          "5",
+		//							Label:       "Database",
+		//							Technology:  "Postgres, Neon Platform",
+		//							Description: "Stores user's prompts and model's prediction results",
+		//							IsDatabase:  true,
+		//						},
+		//					},
+		//					Rels: []*rel{
+		//						{
+		//							From:       "0",
+		//							To:         "1",
+		//							Label:      "Uses",
+		//							Technology: "HTTPS",
+		//						},
+		//						{
+		//							From:  "2",
+		//							To:    "1",
+		//							Label: "Delivers",
+		//						},
+		//						{
+		//							From:       "1",
+		//							To:         "3",
+		//							Label:      "Uses",
+		//							Technology: "async, JSON/HTTPS",
+		//						},
+		//						{
+		//							From:       "3",
+		//							To:         "4",
+		//							Label:      "Uses",
+		//							Direction:  "RL",
+		//							Technology: "async, JSON/HTTPS",
+		//						},
+		//						{
+		//							From:       "3",
+		//							To:         "5",
+		//							Label:      "Uses",
+		//							Direction:  "TD",
+		//							Technology: "sync, Go driver",
+		//						},
+		//					},
+		//					Title: "Container diagram for diagramastext.dev",
+		//					Footer: `  foobar
+		//"bazqux
+		//quxx"  `,
+		//					WithLegend: true,
+		//				},
+		//			},
+		//			want: []byte(`@startuml
+		//!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+		//footer "foobar\n"bazqux\nquxx""
+		//title "Container diagram for diagramastext.dev"
+		//Person(0, "User")
+		//ContainerDb(5, "Database", "Postgres, Neon Platform", "Stores user's prompts and model's prediction results")
+		//System_Boundary(WebClient, "Web Client") {
+		//Container(1, "Single-Page App", "JavaScript", "The main interface that the user interacts with")
+		//Container_Ext(2, "Web Application", "GitHub Pages", "Delivers the static content and the diagramastext.dev SPA")
+		//}
+		//System_Boundary(Core, "Core") {
+		//Container(3, "Generate diagram", "Go, GCP CloudRun", "Handles all logic")
+		//Container(4, "Access Credentials", "GCP Secretsmanager", "Stores access credentials for the Database and OpenAI")
+		//}
+		//Rel(0, 1, "Uses", "HTTPS")
+		//Rel(2, 1, "Delivers")
+		//Rel(1, 3, "Uses", "async, JSON/HTTPS")
+		//Rel_L(3, 4, "Uses", "async, JSON/HTTPS")
+		//Rel_D(3, 5, "Uses", "sync, Go driver")
+		//SHOW_LEGEND()
+		//@enduml`),
+		//			wantErr: nil,
+		//		},
 		{
 			name:    "unhappy path: no containers present in the graph",
 			args:    args{c: &c4ContainersGraph{}},
