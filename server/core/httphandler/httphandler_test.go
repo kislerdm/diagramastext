@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
@@ -721,7 +722,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 				},
 			},
 			want: httpHandlerError{
-				Msg:      "no authorizationWebclient token provided",
+				Msg:      "no authorization token provided",
 				Type:     errorNotAuthorizedNoToken,
 				HTTPCode: http.StatusUnauthorized,
 			},
@@ -763,7 +764,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 				},
 			},
 			want: httpHandlerError{
-				Msg:      "the authorizationWebclient token does not exist, or not active, or account is suspended",
+				Msg:      "the authorization token does not exist, or not active, or account is suspended",
 				Type:     errorNotAuthorizedNoToken,
 				HTTPCode: http.StatusUnauthorized,
 			},
@@ -849,4 +850,377 @@ func Test_readAuthHeaderValue(t *testing.T) {
 			},
 		)
 	}
+}
+
+func Test_httpHandler_HandlerNotFound(t *testing.T) {
+	t.Parallel()
+	t.Run(
+		"api", func(t *testing.T) {
+			// GIVEN
+			errs := &errCollector{}
+
+			handler := httpHandler{
+				reportErrorFn:             errs.Err,
+				repositoryAPITokens:       diagram.MockRepositoryToken{V: "bar"},
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
+				corsHeaders:               corsHeaders{},
+			}
+
+			r := &http.Request{
+				Method: http.MethodGet,
+				URL:    &url.URL{Path: "/foo/bar/qux/unknown"},
+				Header: httpHeaders(
+					map[string]string{
+						"Authorization": "Bearer foo",
+					},
+				),
+			}
+
+			w := &mockWriter{
+				Headers: httpHeaders(nil),
+			}
+
+			// WHEN
+			handler.ServeHTTP(w, r)
+
+			// THEN
+			if !reflect.DeepEqual(w.V, []byte(`{"error":"resource `+r.URL.Path+` not found"}`)) {
+				t.Errorf("unexpected response body")
+			}
+
+			if !reflect.DeepEqual(errs.V, newHandlerNotExistsError(errors.New(r.URL.Path+" not found"))) {
+				t.Errorf("unexpected error reported")
+			}
+		},
+	)
+
+	t.Run(
+		"webclient", func(t *testing.T) {
+			// GIVEN
+			errs := &errCollector{}
+
+			handler := httpHandler{
+				reportErrorFn:             errs.Err,
+				repositoryAPITokens:       diagram.MockRepositoryToken{V: "bar"},
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
+				corsHeaders:               corsHeaders{},
+			}
+
+			r := &http.Request{
+				Method: http.MethodGet,
+				URL:    &url.URL{Path: "/internal/foo/bar/qux/unknown"},
+				Header: httpHeaders(nil),
+			}
+
+			w := &mockWriter{
+				Headers: httpHeaders(nil),
+			}
+
+			// WHEN
+			handler.ServeHTTP(w, r)
+
+			// THEN
+			if !reflect.DeepEqual(w.V, []byte(`{"error":"resource `+r.URL.Path+` not found"}`)) {
+				t.Errorf("unexpected response body")
+			}
+
+			if !reflect.DeepEqual(errs.V, newHandlerNotExistsError(errors.New(r.URL.Path+" not found"))) {
+				t.Errorf("unexpected error reported")
+			}
+		},
+	)
+}
+
+func Test_httpHandler_GetQuotas(t *testing.T) {
+	t.Run(
+		"shall follow the happy path", func(t *testing.T) {
+			// GIVEN
+			handler := httpHandler{
+				repositoryAPITokens:       diagram.MockRepositoryToken{V: "bar"},
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
+				corsHeaders:               corsHeaders{},
+			}
+
+			r := &http.Request{
+				Method: http.MethodGet,
+				URL:    &url.URL{Path: "/quotas"},
+				Header: httpHeaders(
+					map[string]string{
+						"Authorization": "Bearer foo",
+					},
+				),
+			}
+
+			w := &mockWriter{
+				Headers: httpHeaders(nil),
+			}
+
+			// WHEN
+			handler.ServeHTTP(w, r)
+
+			// THEN
+			if w.StatusCode != http.StatusOK {
+				t.Errorf("unexpected response")
+			}
+		},
+	)
+}
+
+func Test_getQuotasUsage(t *testing.T) {
+	t.Parallel()
+	t.Run(
+		"shall follow the happy path", func(t *testing.T) {
+			// GIVEN
+			handler := httpHandler{
+				repositoryAPITokens:       diagram.MockRepositoryToken{V: "bar"},
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
+				corsHeaders:               corsHeaders{},
+			}
+
+			r := &http.Request{
+				Method: http.MethodGet,
+				URL:    &url.URL{Path: "/quotas"},
+				Header: httpHeaders(
+					map[string]string{
+						"Authorization": "Bearer foo",
+					},
+				),
+			}
+
+			w := &mockWriter{
+				Headers: httpHeaders(nil),
+			}
+
+			// WHEN
+			handler.getQuotasUsage(w, r, &diagram.User{})
+
+			// THEN
+			if w.StatusCode != http.StatusOK {
+				t.Errorf("unexpected response")
+			}
+		},
+	)
+
+	t.Run(
+		"shall return method not allowed", func(t *testing.T) {
+			// GIVEN
+			errs := &errCollector{}
+			handler := httpHandler{
+				reportErrorFn:             errs.Err,
+				corsHeaders:               corsHeaders{},
+				repositoryAPITokens:       diagram.MockRepositoryToken{V: "bar"},
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
+			}
+
+			r := &http.Request{
+				Method: http.MethodDelete,
+				URL:    &url.URL{Path: "/quotas"},
+				Header: httpHeaders(
+					map[string]string{
+						"Authorization": "Bearer foo",
+					},
+				),
+			}
+
+			w := &mockWriter{
+				Headers: httpHeaders(nil),
+			}
+
+			// WHEN
+			handler.getQuotasUsage(w, r, &diagram.User{})
+
+			// THEN
+			if w.StatusCode != http.StatusMethodNotAllowed {
+				t.Errorf("unexpected response")
+			}
+
+			if !reflect.DeepEqual(
+				errs.V, newInvalidMethodError(
+					errors.New("method "+r.Method+" not allowed for path: "+r.URL.Path),
+				),
+			) {
+				t.Errorf("unexpected error reported")
+			}
+		},
+	)
+
+	t.Run(
+		"shall return internal error caused by interaction error with repository", func(t *testing.T) {
+			// GIVEN
+			errs := &errCollector{}
+			handler := httpHandler{
+				reportErrorFn:       errs.Err,
+				corsHeaders:         corsHeaders{},
+				repositoryAPITokens: diagram.MockRepositoryToken{V: "bar"},
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{
+					Err: errors.New("foobar"),
+				},
+			}
+
+			r := &http.Request{
+				Method: http.MethodGet,
+				URL:    &url.URL{Path: "/quotas"},
+				Header: httpHeaders(
+					map[string]string{
+						"Authorization": "Bearer foo",
+					},
+				),
+			}
+
+			w := &mockWriter{
+				Headers: httpHeaders(nil),
+			}
+
+			// WHEN
+			handler.getQuotasUsage(w, r, &diagram.User{})
+
+			// THEN
+			if w.StatusCode != http.StatusInternalServerError {
+				t.Errorf("unexpected response")
+			}
+
+			if !reflect.DeepEqual(w.V, []byte(`{"error":"internal error"}`)) {
+				t.Errorf("unexpected response body")
+			}
+
+			if !reflect.DeepEqual(
+				errs.V, httpHandlerError{
+					Msg:      "foobar",
+					Type:     errorQuotaFetching,
+					HTTPCode: http.StatusInternalServerError,
+				},
+			) {
+				t.Errorf("unexpected error reported")
+			}
+		},
+	)
+}
+
+func repeatTimestamp(ts time.Time, nElements int) []time.Time {
+	o := make([]time.Time, nElements)
+	var i int
+	for i < nElements {
+		o[i] = ts
+		i++
+	}
+	return o
+}
+
+func Test_httpHandler_checkQuota(t *testing.T) {
+	type fields struct {
+		diagramRenderingHandler   map[string]diagram.HTTPHandler
+		reportErrorFn             func(err error)
+		corsHeaders               corsHeaders
+		repositoryAPITokens       diagram.RepositoryToken
+		repositoryRequestsHistory diagram.RepositoryPrediction
+	}
+	type args struct {
+		r    *http.Request
+		user *diagram.User
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr error
+	}{
+		{
+			name: "shall yield no quota excess",
+			fields: fields{
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
+			},
+			args: args{
+				r:    &http.Request{},
+				user: &diagram.User{},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "shall yield quota excess",
+			fields: fields{
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{
+					Timestamps: repeatTimestamp(time.Now().UTC(), 100),
+				},
+			},
+			args: args{
+				r:    &http.Request{},
+				user: &diagram.User{},
+			},
+			wantErr: httpHandlerError{
+				Msg:      "quota exceeded",
+				Type:     errorQuotaExceeded,
+				HTTPCode: http.StatusForbidden,
+			},
+		},
+		{
+			name: "shall yield throttling error",
+			fields: fields{
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{
+					Timestamps: repeatTimestamp(time.Now().UTC(), 5),
+				},
+			},
+			args: args{
+				r:    &http.Request{},
+				user: &diagram.User{},
+			},
+			wantErr: httpHandlerError{
+				Msg:      "throttling quota exceeded",
+				Type:     errorQuotaExceeded,
+				HTTPCode: http.StatusTooManyRequests,
+			},
+		},
+		{
+			name: "shall return in internal error",
+			fields: fields{
+				repositoryRequestsHistory: diagram.MockRepositoryPrediction{
+					Err: errors.New("foo"),
+				},
+			},
+			args: args{
+				r:    &http.Request{},
+				user: &diagram.User{},
+			},
+			wantErr: httpHandlerError{
+				Msg:      "internal error",
+				Type:     errorQuotaValidation,
+				HTTPCode: http.StatusInternalServerError,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				h := httpHandler{
+					repositoryRequestsHistory: tt.fields.repositoryRequestsHistory,
+				}
+				if err := h.checkQuota(tt.args.r, tt.args.user); !reflect.DeepEqual(err, tt.wantErr) {
+					t.Errorf("checkQuota() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
+	}
+}
+
+func Test_httpHandler_response(t *testing.T) {
+	t.Run(
+		"shall have the Content-Type header set to application/json", func(t *testing.T) {
+			//GIVEN
+			handler := httpHandler{
+				corsHeaders: corsHeaders{},
+			}
+			w := &mockWriter{Headers: httpHeaders(nil)}
+
+			//WHEN
+			handler.response(w, nil, nil)
+
+			//THEN
+			if w.StatusCode != http.StatusOK {
+				t.Errorf("unexpected response status code")
+			}
+
+			if w.Headers.Get("Content-Type") != "application/json" {
+				t.Errorf("unexpected Content-Type set")
+			}
+		},
+	)
 }

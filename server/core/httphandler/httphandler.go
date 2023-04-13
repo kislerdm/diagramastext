@@ -58,8 +58,8 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
 	}
 
 	h.corsHeaders.setHeaders(w.Header())
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	w.Header().Add("Content-Type", "application/json")
 	_, _ = w.Write(body)
 }
 
@@ -72,9 +72,14 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		pathQuotas = "/quotas"
 	)
 
+	if r.Method == http.MethodOptions {
+		h.response(w, nil, nil)
+		return
+	}
+
 	if r.URL.Path == pathStatus {
 		switch r.Method {
-		case http.MethodGet, http.MethodOptions:
+		case http.MethodGet:
 			h.response(w, nil, nil)
 			return
 		default:
@@ -112,6 +117,12 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.getQuotasUsage(w, r, &user)
 		return
 	}
+
+	h.response(
+		w, []byte(`{"error":"resource `+r.URL.Path+` not found"}`),
+		newHandlerNotExistsError(errors.New(r.URL.Path+" not found")),
+	)
+	return
 }
 
 func (h httpHandler) authorizationWebclient(_ *http.Request, user *diagram.User) error {
@@ -124,7 +135,7 @@ func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error
 	authToken := readAuthHeaderValue(r.Header)
 	if authToken == "" {
 		return httpHandlerError{
-			Msg:      "no authorizationWebclient token provided",
+			Msg:      "no authorization token provided",
 			Type:     errorNotAuthorizedNoToken,
 			HTTPCode: http.StatusUnauthorized,
 		}
@@ -139,7 +150,7 @@ func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error
 	}
 	if userID == "" {
 		return httpHandlerError{
-			Msg:      "the authorizationWebclient token does not exist, or not active, or account is suspended",
+			Msg:      "the authorization token does not exist, or not active, or account is suspended",
 			Type:     errorNotAuthorizedNoToken,
 			HTTPCode: http.StatusUnauthorized,
 		}
@@ -161,18 +172,18 @@ func (h httpHandler) checkQuota(r *http.Request, user *diagram.User) error {
 			HTTPCode: http.StatusInternalServerError,
 		}
 	}
-	if throttling {
-		return httpHandlerError{
-			Msg:      "throttling quota exceeded",
-			Type:     errorQuotaExceeded,
-			HTTPCode: http.StatusTooManyRequests,
-		}
-	}
 	if quotaExceeded {
 		return httpHandlerError{
 			Msg:      "quota exceeded",
 			Type:     errorQuotaExceeded,
 			HTTPCode: http.StatusForbidden,
+		}
+	}
+	if throttling {
+		return httpHandlerError{
+			Msg:      "throttling quota exceeded",
+			Type:     errorQuotaExceeded,
+			HTTPCode: http.StatusTooManyRequests,
 		}
 	}
 	return nil
@@ -244,9 +255,6 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request, us
 
 func (h httpHandler) getQuotasUsage(w http.ResponseWriter, r *http.Request, user *diagram.User) {
 	switch r.Method {
-	case http.MethodOptions:
-		h.response(w, nil, nil)
-		return
 	case http.MethodGet:
 		quotasUsage, err := diagram.GetQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
 		if err != nil {
