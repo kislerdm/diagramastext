@@ -122,7 +122,6 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w, []byte(`{"error":"resource `+r.URL.Path+` not found"}`),
 		newHandlerNotExistsError(errors.New(r.URL.Path+" not found")),
 	)
-	return
 }
 
 func (h httpHandler) authorizationWebclient(_ *http.Request, user *diagram.User) error {
@@ -224,12 +223,11 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request, us
 		}
 
 		result, err := renderingHandler(r.Context(), input)
-		switch err.(type) {
-		case nil:
-		case diagramErrors.ModelPredictionError:
-			h.response(w, err.(diagramErrors.ModelPredictionError).RawJSON, newModelPredictionError(err))
-			return
-		default:
+		if err != nil {
+			if v, ok := err.(diagramErrors.ModelPredictionError); !ok {
+				h.response(w, v.RawJSON, newModelPredictionError(err))
+				return
+			}
 			h.response(w, []byte(`{"error":"internal error"}`), newCoreLogicError(err))
 			return
 		}

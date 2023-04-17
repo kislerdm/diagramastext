@@ -49,6 +49,9 @@ linters-settings:
   gofmt:
     simplify: true
 
+  maligned:
+    suggest-new: true
+
   exhaustive:
     default-signifies-exhaustive: true
 
