@@ -10,8 +10,8 @@ import (
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
-// CIAMClient defines the CIAM client.
-type CIAMClient interface {
+// Client defines the CIAM client.
+type Client interface {
 	// SigninUser executes user's authentication flow.
 	SigninUser(ctx context.Context, email, fingerprint string) (Tokens, error)
 
@@ -21,47 +21,41 @@ type CIAMClient interface {
 	// RefreshAccessToken refreshes access token given the refresh token.
 	RefreshAccessToken(ctx context.Context, refreshToken string) (JWT, error)
 
-	// ValidateToken validates JWT.
-	ValidateToken(ctx context.Context, token string) error
-}
-
-type KMSClient interface {
-	Verify(ctx context.Context, token JWT) error
-	Sign(ctx context.Context, token JWT) error
+	// ValidateAccessToken validates JWT.
+	ValidateAccessToken(ctx context.Context, token string) error
 }
 
 // RepositoryCIAM defines the communication port to persistence layer hosting users' data.
 type RepositoryCIAM interface {
-	GetUser(ctx context.Context, id string) (
-		email string, fingerprint string, emailVerified, isActive bool, err error,
-	)
-	LookupUserByEmail(ctx context.Context, email string) (id string, err error)
-	LookupUserByFingerprint(ctx context.Context, fingerprint string) (id string, err error)
 	CreateUser(ctx context.Context, id, email, fingerprint string) error
-	UpdateUserEmail(ctx context.Context, id, email string) error
-	UpdateUserFignerprint(ctx context.Context, id, fingerprint string) error
-	UpdateUserActiveStatus(ctx context.Context, id string, isActive bool) error
-	SetUserEmailVerified(ctx context.Context, id string) error
+	ReadUser(ctx context.Context, id string) (
+		found, isActive, isPremium, emailVerified bool, email, fingerprint string, err error,
+	)
 
-	LookupOneTimeSecret(ctx context.Context, userID string) (time.Time, error)
-	WriteOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error
+	LookupUserByEmail(ctx context.Context, email string) (id string, isActive bool, err error)
+	LookupUserByFingerprint(ctx context.Context, fingerprint string) (id string, isActive bool, err error)
+
+	UpdateUserSetActiveStatus(ctx context.Context, id string, isActive bool) error
+	UpdateUserSetEmailVerified(ctx context.Context, id string) error
+
+	CreateOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error
+	ReadOneTimeSecret(ctx context.Context, userID string) (string, time.Time, error)
 	DeleteOneTimeSecret(ctx context.Context, userID string) error
 }
 
-func NewCIAMClient(clientRepository RepositoryCIAM, clientKMS KMSClient, clientEmail SMTPClient) CIAMClient {
+// NewClient initializes the CIAM client.
+func NewClient(clientRepository RepositoryCIAM, clientKMS KMSClient, clientEmail SMTPClient) Client {
 	return &client{
-		clientRepository:      clientRepository,
-		clientKMS:             clientKMS,
-		clientEmail:           clientEmail,
-		oneTimeSecretDuration: 10 * time.Minute,
+		clientRepository: clientRepository,
+		clientKMS:        clientKMS,
+		clientEmail:      clientEmail,
 	}
 }
 
 type client struct {
-	clientRepository      RepositoryCIAM
-	clientKMS             KMSClient
-	clientEmail           SMTPClient
-	oneTimeSecretDuration time.Duration
+	clientRepository RepositoryCIAM
+	clientKMS        KMSClient
+	clientEmail      SMTPClient
 }
 
 // SigninAnonym executes anonym's authentication flow:
@@ -78,9 +72,13 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 		err    error
 	)
 
-	userID, err = c.clientRepository.LookupUserByFingerprint(ctx, fingerprint)
+	userID, isActive, err := c.clientRepository.LookupUserByFingerprint(ctx, fingerprint)
 	if err != nil {
 		return Tokens{}, err
+	}
+
+	if userID != "" && !isActive {
+		return Tokens{}, errors.New("user was deactivated")
 	}
 
 	if userID == "" {
@@ -92,9 +90,26 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 
 	iat := time.Now().UTC()
 
+	opts := []OptFn{
+		WithCustomIat(iat), WithSignature(
+			func(signingString string) (signature string, alg string, err error) {
+				return c.clientKMS.Sign(ctx, signature)
+			},
+		),
+	}
+	refreshToken, err := NewRefreshToken(userID, opts...)
+	if err != nil {
+		return Tokens{}, err
+	}
+
+	accessToken, err := NewAccessToken(userID, false, opts...)
+	if err != nil {
+		return Tokens{}, err
+	}
+
 	return Tokens{
-		Refresh: NewRefreshToken(userID, WithCustomIat(iat)),
-		Access:  NewAccessToken(userID, false, WithCustomIat(iat)),
+		Refresh: refreshToken,
+		Access:  accessToken,
 	}, nil
 }
 
@@ -112,7 +127,7 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (Toke
 		err    error
 	)
 
-	userID, err = c.clientRepository.LookupUserByEmail(ctx, email)
+	userID, _, err = c.clientRepository.LookupUserByEmail(ctx, email)
 	if err != nil {
 		return Tokens{}, err
 	}
@@ -124,13 +139,23 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (Toke
 			return Tokens{}, err
 		}
 	default:
-		iat, err := c.clientRepository.LookupOneTimeSecret(ctx, userID)
+		_, iat, err := c.clientRepository.ReadOneTimeSecret(ctx, userID)
 		if err != nil {
 			return Tokens{}, err
 		}
 		if iat.Add(time.Duration(expirationDurationIdentitySec)).After(time.Now().UTC()) {
+			idToken, err := NewIDToken(
+				userID, email, fingerprint, WithCustomIat(iat), WithSignature(
+					func(signingString string) (signature string, alg string, err error) {
+						return c.clientKMS.Sign(ctx, signature)
+					},
+				),
+			)
+			if err != nil {
+				return Tokens{}, err
+			}
 			return Tokens{
-				ID: NewIDToken(userID, email, fingerprint, WithCustomIat(iat)),
+				ID: idToken,
 			}, nil
 		}
 		if err := c.clientRepository.DeleteOneTimeSecret(ctx, userID); err != nil {
@@ -144,12 +169,23 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (Toke
 	if err := c.clientEmail.SendSignInEmail(email, secret); err != nil {
 		return Tokens{}, err
 	}
-	if err := c.clientRepository.WriteOneTimeSecret(ctx, userID, secret, iat); err != nil {
+	if err := c.clientRepository.CreateOneTimeSecret(ctx, userID, secret, iat); err != nil {
+		return Tokens{}, err
+	}
+
+	idToken, err := NewIDToken(
+		userID, email, fingerprint, WithCustomIat(iat), WithSignature(
+			func(signingString string) (signature string, alg string, err error) {
+				return c.clientKMS.Sign(ctx, signature)
+			},
+		),
+	)
+	if err != nil {
 		return Tokens{}, err
 	}
 
 	return Tokens{
-		ID: NewIDToken(userID, email, fingerprint, WithCustomIat(iat)),
+		ID: idToken,
 	}, nil
 }
 
@@ -166,12 +202,47 @@ func generateOnetimeSecret() string {
 	return string(b)
 }
 
-func (c client) ValidateToken(ctx context.Context, accessToken string) error {
-	//TODO implement me
-	panic("implement me")
+func (c client) ValidateAccessToken(ctx context.Context, accessToken string) error {
+	t, err := ParseToken(accessToken)
+	if err != nil {
+		return err
+	}
+	return t.Validate(
+		func(signingString, signature string) error {
+			return c.clientKMS.Verify(ctx, signingString, signature)
+		},
+	)
 }
 
-func (c client) RefreshAccessToken(ctx context.Context, token string) (JWT, error) {
-	//TODO implement me
-	panic("implement me")
+func (c client) RefreshAccessToken(ctx context.Context, refreshToken string) (JWT, error) {
+	t, err := ParseToken(refreshToken)
+	if err != nil {
+		return nil, err
+	}
+	if err := t.Validate(
+		func(signingString, signature string) error {
+			return c.clientKMS.Verify(ctx, signingString, signature)
+		},
+	); err != nil {
+		return nil, err
+	}
+
+	found, isActive, isPremium, _, _, _, err := c.clientRepository.ReadUser(ctx, t.Sub())
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, errors.New("no user exists")
+	}
+	if !isActive {
+		return nil, errors.New("user was deactivated")
+	}
+
+	return NewAccessToken(
+		t.Sub(), isPremium, WithSignature(
+			func(signingString string) (signature string, alg string, err error) {
+				return c.clientKMS.Sign(ctx, signingString)
+			},
+		),
+	)
 }

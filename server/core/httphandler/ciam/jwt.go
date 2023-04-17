@@ -6,18 +6,43 @@ import (
 	"errors"
 	"strings"
 	"time"
-
-	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
 type Tokens struct {
-	ID      JWT `json:"id,omitempty"`
-	Refresh JWT `json:"refresh,omitempty"`
-	Access  JWT `json:"access,omitempty"`
+	ID      JWT
+	Refresh JWT
+	Access  JWT
 }
 
 func (t Tokens) Serialize() ([]byte, error) {
-	return json.Marshal(t)
+	var (
+		temp struct {
+			ID      *string `json:"id,omitempty"`
+			Refresh *string `json:"refresh,omitempty"`
+			Access  *string `json:"access,omitempty"`
+		}
+		s   string
+		err error
+	)
+	s, err = t.ID.String()
+	if err != nil {
+		return nil, err
+	}
+	temp.ID = &s
+
+	s, err = t.Refresh.String()
+	if err != nil {
+		return nil, err
+	}
+	temp.Refresh = &s
+
+	s, err = t.Access.String()
+	if err != nil {
+		return nil, err
+	}
+	temp.Access = &s
+
+	return json.Marshal(temp)
 }
 
 type JWTHeader struct {
@@ -37,51 +62,56 @@ type JWTPayload struct {
 	Exp           int64   `json:"exp"`
 }
 
-type OptFn func(JWT)
+type OptFn func(JWT) error
+type SigningFn func(signingString string) (signature string, alg string, err error)
+type SignatureVerificationFn func(signingString, signature string) error
 
 func WithCustomIat(iat time.Time) OptFn {
-	return func(jwt JWT) {
+	return func(jwt JWT) error {
 		jwt.(*token).Payload.Iat = iat.Unix()
+		return nil
 	}
 }
 
-func NewIDToken(userID, email, fingerprint string, optFns ...OptFn) JWT {
-	o := defaultToken(userID)
+func WithSignature(signFn SigningFn) OptFn {
+	return func(jwt JWT) (err error) {
+		signingString, err := jwt.(*token).signingString()
+		if err != nil {
+			return
+		}
+		jwt.(*token).Signature, jwt.(*token).Header.Alg, err = signFn(signingString)
+		return
+	}
+}
+
+func NewIDToken(userID, email, fingerprint string, optFns ...OptFn) (JWT, error) {
+	o, err := defaultToken(userID, optFns...)
+	if err != nil {
+		return nil, err
+	}
 	o.Payload.Email = &email
 	o.Payload.Fingerprint = &fingerprint
-
-	for _, optFn := range optFns {
-		optFn(o)
-	}
-
 	o.Payload.Exp = o.Payload.Iat + expirationDurationIdentitySec
-
-	return o
+	return o, nil
 }
 
-func NewRefreshToken(userID string, optFns ...OptFn) JWT {
-	o := defaultToken(userID)
-
-	for _, optFn := range optFns {
-		optFn(o)
+func NewRefreshToken(userID string, optFns ...OptFn) (JWT, error) {
+	o, err := defaultToken(userID, optFns...)
+	if err != nil {
+		return nil, err
 	}
-
 	o.Payload.Exp = o.Payload.Iat + expirationDurationRefreshSec
-
-	return o
+	return o, nil
 }
 
-func NewAccessToken(userID string, isPremium bool, optFns ...OptFn) JWT {
-	o := defaultToken(userID)
-	o.Payload.IsPremium = isPremium
-
-	for _, optFn := range optFns {
-		optFn(o)
+func NewAccessToken(userID string, isPremium bool, optFns ...OptFn) (JWT, error) {
+	o, err := defaultToken(userID, optFns...)
+	if err != nil {
+		return nil, err
 	}
-
+	o.Payload.IsPremium = isPremium
 	o.Payload.Exp = o.Payload.Iat + expirationDurationAccessSec
-
-	return o
+	return o, nil
 }
 
 const (
@@ -91,8 +121,8 @@ const (
 	aud     = "https://diagramastext.dev"
 )
 
-func defaultToken(userID string) *token {
-	return &token{
+func defaultToken(userID string, optFns ...OptFn) (*token, error) {
+	o := &token{
 		Header: JWTHeader{
 			Alg: algNone,
 			Typ: typ,
@@ -104,14 +134,19 @@ func defaultToken(userID string) *token {
 			Sub: userID,
 		},
 	}
+	for _, optFn := range optFns {
+		if err := optFn(o); err != nil {
+			return nil, err
+		}
+	}
+	return o, nil
 }
 
 type JWT interface {
-	Validate() error
-	SigningString() (string, error)
 	String() (string, error)
-	SetAlg(alg string)
-	GetAlg() string
+	Validate(fn SignatureVerificationFn) error
+	IsPremium() bool
+	Sub() string
 }
 
 type token struct {
@@ -120,16 +155,16 @@ type token struct {
 	Signature string
 }
 
-func (t *token) SetAlg(alg string) {
-	t.Header.Alg = alg
+func (t token) Sub() string {
+	return t.Payload.Sub
 }
 
-func (t *token) GetAlg() string {
-	return t.Header.Alg
+func (t token) IsPremium() bool {
+	return t.Payload.IsPremium
 }
 
-func (t *token) String() (string, error) {
-	signingString, err := t.SigningString()
+func (t token) String() (string, error) {
+	signingString, err := t.signingString()
 	if err != nil {
 		return "", err
 	}
@@ -144,7 +179,17 @@ func (t *token) String() (string, error) {
 	return signingString + "." + t.Signature, nil
 }
 
-func (t *token) SigningString() (string, error) {
+func (t token) Validate(fn SignatureVerificationFn) error {
+	if err := t.verifySignature(fn); err != nil {
+		return err
+	}
+	if t.isExpired() {
+		return errors.New("token is expired")
+	}
+	return nil
+}
+
+func (t token) signingString() (string, error) {
 	header, err := json.Marshal(t.Header)
 	if err != nil {
 		return "", err
@@ -156,35 +201,27 @@ func (t *token) SigningString() (string, error) {
 	return encodeSegment(header) + "." + encodeSegment(payload), nil
 }
 
-func (t *token) Validate() error {
-	if t.Header.Typ != typ {
-		return errors.New("corrupt JWT header: typ")
+func (t token) verifySignature(verificationFn SignatureVerificationFn) error {
+	if (t.Header.Alg != algNone && verificationFn == nil) || (t.Header.Alg == algNone && t.Signature == "") {
+		return errors.New("corrupt JWT: alg does not match the signature")
 	}
-
-	if t.Payload.Iss != iss {
-		return errors.New("corrupt JWT payload: iss")
+	signingString, err := t.signingString()
+	if err != nil {
+		return err
 	}
-	if t.Payload.Aud != aud {
-		return errors.New("corrupt JWT payload: aud")
+	if err := verificationFn(signingString, t.Signature); err != nil {
+		return err
 	}
-	if err := utils.ValidateUUID(t.Payload.Sub); err != nil {
-		return errors.New("corrupt JWT payload: sub")
-	}
-	if t.Payload.Exp < t.Payload.Iat {
-		return errors.New("corrupt JWT payload: exp, iat")
-	}
-
-	now := time.Now().UTC().Unix()
-	if t.Payload.Exp == t.Payload.Iat || t.Payload.Exp < now {
-		return errors.New("JWT has expired")
-	}
-
 	return nil
 }
 
-func ParseToken(v string) (JWT, error) {
-	elements := strings.SplitN(v, ".", 3)
-	if len(elements) != 3 {
+func (t token) isExpired() bool {
+	return t.Payload.Exp <= t.Payload.Iat || t.Payload.Exp < time.Now().UTC().Unix()
+}
+
+func ParseToken(s string) (JWT, error) {
+	elements := strings.SplitN(s, ".", 3)
+	if len(elements) < 2 {
 		return nil, errors.New("wrong JWT format")
 	}
 
@@ -205,10 +242,8 @@ func ParseToken(v string) (JWT, error) {
 		return nil, errors.New("wrong JWT payload format")
 	}
 
-	o.Signature = elements[2]
-
-	if err := o.Validate(); err != nil {
-		return nil, err
+	if len(elements) == 3 {
+		o.Signature = elements[2]
 	}
 
 	return &o, nil
