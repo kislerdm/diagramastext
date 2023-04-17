@@ -21,8 +21,8 @@ type Client interface {
 	// IssueTokensAfterSecretConfirmation validates user's confirmation.
 	IssueTokensAfterSecretConfirmation(ctx context.Context, identityToken, secret string) (Tokens, error)
 
-	// RefreshAccessToken refreshes access token given the refresh token.
-	RefreshAccessToken(ctx context.Context, refreshToken string) (accessToken JWT, err error)
+	// RefreshTokens refreshes access token given the refresh token.
+	RefreshTokens(ctx context.Context, refreshToken string) (Tokens, error)
 
 	// ValidateToken validates JWT.
 	ValidateToken(ctx context.Context, token string) error
@@ -91,7 +91,7 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 		return Tokens{}, err
 	}
 
-	return c.issueTokens(ctx, t.Sub())
+	return c.issueTokens(ctx, t.Sub(), t.Email(), t.Fingerprint(), false)
 }
 
 // SigninAnonym executes anonym's authentication flow:
@@ -124,10 +124,10 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 		}
 	}
 
-	return c.issueTokens(ctx, userID)
+	return c.issueTokens(ctx, userID, "", fingerprint, false)
 }
 
-func (c client) issueTokens(ctx context.Context, userID string) (Tokens, error) {
+func (c client) issueTokens(ctx context.Context, userID, email, fingerprint string, isPremium bool) (Tokens, error) {
 	iat := time.Now().UTC()
 	opts := []OptFn{
 		WithCustomIat(iat), WithSignature(
@@ -136,15 +136,20 @@ func (c client) issueTokens(ctx context.Context, userID string) (Tokens, error) 
 			},
 		),
 	}
+	idToken, err := NewIDToken(userID, email, fingerprint, 0, opts...)
+	if err != nil {
+		return Tokens{}, err
+	}
 	refreshToken, err := NewRefreshToken(userID, opts...)
 	if err != nil {
 		return Tokens{}, err
 	}
-	accessToken, err := NewAccessToken(userID, false, opts...)
+	accessToken, err := NewAccessToken(userID, isPremium, opts...)
 	if err != nil {
 		return Tokens{}, err
 	}
 	return Tokens{
+		ID:      idToken,
 		Refresh: refreshToken,
 		Access:  accessToken,
 	}, nil
@@ -180,9 +185,9 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 		if err != nil {
 			return nil, err
 		}
-		if iat.Add(time.Duration(expirationDurationIdentitySec)).After(time.Now().UTC()) {
+		if iat.Add(time.Duration(defaultExpirationDurationIdentitySec)).After(time.Now().UTC()) {
 			return NewIDToken(
-				userID, email, fingerprint, WithCustomIat(iat), WithSignature(
+				userID, email, fingerprint, 0, WithCustomIat(iat), WithSignature(
 					func(signingString string) (signature string, alg string, err error) {
 						return c.clientKMS.Sign(ctx, signature)
 					},
@@ -205,7 +210,7 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 	}
 
 	return NewIDToken(
-		userID, email, fingerprint, WithCustomIat(iat), WithSignature(
+		userID, email, fingerprint, 0, WithCustomIat(iat), WithSignature(
 			func(signingString string) (signature string, alg string, err error) {
 				return c.clientKMS.Sign(ctx, signature)
 			},
@@ -238,35 +243,27 @@ func (c client) ValidateToken(ctx context.Context, token string) error {
 	)
 }
 
-func (c client) RefreshAccessToken(ctx context.Context, refreshToken string) (JWT, error) {
+func (c client) RefreshTokens(ctx context.Context, refreshToken string) (Tokens, error) {
 	t, err := ParseToken(refreshToken)
 	if err != nil {
-		return nil, err
+		return Tokens{}, err
 	}
 	if err := t.Validate(
 		func(signingString, signature string) error {
 			return c.clientKMS.Verify(ctx, signingString, signature)
 		},
 	); err != nil {
-		return nil, err
+		return Tokens{}, err
 	}
-
-	found, isActive, isPremium, _, _, _, err := c.clientRepository.ReadUser(ctx, t.Sub())
+	found, isActive, isPremium, _, email, fingerprint, err := c.clientRepository.ReadUser(ctx, t.Sub())
 	if err != nil {
-		return nil, err
+		return Tokens{}, err
 	}
 	if !found {
-		return nil, errors.New("user not found")
+		return Tokens{}, errors.New("user not found")
 	}
 	if !isActive {
-		return nil, errors.New("user was deactivated")
+		return Tokens{}, errors.New("user was deactivated")
 	}
-
-	return NewAccessToken(
-		t.Sub(), isPremium, WithSignature(
-			func(signingString string) (signature string, alg string, err error) {
-				return c.clientKMS.Sign(ctx, signingString)
-			},
-		),
-	)
+	return c.issueTokens(ctx, t.Sub(), email, fingerprint, isPremium)
 }

@@ -84,14 +84,17 @@ func WithSignature(signFn SigningFn) OptFn {
 	}
 }
 
-func NewIDToken(userID, email, fingerprint string, optFns ...OptFn) (JWT, error) {
+func NewIDToken(userID, email, fingerprint string, durationSec int64, optFns ...OptFn) (JWT, error) {
 	o, err := defaultToken(userID, optFns...)
 	if err != nil {
 		return nil, err
 	}
 	o.Payload.Email = &email
 	o.Payload.Fingerprint = &fingerprint
-	o.Payload.Exp = o.Payload.Iat + expirationDurationIdentitySec
+	if durationSec == 0 {
+		durationSec = defaultExpirationDurationRefreshSec
+	}
+	o.Payload.Exp = o.Payload.Iat + durationSec
 	return o, nil
 }
 
@@ -100,7 +103,7 @@ func NewRefreshToken(userID string, optFns ...OptFn) (JWT, error) {
 	if err != nil {
 		return nil, err
 	}
-	o.Payload.Exp = o.Payload.Iat + expirationDurationRefreshSec
+	o.Payload.Exp = o.Payload.Iat + defaultExpirationDurationRefreshSec
 	return o, nil
 }
 
@@ -110,7 +113,7 @@ func NewAccessToken(userID string, isPremium bool, optFns ...OptFn) (JWT, error)
 		return nil, err
 	}
 	o.Payload.IsPremium = isPremium
-	o.Payload.Exp = o.Payload.Iat + expirationDurationAccessSec
+	o.Payload.Exp = o.Payload.Iat + defaultExpirationDurationAccessSec
 	return o, nil
 }
 
@@ -147,12 +150,28 @@ type JWT interface {
 	Validate(fn SignatureVerificationFn) error
 	IsPremium() bool
 	Sub() string
+	Email() string
+	Fingerprint() string
 }
 
 type token struct {
 	Header    JWTHeader
 	Payload   JWTPayload
 	Signature string
+}
+
+func (t token) Email() string {
+	if t.Payload.Email == nil {
+		return ""
+	}
+	return *t.Payload.Email
+}
+
+func (t token) Fingerprint() string {
+	if t.Payload.Fingerprint == nil {
+		return ""
+	}
+	return *t.Payload.Fingerprint
 }
 
 func (t token) Sub() string {
@@ -258,7 +277,8 @@ func decodeSegment(seg string) ([]byte, error) {
 }
 
 var (
-	expirationDurationIdentitySec = 10 * int64(time.Minute)
-	expirationDurationRefreshSec  = 7 * 24 * int64(time.Hour)
-	expirationDurationAccessSec   = 30 * int64(time.Minute)
+	// OKTA defaults: https://support.okta.com/help/s/article/What-is-the-lifetime-of-the-JWT-tokens
+	defaultExpirationDurationIdentitySec = 1 * int64(time.Hour)
+	defaultExpirationDurationAccessSec   = 1 * int64(time.Hour)
+	defaultExpirationDurationRefreshSec  = 100 * 24 * int64(time.Hour)
 )
