@@ -91,6 +91,8 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 		return Tokens{}, err
 	}
 
+	_ = c.clientRepository.DeleteOneTimeSecret(ctx, t.Sub())
+
 	return c.issueTokens(ctx, t.Sub(), t.Email(), t.Fingerprint(), false)
 }
 
