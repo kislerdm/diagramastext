@@ -67,10 +67,35 @@ type client struct {
 // SigninAnonym executes anonym's authentication flow:
 //
 //	Fingerprint found in DB -> No  -> Create \
-//							   -> Yes ->  --	-> Generate Refresh and Access JWT -> Return generates JWT.
+//							-> Yes ->  --	-> Generate Refresh and Access JWT -> Return generates JWT.
 func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, error) {
-	//TODO implement me
-	panic("implement me")
+	if fingerprint == "" {
+		return Tokens{}, errors.New("fingerprint must be provided")
+	}
+
+	var (
+		userID string
+		err    error
+	)
+
+	userID, err = c.clientRepository.LookupUserByFingerprint(ctx, fingerprint)
+	if err != nil {
+		return Tokens{}, err
+	}
+
+	if userID == "" {
+		userID = utils.NewUUID()
+		if err := c.clientRepository.CreateUser(ctx, userID, "", fingerprint); err != nil {
+			return Tokens{}, err
+		}
+	}
+
+	iat := time.Now().UTC()
+
+	return Tokens{
+		Refresh: NewRefreshToken(userID, WithCustomIat(iat)),
+		Access:  NewAccessToken(userID, false, WithCustomIat(iat)),
+	}, nil
 }
 
 // SigninUser executes user's authentication flow:
