@@ -4,6 +4,8 @@ package ciam
 import (
 	"context"
 	"errors"
+	"math/rand"
+	"time"
 
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
@@ -28,8 +30,8 @@ type KMSClient interface {
 	Sign(ctx context.Context, token JWT) error
 }
 
-// RepositoryUsers defines the communication port to persistence layer hosting users' data.
-type RepositoryUsers interface {
+// RepositoryCIAM defines the communication port to persistence layer hosting users' data.
+type RepositoryCIAM interface {
 	GetUser(ctx context.Context, id string) (
 		email string, fingerprint string, emailVerified, isActive bool, err error,
 	)
@@ -40,20 +42,26 @@ type RepositoryUsers interface {
 	UpdateUserFignerprint(ctx context.Context, id, fingerprint string) error
 	UpdateUserActiveStatus(ctx context.Context, id string, isActive bool) error
 	SetUserEmailVerified(ctx context.Context, id string) error
+
+	LookupOneTimeSecret(ctx context.Context, userID string) (time.Time, error)
+	WriteOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error
+	DeleteOneTimeSecret(ctx context.Context, userID string) error
 }
 
-func NewCIAMClient(clientRepository RepositoryUsers, clientKMS KMSClient, clientEmail SMTPClient) CIAMClient {
+func NewCIAMClient(clientRepository RepositoryCIAM, clientKMS KMSClient, clientEmail SMTPClient) CIAMClient {
 	return &client{
-		clientRepository: clientRepository,
-		clientKMS:        clientKMS,
-		clientEmail:      clientEmail,
+		clientRepository:      clientRepository,
+		clientKMS:             clientKMS,
+		clientEmail:           clientEmail,
+		oneTimeSecretDuration: 10 * time.Minute,
 	}
 }
 
 type client struct {
-	clientRepository RepositoryUsers
-	clientKMS        KMSClient
-	clientEmail      SMTPClient
+	clientRepository      RepositoryCIAM
+	clientKMS             KMSClient
+	clientEmail           SMTPClient
+	oneTimeSecretDuration time.Duration
 }
 
 // SigninAnonym executes anonym's authentication flow:
@@ -68,37 +76,69 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 // SigninUser executes user's authentication flow:
 //
 //	Email found in DB -> No  -> Create \
-//			 	   		 -> Yes ->	--	  -> Generate secret and ID JWT -> Send secret to email -> Return ID JWT.
+//			 	   	  -> Yes ->	--	  -> Generate secret and ID JWT -> Send secret to email -> Return ID JWT.
 func (c client) SigninUser(ctx context.Context, email, fingerprint string) (Tokens, error) {
 	if email == "" {
 		return Tokens{}, errors.New("email must be provided")
 	}
 
 	var (
-		clientID string
-		err      error
+		userID string
+		err    error
 	)
 
-	clientID, err = c.clientRepository.LookupUserByEmail(ctx, email)
+	userID, err = c.clientRepository.LookupUserByEmail(ctx, email)
 	if err != nil {
 		return Tokens{}, err
 	}
 
-	if clientID == "" {
-		clientID = utils.NewUUID()
-		if err := c.clientRepository.CreateUser(ctx, clientID, email, fingerprint); err != nil {
+	switch userID == "" {
+	case true:
+		userID = utils.NewUUID()
+		if err := c.clientRepository.CreateUser(ctx, userID, email, fingerprint); err != nil {
+			return Tokens{}, err
+		}
+	default:
+		iat, err := c.clientRepository.LookupOneTimeSecret(ctx, userID)
+		if err != nil {
+			return Tokens{}, err
+		}
+		if iat.Add(time.Duration(expirationDurationIdentitySec)).After(time.Now().UTC()) {
+			return Tokens{
+				ID: NewIDToken(userID, email, fingerprint, WithCustomIat(iat)),
+			}, nil
+		}
+		if err := c.clientRepository.DeleteOneTimeSecret(ctx, userID); err != nil {
 			return Tokens{}, err
 		}
 	}
 
-	//iat := time.Now().UTC()
-	//secret := generateOnetimeSecret()
+	secret := generateOnetimeSecret()
+	iat := time.Now().UTC()
 
-	return Tokens{}, nil
+	if err := c.clientEmail.SendSignInEmail(email, secret); err != nil {
+		return Tokens{}, err
+	}
+	if err := c.clientRepository.WriteOneTimeSecret(ctx, userID, secret, iat); err != nil {
+		return Tokens{}, err
+	}
+
+	return Tokens{
+		ID: NewIDToken(userID, email, fingerprint, WithCustomIat(iat)),
+	}, nil
 }
 
 func generateOnetimeSecret() string {
-	panic("todo")
+	const (
+		charset = "0123456789abcdef"
+		length  = 6
+	)
+	var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	var b = make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
 }
 
 func (c client) ValidateToken(ctx context.Context, accessToken string) error {

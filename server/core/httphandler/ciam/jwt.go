@@ -26,15 +26,15 @@ type JWTHeader struct {
 }
 
 type JWTPayload struct {
-	Iat           int64  `json:"iat"`
-	Exp           int64  `json:"exp"`
-	Iss           string `json:"iss"`
-	Sub           string `json:"sub"`
-	Aud           string `json:"aud"`
-	IsPremium     bool   `json:"isPremium,omitempty"`
-	Email         string `json:"email,omitempty"`
-	Fingerprint   string `json:"fingerprint,omitempty"`
-	EmailVerified bool   `json:"email_verified,omitempty"`
+	IsPremium     bool    `json:"isPremium,omitempty"`
+	EmailVerified bool    `json:"email_verified,omitempty"`
+	Email         *string `json:"email,omitempty"`
+	Fingerprint   *string `json:"fingerprint,omitempty"`
+	Iss           string  `json:"iss"`
+	Sub           string  `json:"sub"`
+	Aud           string  `json:"aud"`
+	Iat           int64   `json:"iat"`
+	Exp           int64   `json:"exp"`
 }
 
 type OptFn func(JWT)
@@ -45,10 +45,10 @@ func WithCustomIat(iat time.Time) OptFn {
 	}
 }
 
-func NewIDToken(userID, email, fingerprint string, optFns ...OptFn) (JWT, error) {
+func NewIDToken(userID, email, fingerprint string, optFns ...OptFn) JWT {
 	o := defaultToken(userID)
-	o.Payload.Email = email
-	o.Payload.Fingerprint = fingerprint
+	o.Payload.Email = &email
+	o.Payload.Fingerprint = &fingerprint
 
 	for _, optFn := range optFns {
 		optFn(o)
@@ -56,10 +56,10 @@ func NewIDToken(userID, email, fingerprint string, optFns ...OptFn) (JWT, error)
 
 	o.Payload.Exp = o.Payload.Iat + expirationDurationIdentitySec
 
-	return o, nil
+	return o
 }
 
-func NewRefreshToken(userID string, optFns ...OptFn) (JWT, error) {
+func NewRefreshToken(userID string, optFns ...OptFn) JWT {
 	o := defaultToken(userID)
 
 	for _, optFn := range optFns {
@@ -68,10 +68,10 @@ func NewRefreshToken(userID string, optFns ...OptFn) (JWT, error) {
 
 	o.Payload.Exp = o.Payload.Iat + expirationDurationRefreshSec
 
-	return o, nil
+	return o
 }
 
-func NewAccessToken(userID string, isPremium bool, optFns ...OptFn) (JWT, error) {
+func NewAccessToken(userID string, isPremium bool, optFns ...OptFn) JWT {
 	o := defaultToken(userID)
 	o.Payload.IsPremium = isPremium
 
@@ -81,7 +81,7 @@ func NewAccessToken(userID string, isPremium bool, optFns ...OptFn) (JWT, error)
 
 	o.Payload.Exp = o.Payload.Iat + expirationDurationAccessSec
 
-	return o, nil
+	return o
 }
 
 const (
