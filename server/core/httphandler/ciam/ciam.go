@@ -13,16 +13,19 @@ import (
 // Client defines the CIAM client.
 type Client interface {
 	// SigninUser executes user's authentication flow.
-	SigninUser(ctx context.Context, email, fingerprint string) (Tokens, error)
+	SigninUser(ctx context.Context, email, fingerprint string) (identityToken JWT, err error)
 
 	// SigninAnonym executes anonym's authentication flow.
 	SigninAnonym(ctx context.Context, fingerprint string) (Tokens, error)
 
-	// RefreshAccessToken refreshes access token given the refresh token.
-	RefreshAccessToken(ctx context.Context, refreshToken string) (JWT, error)
+	// IssueTokensAfterSecretConfirmation validates user's confirmation.
+	IssueTokensAfterSecretConfirmation(ctx context.Context, identityToken, secret string) (Tokens, error)
 
-	// ValidateAccessToken validates JWT.
-	ValidateAccessToken(ctx context.Context, token string) error
+	// RefreshAccessToken refreshes access token given the refresh token.
+	RefreshAccessToken(ctx context.Context, refreshToken string) (accessToken JWT, err error)
+
+	// ValidateToken validates JWT.
+	ValidateToken(ctx context.Context, token string) error
 }
 
 // RepositoryCIAM defines the communication port to persistence layer hosting users' data.
@@ -39,7 +42,7 @@ type RepositoryCIAM interface {
 	UpdateUserSetEmailVerified(ctx context.Context, id string) error
 
 	CreateOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error
-	ReadOneTimeSecret(ctx context.Context, userID string) (string, time.Time, error)
+	ReadOneTimeSecret(ctx context.Context, userID string) (secret string, issuedAt time.Time, err error)
 	DeleteOneTimeSecret(ctx context.Context, userID string) error
 }
 
@@ -56,6 +59,39 @@ type client struct {
 	clientRepository RepositoryCIAM
 	clientKMS        KMSClient
 	clientEmail      SMTPClient
+}
+
+func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identityToken, secret string) (Tokens, error) {
+	t, err := ParseToken(identityToken)
+	if err != nil {
+		return Tokens{}, err
+	}
+	if err := t.Validate(
+		func(signingString, signature string) error {
+			return c.clientKMS.Verify(ctx, signingString, signature)
+		},
+	); err != nil {
+		return Tokens{}, err
+	}
+
+	secretRef, _, err := c.clientRepository.ReadOneTimeSecret(ctx, t.Sub())
+	if err != nil {
+		return Tokens{}, err
+	}
+
+	if secret != secretRef {
+		return Tokens{}, errors.New("secret is wrong")
+	}
+
+	if err := c.clientRepository.UpdateUserSetActiveStatus(ctx, t.Sub(), true); err != nil {
+		return Tokens{}, err
+	}
+
+	if err := c.clientRepository.UpdateUserSetEmailVerified(ctx, t.Sub()); err != nil {
+		return Tokens{}, err
+	}
+
+	return c.issueTokens(ctx, t.Sub())
 }
 
 // SigninAnonym executes anonym's authentication flow:
@@ -88,8 +124,11 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 		}
 	}
 
-	iat := time.Now().UTC()
+	return c.issueTokens(ctx, userID)
+}
 
+func (c client) issueTokens(ctx context.Context, userID string) (Tokens, error) {
+	iat := time.Now().UTC()
 	opts := []OptFn{
 		WithCustomIat(iat), WithSignature(
 			func(signingString string) (signature string, alg string, err error) {
@@ -101,12 +140,10 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 	if err != nil {
 		return Tokens{}, err
 	}
-
 	accessToken, err := NewAccessToken(userID, false, opts...)
 	if err != nil {
 		return Tokens{}, err
 	}
-
 	return Tokens{
 		Refresh: refreshToken,
 		Access:  accessToken,
@@ -117,9 +154,9 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 //
 //	Email found in DB -> No  -> Create \
 //			 	   	  -> Yes ->	--	  -> Generate secret and ID JWT -> Send secret to email -> Return ID JWT.
-func (c client) SigninUser(ctx context.Context, email, fingerprint string) (Tokens, error) {
+func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT, error) {
 	if email == "" {
-		return Tokens{}, errors.New("email must be provided")
+		return nil, errors.New("email must be provided")
 	}
 
 	var (
@@ -129,37 +166,31 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (Toke
 
 	userID, _, err = c.clientRepository.LookupUserByEmail(ctx, email)
 	if err != nil {
-		return Tokens{}, err
+		return nil, err
 	}
 
 	switch userID == "" {
 	case true:
 		userID = utils.NewUUID()
 		if err := c.clientRepository.CreateUser(ctx, userID, email, fingerprint); err != nil {
-			return Tokens{}, err
+			return nil, err
 		}
 	default:
 		_, iat, err := c.clientRepository.ReadOneTimeSecret(ctx, userID)
 		if err != nil {
-			return Tokens{}, err
+			return nil, err
 		}
 		if iat.Add(time.Duration(expirationDurationIdentitySec)).After(time.Now().UTC()) {
-			idToken, err := NewIDToken(
+			return NewIDToken(
 				userID, email, fingerprint, WithCustomIat(iat), WithSignature(
 					func(signingString string) (signature string, alg string, err error) {
 						return c.clientKMS.Sign(ctx, signature)
 					},
 				),
 			)
-			if err != nil {
-				return Tokens{}, err
-			}
-			return Tokens{
-				ID: idToken,
-			}, nil
 		}
 		if err := c.clientRepository.DeleteOneTimeSecret(ctx, userID); err != nil {
-			return Tokens{}, err
+			return nil, err
 		}
 	}
 
@@ -167,26 +198,19 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (Toke
 	iat := time.Now().UTC()
 
 	if err := c.clientEmail.SendSignInEmail(email, secret); err != nil {
-		return Tokens{}, err
+		return nil, err
 	}
 	if err := c.clientRepository.CreateOneTimeSecret(ctx, userID, secret, iat); err != nil {
-		return Tokens{}, err
+		return nil, err
 	}
 
-	idToken, err := NewIDToken(
+	return NewIDToken(
 		userID, email, fingerprint, WithCustomIat(iat), WithSignature(
 			func(signingString string) (signature string, alg string, err error) {
 				return c.clientKMS.Sign(ctx, signature)
 			},
 		),
 	)
-	if err != nil {
-		return Tokens{}, err
-	}
-
-	return Tokens{
-		ID: idToken,
-	}, nil
 }
 
 func generateOnetimeSecret() string {
@@ -202,8 +226,8 @@ func generateOnetimeSecret() string {
 	return string(b)
 }
 
-func (c client) ValidateAccessToken(ctx context.Context, accessToken string) error {
-	t, err := ParseToken(accessToken)
+func (c client) ValidateToken(ctx context.Context, token string) error {
+	t, err := ParseToken(token)
 	if err != nil {
 		return err
 	}
@@ -232,7 +256,7 @@ func (c client) RefreshAccessToken(ctx context.Context, refreshToken string) (JW
 		return nil, err
 	}
 	if !found {
-		return nil, errors.New("no user exists")
+		return nil, errors.New("user not found")
 	}
 	if !isActive {
 		return nil, errors.New("user was deactivated")
