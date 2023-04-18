@@ -54,9 +54,9 @@ type JWTPayload struct {
 	EmailVerified bool    `json:"email_verified,omitempty"`
 	Email         *string `json:"email,omitempty"`
 	Fingerprint   *string `json:"fingerprint,omitempty"`
-	Role          Role    `json:"role"`
-	Iss           string  `json:"iss"`
+	Role          *Role   `json:"role,omitempty"`
 	Sub           string  `json:"sub"`
+	Iss           string  `json:"iss"`
 	Aud           string  `json:"aud"`
 	Iat           int64   `json:"iat"`
 	Exp           int64   `json:"exp"`
@@ -106,7 +106,7 @@ func NewIDToken(userID, email, fingerprint string, emailVerified bool, durationS
 	o.Payload.Fingerprint = &fingerprint
 	o.Payload.EmailVerified = emailVerified
 	if durationSec == 0 {
-		durationSec = defaultExpirationDurationRefreshSec
+		durationSec = defaultExpirationDurationIdentitySec
 	}
 	o.Payload.Exp = o.Payload.Iat + durationSec
 	return o, nil
@@ -126,10 +126,11 @@ func NewAccessToken(userID string, emailVerified bool, optFns ...OptFn) (JWT, er
 	if err != nil {
 		return nil, err
 	}
-	o.Payload.Role = roleAnonymUser
+	tmp := roleAnonymUser
 	if emailVerified {
-		o.Payload.Role = roleRegisteredUser
+		tmp = roleRegisteredUser
 	}
+	o.Payload.Role = &tmp
 	o.Payload.Exp = o.Payload.Iat + defaultExpirationDurationAccessSec
 	return o, nil
 }
@@ -196,7 +197,7 @@ func (t token) Sub() string {
 }
 
 func (t token) Role() Role {
-	return t.Payload.Role
+	return *t.Payload.Role
 }
 
 func (t token) String() (string, error) {
@@ -295,7 +296,7 @@ func decodeSegment(seg string) ([]byte, error) {
 
 var (
 	// OKTA defaults: https://support.okta.com/help/s/article/What-is-the-lifetime-of-the-JWT-tokens
-	defaultExpirationDurationIdentitySec = 1 * int64(time.Hour)
-	defaultExpirationDurationAccessSec   = 1 * int64(time.Hour)
-	defaultExpirationDurationRefreshSec  = 100 * 24 * int64(time.Hour)
+	defaultExpirationDurationIdentitySec = int64(time.Hour.Seconds())
+	defaultExpirationDurationAccessSec   = int64(time.Hour.Seconds())
+	defaultExpirationDurationRefreshSec  = 100 * 24 * int64(time.Hour.Seconds())
 )

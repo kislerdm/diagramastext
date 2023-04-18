@@ -30,7 +30,7 @@ type Client interface {
 }
 
 // NewClient initializes the CIAM client.
-func NewClient(clientRepository RepositoryCIAM, clientKMS KMSClient, clientEmail SMTPClient) Client {
+func NewClient(clientRepository RepositoryCIAM, clientKMS TokenSigningClient, clientEmail SMTPClient) Client {
 	return &client{
 		clientRepository: clientRepository,
 		clientKMS:        clientKMS,
@@ -40,7 +40,7 @@ func NewClient(clientRepository RepositoryCIAM, clientKMS KMSClient, clientEmail
 
 type client struct {
 	clientRepository RepositoryCIAM
-	clientKMS        KMSClient
+	clientKMS        TokenSigningClient
 	clientEmail      SMTPClient
 }
 
@@ -70,6 +70,9 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 	if userID == "" {
 		userID = utils.NewUUID()
 		if err := c.clientRepository.CreateUser(ctx, userID, "", fingerprint); err != nil {
+			return Tokens{}, err
+		}
+		if err := c.clientRepository.UpdateUserSetActiveStatus(ctx, userID, true); err != nil {
 			return Tokens{}, err
 		}
 	}
