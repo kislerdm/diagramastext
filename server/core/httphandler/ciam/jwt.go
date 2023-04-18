@@ -51,16 +51,27 @@ type JWTHeader struct {
 }
 
 type JWTPayload struct {
-	IsPremium     bool    `json:"isPremium,omitempty"`
 	EmailVerified bool    `json:"email_verified,omitempty"`
 	Email         *string `json:"email,omitempty"`
 	Fingerprint   *string `json:"fingerprint,omitempty"`
+	Role          Role    `json:"role"`
 	Iss           string  `json:"iss"`
 	Sub           string  `json:"sub"`
 	Aud           string  `json:"aud"`
 	Iat           int64   `json:"iat"`
 	Exp           int64   `json:"exp"`
 }
+
+type Role uint8
+
+func (r Role) IsRegisteredUser() bool {
+	return r == roleRegisteredUser
+}
+
+const (
+	roleAnonymUser Role = iota
+	roleRegisteredUser
+)
 
 type OptFn func(JWT) error
 type SigningFn func(signingString string) (signature string, alg string, err error)
@@ -84,13 +95,16 @@ func WithSignature(signFn SigningFn) OptFn {
 	}
 }
 
-func NewIDToken(userID, email, fingerprint string, durationSec int64, optFns ...OptFn) (JWT, error) {
+func NewIDToken(userID, email, fingerprint string, emailVerified bool, durationSec int64, optFns ...OptFn) (
+	JWT, error,
+) {
 	o, err := defaultToken(userID, optFns...)
 	if err != nil {
 		return nil, err
 	}
 	o.Payload.Email = &email
 	o.Payload.Fingerprint = &fingerprint
+	o.Payload.EmailVerified = emailVerified
 	if durationSec == 0 {
 		durationSec = defaultExpirationDurationRefreshSec
 	}
@@ -107,12 +121,15 @@ func NewRefreshToken(userID string, optFns ...OptFn) (JWT, error) {
 	return o, nil
 }
 
-func NewAccessToken(userID string, isPremium bool, optFns ...OptFn) (JWT, error) {
+func NewAccessToken(userID string, emailVerified bool, optFns ...OptFn) (JWT, error) {
 	o, err := defaultToken(userID, optFns...)
 	if err != nil {
 		return nil, err
 	}
-	o.Payload.IsPremium = isPremium
+	o.Payload.Role = roleAnonymUser
+	if emailVerified {
+		o.Payload.Role = roleRegisteredUser
+	}
 	o.Payload.Exp = o.Payload.Iat + defaultExpirationDurationAccessSec
 	return o, nil
 }
@@ -148,7 +165,7 @@ func defaultToken(userID string, optFns ...OptFn) (*token, error) {
 type JWT interface {
 	String() (string, error)
 	Validate(fn SignatureVerificationFn) error
-	IsPremium() bool
+	Role() Role
 	Sub() string
 	Email() string
 	Fingerprint() string
@@ -178,8 +195,8 @@ func (t token) Sub() string {
 	return t.Payload.Sub
 }
 
-func (t token) IsPremium() bool {
-	return t.Payload.IsPremium
+func (t token) Role() Role {
+	return t.Payload.Role
 }
 
 func (t token) String() (string, error) {
