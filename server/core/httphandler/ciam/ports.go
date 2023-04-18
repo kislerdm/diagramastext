@@ -182,3 +182,37 @@ func (m *MockRepositoryCIAM) DeleteOneTimeSecret(_ context.Context, userID strin
 	delete(m.Secret, userID)
 	return nil
 }
+
+// TokenSigningClient defines the communication port to the token's signing entity.
+type TokenSigningClient interface {
+	// Verify verifies the token.
+	Verify(ctx context.Context, signingString, signature string) error
+
+	// Sign signs the token.
+	Sign(ctx context.Context, signingString string) (signature string, alg string, err error)
+}
+
+type MockTokenSigningClient struct {
+	Alg       string
+	Signature string
+	Err       error
+}
+
+func (m MockTokenSigningClient) Verify(_ context.Context, _, signature string) error {
+	if m.Err != nil {
+		return m.Err
+	}
+	if signature != m.Signature {
+		return errors.New("invalid signature")
+	}
+	return nil
+}
+
+func (m MockTokenSigningClient) Sign(_ context.Context, _ string) (
+	signature string, alg string, err error,
+) {
+	if m.Err != nil {
+		return "", "", err
+	}
+	return m.Signature, m.Alg, nil
+}
