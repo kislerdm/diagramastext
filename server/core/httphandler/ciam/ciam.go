@@ -3,6 +3,7 @@ package ciam
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math/rand"
 	"time"
@@ -29,6 +30,43 @@ type Client interface {
 	ValidateToken(ctx context.Context, token string) error
 }
 
+type Tokens struct {
+	id      JWT
+	refresh JWT
+	access  JWT
+}
+
+func (t Tokens) Serialize() ([]byte, error) {
+	var (
+		temp struct {
+			ID      *string `json:"id,omitempty"`
+			Refresh *string `json:"refresh,omitempty"`
+			Access  *string `json:"access,omitempty"`
+		}
+		s   string
+		err error
+	)
+	s, err = t.id.String()
+	if err != nil {
+		return nil, err
+	}
+	temp.ID = &s
+
+	s, err = t.refresh.String()
+	if err != nil {
+		return nil, err
+	}
+	temp.Refresh = &s
+
+	s, err = t.access.String()
+	if err != nil {
+		return nil, err
+	}
+	temp.Access = &s
+
+	return json.Marshal(temp)
+}
+
 // NewClient initializes the CIAM client.
 func NewClient(clientRepository RepositoryCIAM, clientKMS TokenSigningClient, clientEmail SMTPClient) Client {
 	return &client{
@@ -47,7 +85,7 @@ type client struct {
 // SigninAnonym executes anonym's authentication flow:
 //
 //	Fingerprint found in DB -> No  -> Create \
-//							-> Yes ->  --	-> Generate Refresh and Access JWT -> Return generates JWT.
+//							-> Yes ->  --	-> Generate refresh and access JWT -> Return generates JWT.
 func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, error) {
 	if fingerprint == "" {
 		return Tokens{}, errors.New("fingerprint must be provided")
@@ -83,7 +121,7 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 // SigninUser executes user's authentication flow:
 //
 //	Email found in DB -> No  -> Create \
-//			 	   	  -> Yes ->	--	  -> Generate secret and ID JWT -> Send secret to email -> Return ID JWT.
+//			 	   	  -> Yes ->	--	  -> Generate secret and id JWT -> Send secret to email -> Return id JWT.
 func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT, error) {
 	if email == "" {
 		return nil, errors.New("email must be provided")
@@ -149,7 +187,7 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 		return Tokens{}, err
 	}
 
-	found, secretRef, _, err := c.clientRepository.ReadOneTimeSecret(ctx, t.Payload().Sub)
+	found, secretRef, _, err := c.clientRepository.ReadOneTimeSecret(ctx, t.UserID())
 	if err != nil {
 		return Tokens{}, err
 	}
@@ -162,17 +200,17 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 		return Tokens{}, errors.New("secret is wrong")
 	}
 
-	if err := c.clientRepository.UpdateUserSetEmailVerified(ctx, t.Payload().Sub); err != nil {
+	if err := c.clientRepository.UpdateUserSetEmailVerified(ctx, t.UserID()); err != nil {
 		return Tokens{}, err
 	}
 
-	if err := c.clientRepository.UpdateUserSetActiveStatus(ctx, t.Payload().Sub, true); err != nil {
+	if err := c.clientRepository.UpdateUserSetActiveStatus(ctx, t.UserID(), true); err != nil {
 		return Tokens{}, err
 	}
 
-	_ = c.clientRepository.DeleteOneTimeSecret(ctx, t.Payload().Sub)
+	_ = c.clientRepository.DeleteOneTimeSecret(ctx, t.UserID())
 
-	return c.issueTokens(ctx, t.Payload().Sub, *t.Payload().Email, *t.Payload().Fingerprint, false)
+	return c.issueTokens(ctx, t.UserID(), t.UserEmail(), t.UserDeviceFingerprint(), false)
 }
 
 func (c client) issueTokens(ctx context.Context, userID, email, fingerprint string, emailVerified bool) (
@@ -199,9 +237,9 @@ func (c client) issueTokens(ctx context.Context, userID, email, fingerprint stri
 		return Tokens{}, err
 	}
 	return Tokens{
-		ID:      idToken,
-		Refresh: refreshToken,
-		Access:  accessToken,
+		id:      idToken,
+		refresh: refreshToken,
+		access:  accessToken,
 	}, nil
 }
 
@@ -229,7 +267,7 @@ func (c client) RefreshTokens(ctx context.Context, refreshToken string) (Tokens,
 	); err != nil {
 		return Tokens{}, err
 	}
-	found, isActive, emailVerified, email, fingerprint, err := c.clientRepository.ReadUser(ctx, t.Payload().Sub)
+	found, isActive, emailVerified, email, fingerprint, err := c.clientRepository.ReadUser(ctx, t.UserID())
 	if err != nil {
 		return Tokens{}, err
 	}
@@ -239,7 +277,7 @@ func (c client) RefreshTokens(ctx context.Context, refreshToken string) (Tokens,
 	if !isActive {
 		return Tokens{}, errors.New("user was deactivated")
 	}
-	return c.issueTokens(ctx, t.Payload().Sub, email, fingerprint, emailVerified)
+	return c.issueTokens(ctx, t.UserID(), email, fingerprint, emailVerified)
 }
 
 func generateOnetimeSecret() string {
