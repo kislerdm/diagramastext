@@ -127,7 +127,7 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 		return nil, errors.New("email must be provided")
 	}
 
-	const defaultExpirationSecretSec = 600
+	const defaultExpirationSecret = 10 * time.Minute
 
 	var (
 		userID     string
@@ -143,7 +143,7 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 		}
 	)
 
-	userID, _, err = c.clientRepository.LookupUserByEmail(ctx, email)
+	userID, isActive, err := c.clientRepository.LookupUserByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
@@ -155,17 +155,20 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 			return nil, err
 		}
 	default:
+		if !isActive {
+			return nil, errors.New("user was deactivated")
+		}
 		found, _, iat, err := c.clientRepository.ReadOneTimeSecret(ctx, userID)
 		if err != nil {
 			return nil, err
 		}
-
-		if found && iat.Add(time.Duration(defaultExpirationSecretSec)).After(time.Now().UTC()) {
-			return newIDToken(userID, email, fingerprint, iat)
-		}
-
-		if err := c.clientRepository.DeleteOneTimeSecret(ctx, userID); err != nil {
-			return nil, err
+		if found {
+			if iat.Add(defaultExpirationSecret).After(time.Now().UTC()) {
+				return newIDToken(userID, email, fingerprint, iat)
+			}
+			if err := c.clientRepository.DeleteOneTimeSecret(ctx, userID); err != nil {
+				return nil, err
+			}
 		}
 	}
 
