@@ -707,3 +707,98 @@ func TestIssueTokensAfterSecretConfirmationHappyPath(t *testing.T) {
 		t.Errorf("one-time secret was not removed from the repo")
 	}
 }
+
+func Test_client_ValidateToken(t *testing.T) {
+	type fields struct {
+		clientRepository RepositoryCIAM
+		clientKMS        TokenSigningClient
+		clientEmail      SMTPClient
+	}
+	type args struct {
+		ctx   context.Context
+		token string
+	}
+
+	signingClient := MockTokenSigningClient{
+		Alg:       "EdDSA",
+		Signature: "qux",
+	}
+
+	const userID = "4fa6ecab-1029-42aa-bce7-99800d6eb630"
+
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "token valid",
+			fields: fields{
+				clientKMS: signingClient,
+			},
+			args: args{
+				ctx: context.TODO(),
+				token: mustNewToken(
+					NewAccessToken(
+						userID, true, WithSignature(
+							func(signingString string) (signature string, alg string, err error) {
+								return signingClient.Sign(context.TODO(), signingString)
+							},
+						),
+					),
+				),
+			},
+			wantErr: false,
+		},
+		{
+			name: "token invalid: signature",
+			fields: fields{
+				clientKMS: signingClient,
+			},
+			args: args{
+				ctx: context.TODO(),
+				token: mustNewToken(
+					NewAccessToken(userID, true),
+				),
+			},
+			wantErr: true,
+		},
+		{
+			name: "token invalid: corrupt JWT",
+			fields: fields{
+				clientKMS: signingClient,
+			},
+			args: args{
+				ctx:   context.TODO(),
+				token: "foo",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := client{
+					clientRepository: tt.fields.clientRepository,
+					clientKMS:        tt.fields.clientKMS,
+					clientEmail:      tt.fields.clientEmail,
+				}
+				if err := c.ValidateToken(tt.args.ctx, tt.args.token); (err != nil) != tt.wantErr {
+					t.Errorf("ValidateToken() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
+	}
+}
+
+func mustNewToken(token JWT, err error) string {
+	if err != nil {
+		panic(err)
+	}
+	s, err := token.String()
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
