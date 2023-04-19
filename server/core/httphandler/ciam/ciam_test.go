@@ -598,3 +598,112 @@ func testSigninUserFlowUserExistedExpiredSecretExisted(t *testing.T) {
 		t.Errorf("one-time secret was not re-generated and stored to the repo")
 	}
 }
+
+func TestIssueTokensAfterSecretConfirmationHappyPath(t *testing.T) {
+	// GIVEN
+	const (
+		fingerprint = "foo"
+		email       = "bar@baz.quxx"
+		userID      = "4fa6ecab-1029-42aa-bce7-99800d6eb630"
+		secretVal   = "foobar"
+	)
+	tokenSignClient := MockTokenSigningClient{
+		Alg:       "EdDSA",
+		Signature: "qux",
+	}
+
+	u := &User{
+		ID:          userID,
+		Email:       email,
+		Fingerprint: fingerprint,
+	}
+
+	iat := time.Now().UTC()
+
+	tID, err := NewIDToken(
+		u.ID, u.Email, u.Fingerprint, u.EmailVerified, 0,
+		WithCustomIat(iat), WithSignature(
+			func(signingString string) (signature string, alg string, err error) {
+				return tokenSignClient.Sign(context.TODO(), signingString)
+			},
+		),
+	)
+	if err != nil {
+		panic(err)
+	}
+	tokenID, err := tID.String()
+	if err != nil {
+		panic(err)
+	}
+
+	secret := Secret{
+		Secret:   secretVal,
+		IssuedAt: iat,
+	}
+
+	repoClient := &MockRepositoryCIAM{
+		UserID: map[string]*User{
+			userID: u,
+		},
+		UserEmail: map[string]*User{
+			email: u,
+		},
+		UserFingerprint: map[string]*User{
+			fingerprint: u,
+		},
+		Secret: map[string]Secret{
+			userID: secret,
+		},
+	}
+
+	smtpClient := &MockSMTPClient{}
+
+	ciamClient := NewClient(repoClient, tokenSignClient, smtpClient)
+
+	// WHEN
+	tokens, err := ciamClient.IssueTokensAfterSecretConfirmation(context.TODO(), tokenID, secretVal)
+
+	// THEN
+	if err != nil {
+		t.Errorf("unexpected error")
+	}
+
+	validateToken(t, tokens.id, "id", tokenSignClient, defaultExpirationDurationIdentitySec)
+	validateToken(t, tokens.access, "access", tokenSignClient, defaultExpirationDurationAccessSec)
+	validateToken(t, tokens.refresh, "refresh", tokenSignClient, defaultExpirationDurationRefreshSec)
+
+	if tokens.id.UserID() != tokens.refresh.UserID() || tokens.id.UserID() != tokens.access.UserID() {
+		t.Errorf("sub does not match")
+	}
+
+	if tokens.id.UserID() != userID {
+		t.Error("wrong userID was set in the tokens")
+	}
+
+	found, isActive, emailVerified, gotEmail, gotFingerprint, err := repoClient.ReadUser(
+		context.TODO(), tokens.id.UserID(),
+	)
+	if err != nil {
+		t.Errorf("unexpected error: CIAM repository")
+	}
+	if !found {
+		t.Errorf("user was not recorded to the CIAM repository")
+	}
+	if !isActive {
+		t.Errorf("user's activity was not set corretly, true expected")
+	}
+	if !emailVerified {
+		t.Errorf("user email's verification was not set corretly, true expected")
+	}
+	if email != tokens.id.UserEmail() || email != gotEmail {
+		t.Errorf("user's email was persisted incorrectly")
+	}
+	if fingerprint != tokens.id.UserDeviceFingerprint() || fingerprint != gotFingerprint {
+		t.Errorf("user's fingerprint was set incorrectly")
+	}
+
+	found, gotSecretStr, _, _ := repoClient.ReadOneTimeSecret(context.TODO(), userID)
+	if found || secret.Secret == gotSecretStr {
+		t.Errorf("one-time secret was not removed from the repo")
+	}
+}
