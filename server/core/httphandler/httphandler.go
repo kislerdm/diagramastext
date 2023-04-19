@@ -224,7 +224,7 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request, us
 
 		result, err := renderingHandler(r.Context(), input)
 		if err != nil {
-			if v, ok := err.(diagramErrors.ModelPredictionError); !ok {
+			if v, ok := err.(diagramErrors.ModelPredictionError); ok {
 				h.response(w, v.RawJSON, newModelPredictionError(err))
 				return
 			}
