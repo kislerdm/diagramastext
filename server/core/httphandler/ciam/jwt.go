@@ -32,6 +32,9 @@ func WithCustomIat(iat time.Time) OptFn {
 
 func WithSignature(signFn SigningFn) OptFn {
 	return func(jwt JWT) (err error) {
+		if signFn == nil {
+			return errors.New("signing function must be provided")
+		}
 		signingString, err := jwt.(*token).signingString()
 		if err != nil {
 			return
@@ -167,14 +170,18 @@ func (t token) String() (string, error) {
 		return "", err
 	}
 
-	if t.header.Alg == algNone {
+	switch t.signature == "" {
+	case true:
+		if t.header.Alg != algNone {
+			return "", errors.New("signature is missing")
+		}
 		return signingString, nil
+	default:
+		if t.header.Alg == algNone || t.header.Alg == "" {
+			return "", errors.New("JWT header corrupt: alg value")
+		}
+		return signingString + "." + t.signature, nil
 	}
-
-	if t.signature == "" {
-		return "", errors.New("signature is missing")
-	}
-	return signingString + "." + t.signature, nil
 }
 
 func (t token) Validate(fn SignatureVerificationFn) error {
