@@ -149,7 +149,7 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 		return Tokens{}, err
 	}
 
-	found, secretRef, _, err := c.clientRepository.ReadOneTimeSecret(ctx, t.Sub())
+	found, secretRef, _, err := c.clientRepository.ReadOneTimeSecret(ctx, t.Payload().Sub)
 	if err != nil {
 		return Tokens{}, err
 	}
@@ -162,17 +162,17 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 		return Tokens{}, errors.New("secret is wrong")
 	}
 
-	if err := c.clientRepository.UpdateUserSetEmailVerified(ctx, t.Sub()); err != nil {
+	if err := c.clientRepository.UpdateUserSetEmailVerified(ctx, t.Payload().Sub); err != nil {
 		return Tokens{}, err
 	}
 
-	if err := c.clientRepository.UpdateUserSetActiveStatus(ctx, t.Sub(), true); err != nil {
+	if err := c.clientRepository.UpdateUserSetActiveStatus(ctx, t.Payload().Sub, true); err != nil {
 		return Tokens{}, err
 	}
 
-	_ = c.clientRepository.DeleteOneTimeSecret(ctx, t.Sub())
+	_ = c.clientRepository.DeleteOneTimeSecret(ctx, t.Payload().Sub)
 
-	return c.issueTokens(ctx, t.Sub(), t.Email(), t.Fingerprint(), false)
+	return c.issueTokens(ctx, t.Payload().Sub, *t.Payload().Email, *t.Payload().Fingerprint, false)
 }
 
 func (c client) issueTokens(ctx context.Context, userID, email, fingerprint string, emailVerified bool) (
@@ -229,7 +229,7 @@ func (c client) RefreshTokens(ctx context.Context, refreshToken string) (Tokens,
 	); err != nil {
 		return Tokens{}, err
 	}
-	found, isActive, emailVerified, email, fingerprint, err := c.clientRepository.ReadUser(ctx, t.Sub())
+	found, isActive, emailVerified, email, fingerprint, err := c.clientRepository.ReadUser(ctx, t.Payload().Sub)
 	if err != nil {
 		return Tokens{}, err
 	}
@@ -239,7 +239,7 @@ func (c client) RefreshTokens(ctx context.Context, refreshToken string) (Tokens,
 	if !isActive {
 		return Tokens{}, errors.New("user was deactivated")
 	}
-	return c.issueTokens(ctx, t.Sub(), email, fingerprint, emailVerified)
+	return c.issueTokens(ctx, t.Payload().Sub, email, fingerprint, emailVerified)
 }
 
 func generateOnetimeSecret() string {
