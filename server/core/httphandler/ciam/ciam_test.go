@@ -16,6 +16,34 @@ func Test_client_SigninAnonymFlow(t *testing.T) {
 	t.Run("shall fetch existing user and issue tokens", testSigninAnonymFlowUserExisted)
 	t.Run("shall fetch deactivated user and fail", testSigninAnonymFlowUserDeactivated)
 	t.Run("shall fail if no fingerprint was provided", testSigninAnonymFlowMissingRequiredInput)
+	t.Run("shall fail because of faulty interaction with CIAM repo", testSigninAnonymFlowFailedRepoInterface)
+}
+
+func testSigninAnonymFlowFailedRepoInterface(t *testing.T) {
+	// GIVEN
+	const fingerprint = "foo"
+
+	repoComsError := errors.New("foobar")
+	repoClient := &MockRepositoryCIAM{
+		Err: repoComsError,
+	}
+
+	tokenSignClient := TokenSigningClient(nil)
+	smtpClient := SMTPClient(nil)
+
+	ciamClient := NewClient(repoClient, tokenSignClient, smtpClient)
+
+	// WHEN
+	tokens, err := ciamClient.SigninAnonym(context.TODO(), fingerprint)
+
+	// THEN
+	if !reflect.DeepEqual(err, repoComsError) {
+		t.Errorf("unexpected error")
+	}
+
+	if !reflect.DeepEqual(tokens, Tokens{}) {
+		t.Errorf("unexpected happy path's result")
+	}
 }
 
 func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign TokenSigningClient, wantTTL int64) {
