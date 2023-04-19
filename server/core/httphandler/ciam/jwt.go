@@ -207,7 +207,7 @@ func (t token) signingString() (string, error) {
 }
 
 func (t token) verifySignature(verificationFn SignatureVerificationFn) error {
-	if (t.header.Alg != algNone && verificationFn == nil) || (t.header.Alg == algNone && t.signature == "") {
+	if (t.header.Alg != algNone && verificationFn == nil) || (t.header.Alg == algNone && t.signature != "") {
 		return errors.New("corrupt JWT: alg does not match the signature")
 	}
 	signingString, err := t.signingString()
