@@ -43,26 +43,25 @@ func (t Tokens) Serialize() ([]byte, error) {
 			Refresh *string `json:"refresh,omitempty"`
 			Access  *string `json:"access,omitempty"`
 		}
-		s   string
 		err error
 	)
-	s, err = t.id.String()
+	sID, err := t.id.String()
 	if err != nil {
 		return nil, err
 	}
-	temp.ID = &s
+	temp.ID = &sID
 
-	s, err = t.refresh.String()
+	sRefresh, err := t.refresh.String()
 	if err != nil {
 		return nil, err
 	}
-	temp.Refresh = &s
+	temp.Refresh = &sRefresh
 
-	s, err = t.access.String()
+	sAccess, err := t.access.String()
 	if err != nil {
 		return nil, err
 	}
-	temp.Access = &s
+	temp.Access = &sAccess
 
 	return json.Marshal(temp)
 }

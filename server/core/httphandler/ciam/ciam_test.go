@@ -10,40 +10,19 @@ import (
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
-func Test_client_SigninAnonymFlow(t *testing.T) {
-	t.Parallel()
-	t.Run("shall create a user and issue tokens", testSigninAnonymFlowUserDidNotExist)
-	t.Run("shall fetch existing user and issue tokens", testSigninAnonymFlowUserExisted)
-	t.Run("shall fetch deactivated user and fail", testSigninAnonymFlowUserDeactivated)
-	t.Run("shall fail if no fingerprint was provided", testSigninAnonymFlowMissingRequiredInput)
-	t.Run("shall fail because of faulty interaction with CIAM repo", testSigninAnonymFlowFailedRepoInterface)
+func mustNewToken(token JWT, err error) JWT {
+	if err != nil {
+		panic(err)
+	}
+	return token
 }
 
-func testSigninAnonymFlowFailedRepoInterface(t *testing.T) {
-	// GIVEN
-	const fingerprint = "foo"
-
-	repoComsError := errors.New("foobar")
-	repoClient := &MockRepositoryCIAM{
-		Err: repoComsError,
+func mustNewTokenStr(token JWT, err error) string {
+	s, err := mustNewToken(token, err).String()
+	if err != nil {
+		panic(err)
 	}
-
-	tokenSignClient := TokenSigningClient(nil)
-	smtpClient := SMTPClient(nil)
-
-	ciamClient := NewClient(repoClient, tokenSignClient, smtpClient)
-
-	// WHEN
-	tokens, err := ciamClient.SigninAnonym(context.TODO(), fingerprint)
-
-	// THEN
-	if !reflect.DeepEqual(err, repoComsError) {
-		t.Errorf("unexpected error")
-	}
-
-	if !reflect.DeepEqual(tokens, Tokens{}) {
-		t.Errorf("unexpected happy path's result")
-	}
+	return s
 }
 
 func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign TokenSigningClient, wantTTL int64) {
@@ -78,6 +57,15 @@ func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign TokenSigni
 			}
 		}
 	}
+}
+
+func Test_client_SigninAnonymFlow(t *testing.T) {
+	t.Parallel()
+	t.Run("shall create a user and issue tokens", testSigninAnonymFlowUserDidNotExist)
+	t.Run("shall fetch existing user and issue tokens", testSigninAnonymFlowUserExisted)
+	t.Run("shall fetch deactivated user and fail", testSigninAnonymFlowUserDeactivated)
+	t.Run("shall fail if no fingerprint was provided", testSigninAnonymFlowMissingRequiredInput)
+	t.Run("shall fail because of faulty interaction with CIAM repo", testSigninAnonymFlowFailedRepoInterface)
 }
 
 func testSigninAnonymFlowUserDidNotExist(t *testing.T) {
@@ -251,6 +239,33 @@ func testSigninAnonymFlowMissingRequiredInput(t *testing.T) {
 	) {
 		t.Errorf("unexpected error")
 	}
+	if !reflect.DeepEqual(tokens, Tokens{}) {
+		t.Errorf("unexpected happy path's result")
+	}
+}
+
+func testSigninAnonymFlowFailedRepoInterface(t *testing.T) {
+	// GIVEN
+	const fingerprint = "foo"
+
+	repoComsError := errors.New("foobar")
+	repoClient := &MockRepositoryCIAM{
+		Err: repoComsError,
+	}
+
+	tokenSignClient := TokenSigningClient(nil)
+	smtpClient := SMTPClient(nil)
+
+	ciamClient := NewClient(repoClient, tokenSignClient, smtpClient)
+
+	// WHEN
+	tokens, err := ciamClient.SigninAnonym(context.TODO(), fingerprint)
+
+	// THEN
+	if !reflect.DeepEqual(err, repoComsError) {
+		t.Errorf("unexpected error")
+	}
+
 	if !reflect.DeepEqual(tokens, Tokens{}) {
 		t.Errorf("unexpected happy path's result")
 	}
@@ -771,7 +786,7 @@ func Test_client_ValidateToken(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				token: mustNewToken(
+				token: mustNewTokenStr(
 					NewAccessToken(
 						userID, true, WithSignature(
 							func(signingString string) (signature string, alg string, err error) {
@@ -790,7 +805,7 @@ func Test_client_ValidateToken(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				token: mustNewToken(
+				token: mustNewTokenStr(
 					NewAccessToken(userID, true),
 				),
 			},
@@ -822,17 +837,6 @@ func Test_client_ValidateToken(t *testing.T) {
 			},
 		)
 	}
-}
-
-func mustNewToken(token JWT, err error) string {
-	if err != nil {
-		panic(err)
-	}
-	s, err := token.String()
-	if err != nil {
-		panic(err)
-	}
-	return s
 }
 
 func Test_client_RefreshTokens(t *testing.T) {
@@ -883,7 +887,7 @@ func Test_client_RefreshTokens(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				refreshToken: mustNewToken(
+				refreshToken: mustNewTokenStr(
 					NewRefreshToken(
 						userID, WithSignature(
 							func(signingString string) (signature string, alg string, err error) {
@@ -913,7 +917,7 @@ func Test_client_RefreshTokens(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				refreshToken: mustNewToken(
+				refreshToken: mustNewTokenStr(
 					NewRefreshToken(
 						userID, WithSignature(
 							func(signingString string) (signature string, alg string, err error) {
@@ -933,7 +937,7 @@ func Test_client_RefreshTokens(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				refreshToken: mustNewToken(
+				refreshToken: mustNewTokenStr(
 					NewRefreshToken(
 						userID, WithSignature(
 							func(signingString string) (signature string, alg string, err error) {
@@ -963,7 +967,7 @@ func Test_client_RefreshTokens(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				refreshToken: mustNewToken(
+				refreshToken: mustNewTokenStr(
 					NewRefreshToken(
 						userID, WithSignature(
 							func(signingString string) (signature string, alg string, err error) {
@@ -985,7 +989,7 @@ func Test_client_RefreshTokens(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				refreshToken: mustNewToken(
+				refreshToken: mustNewTokenStr(
 					NewRefreshToken(
 						userID, WithSignature(
 							func(signingString string) (signature string, alg string, err error) {
@@ -1007,7 +1011,7 @@ func Test_client_RefreshTokens(t *testing.T) {
 			},
 			args: args{
 				ctx: context.TODO(),
-				refreshToken: mustNewToken(
+				refreshToken: mustNewTokenStr(
 					NewRefreshToken(
 						userID, WithSignature(
 							func(_ string) (signature string, alg string, err error) {
@@ -1062,6 +1066,93 @@ func Test_client_RefreshTokens(t *testing.T) {
 					if got.id.UserID() != userID {
 						t.Errorf("wront userID was set")
 					}
+				}
+			},
+		)
+	}
+}
+
+func TestTokens_Serialize(t *testing.T) {
+	type fields struct {
+		id      JWT
+		refresh JWT
+		access  JWT
+	}
+
+	signingClient := MockTokenSigningClient{
+		Alg:       "EdDSA",
+		Signature: "qux",
+	}
+
+	const (
+		fingerprint = "foo"
+		email       = "bar@baz.quxx"
+		userID      = "4fa6ecab-1029-42aa-bce7-99800d6eb630"
+	)
+	iat := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name    string
+		fields  fields
+		want    []byte
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				id: mustNewToken(
+					NewIDToken(
+						userID, email, fingerprint, true, 0,
+						WithCustomIat(iat),
+						WithSignature(
+							func(signingString string) (signature string, alg string, err error) {
+								return signingClient.Sign(context.TODO(), signingString)
+							},
+						),
+					),
+				),
+				refresh: mustNewToken(
+					NewRefreshToken(
+						userID, WithCustomIat(iat),
+						WithSignature(
+							func(signingString string) (signature string, alg string, err error) {
+								return signingClient.Sign(context.TODO(), signingString)
+							},
+						),
+					),
+				),
+				access: mustNewToken(
+					NewAccessToken(
+						userID, true, WithCustomIat(iat),
+						WithSignature(
+							func(signingString string) (signature string, alg string, err error) {
+								return signingClient.Sign(context.TODO(), signingString)
+							},
+						),
+					),
+				),
+			},
+			want:    []byte(`{"id":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZW1haWwiOiJiYXJAYmF6LnF1eHgiLCJmaW5nZXJwcmludCI6ImZvbyIsInN1YiI6IjRmYTZlY2FiLTEwMjktNDJhYS1iY2U3LTk5ODAwZDZlYjYzMCIsImlzcyI6Imh0dHBzOi8vY2lhbS5kaWFncmFtYXN0ZXh0LmRldiIsImF1ZCI6Imh0dHBzOi8vZGlhZ3JhbWFzdGV4dC5kZXYiLCJpYXQiOjAsImV4cCI6MzYwMH0.qux","refresh":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0ZmE2ZWNhYi0xMDI5LTQyYWEtYmNlNy05OTgwMGQ2ZWI2MzAiLCJpc3MiOiJodHRwczovL2NpYW0uZGlhZ3JhbWFzdGV4dC5kZXYiLCJhdWQiOiJodHRwczovL2RpYWdyYW1hc3RleHQuZGV2IiwiaWF0IjowLCJleHAiOjg2NDAwMDB9.qux","access":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoxLCJzdWIiOiI0ZmE2ZWNhYi0xMDI5LTQyYWEtYmNlNy05OTgwMGQ2ZWI2MzAiLCJpc3MiOiJodHRwczovL2NpYW0uZGlhZ3JhbWFzdGV4dC5kZXYiLCJhdWQiOiJodHRwczovL2RpYWdyYW1hc3RleHQuZGV2IiwiaWF0IjowLCJleHAiOjM2MDB9.qux"}`),
+			wantErr: false,
+		},
+	}
+
+	t.Parallel()
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				tkn := Tokens{
+					id:      tt.fields.id,
+					refresh: tt.fields.refresh,
+					access:  tt.fields.access,
+				}
+				got, err := tkn.Serialize()
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Serialize() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("Serialize() got = %v, want %v", got, tt.want)
 				}
 			},
 		)
