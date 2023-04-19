@@ -10,7 +10,7 @@ import (
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
-func TestSigninAnonymFlow(t *testing.T) {
+func Test_client_SigninAnonymFlow(t *testing.T) {
 	t.Parallel()
 	t.Run("shall create a user and issue tokens", testSigninAnonymFlowUserDidNotExist)
 	t.Run("shall fetch existing user and issue tokens", testSigninAnonymFlowUserExisted)
@@ -18,21 +18,10 @@ func TestSigninAnonymFlow(t *testing.T) {
 	t.Run("shall fail if no fingerprint was provided", testSigninAnonymFlowMissingRequiredInput)
 }
 
-func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign MockTokenSigningClient, wantTTL int64) {
-	if err := tkn.Validate(
-		func(signingString, signature string) error {
-			return clientSign.Verify(context.TODO(), signingString, signature)
-		},
-	); err != nil {
-		t.Errorf("%s wrong signrature: %+v", tokenTyp, err)
-	}
-
+func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign TokenSigningClient, wantTTL int64) {
 	tk, ok := tkn.(*token)
 	if !ok {
 		t.Errorf("%s wrong token format", tokenTyp)
-	}
-	if tk.header.Alg != clientSign.Alg {
-		t.Errorf("%s wrong header: alg", tokenTyp)
 	}
 	if tk.header.Typ != typ {
 		t.Errorf("%s wrong header: typ", tokenTyp)
@@ -45,6 +34,21 @@ func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign MockTokenS
 	}
 	if tk.payload.Exp-tk.payload.Iat != wantTTL {
 		t.Errorf("%s wrong payload: iat and exp", tokenTyp)
+	}
+
+	if clientSign != nil {
+		if err := tkn.Validate(
+			func(signingString, signature string) error {
+				return clientSign.Verify(context.TODO(), signingString, signature)
+			},
+		); err != nil {
+			t.Errorf("%s wrong signrature: %+v", tokenTyp, err)
+		}
+		if c, ok := clientSign.(MockTokenSigningClient); ok {
+			if tk.header.Alg != c.Alg {
+				t.Errorf("%s wrong header: alg", tokenTyp)
+			}
+		}
 	}
 }
 
@@ -224,7 +228,7 @@ func testSigninAnonymFlowMissingRequiredInput(t *testing.T) {
 	}
 }
 
-func TestSigninUserFlow(t *testing.T) {
+func Test_client_SigninUserFlow(t *testing.T) {
 	t.Parallel()
 	t.Run("shall create a user, generate and send a secret and issue ID token", testSigninUserFlowUserDidNotExist)
 	t.Run(
@@ -599,7 +603,7 @@ func testSigninUserFlowUserExistedExpiredSecretExisted(t *testing.T) {
 	}
 }
 
-func TestIssueTokensAfterSecretConfirmationHappyPath(t *testing.T) {
+func Test_client_IssueTokensAfterSecretConfirmationHappyPath(t *testing.T) {
 	// GIVEN
 	const (
 		fingerprint = "foo"
@@ -801,4 +805,237 @@ func mustNewToken(token JWT, err error) string {
 		panic(err)
 	}
 	return s
+}
+
+func Test_client_RefreshTokens(t *testing.T) {
+	type fields struct {
+		clientRepository RepositoryCIAM
+		clientKMS        TokenSigningClient
+		clientEmail      SMTPClient
+	}
+	type args struct {
+		ctx          context.Context
+		refreshToken string
+	}
+	const (
+		fingerprint = "foo"
+		email       = "bar@baz.quxx"
+		userID      = "4fa6ecab-1029-42aa-bce7-99800d6eb630"
+	)
+
+	signingClient := MockTokenSigningClient{
+		Alg:       "EdDSA",
+		Signature: "qux",
+	}
+
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    Tokens
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				clientRepository: &MockRepositoryCIAM{
+					UserID: map[string]*User{
+						userID: {
+							ID:            userID,
+							Email:         email,
+							Fingerprint:   fingerprint,
+							IsActive:      true,
+							EmailVerified: true,
+						},
+					},
+				},
+				clientKMS: signingClient,
+			},
+			args: args{
+				ctx: context.TODO(),
+				refreshToken: mustNewToken(
+					NewRefreshToken(
+						userID, WithSignature(
+							func(signingString string) (signature string, alg string, err error) {
+								return signingClient.Sign(context.TODO(), signingString)
+							},
+						),
+					),
+				),
+			},
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: user deactivated",
+			fields: fields{
+				clientRepository: &MockRepositoryCIAM{
+					UserID: map[string]*User{
+						userID: {
+							ID:            userID,
+							Email:         email,
+							Fingerprint:   fingerprint,
+							IsActive:      false,
+							EmailVerified: true,
+						},
+					},
+				},
+				clientKMS: signingClient,
+			},
+			args: args{
+				ctx: context.TODO(),
+				refreshToken: mustNewToken(
+					NewRefreshToken(
+						userID, WithSignature(
+							func(signingString string) (signature string, alg string, err error) {
+								return signingClient.Sign(context.TODO(), signingString)
+							},
+						),
+					),
+				),
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: user not found",
+			fields: fields{
+				clientRepository: &MockRepositoryCIAM{},
+				clientKMS:        signingClient,
+			},
+			args: args{
+				ctx: context.TODO(),
+				refreshToken: mustNewToken(
+					NewRefreshToken(
+						userID, WithSignature(
+							func(signingString string) (signature string, alg string, err error) {
+								return signingClient.Sign(context.TODO(), signingString)
+							},
+						),
+					),
+				),
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: registered user's email was not confirmed",
+			fields: fields{
+				clientRepository: &MockRepositoryCIAM{
+					UserID: map[string]*User{
+						userID: {
+							ID:            userID,
+							Email:         email,
+							Fingerprint:   fingerprint,
+							IsActive:      true,
+							EmailVerified: false,
+						},
+					},
+				},
+				clientKMS: signingClient,
+			},
+			args: args{
+				ctx: context.TODO(),
+				refreshToken: mustNewToken(
+					NewRefreshToken(
+						userID, WithSignature(
+							func(signingString string) (signature string, alg string, err error) {
+								return signingClient.Sign(context.TODO(), signingString)
+							},
+						),
+					),
+				),
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: failed interactions with CIAM repo",
+			fields: fields{
+				clientRepository: &MockRepositoryCIAM{
+					Err: errors.New("foobar"),
+				},
+				clientKMS: signingClient,
+			},
+			args: args{
+				ctx: context.TODO(),
+				refreshToken: mustNewToken(
+					NewRefreshToken(
+						userID, WithSignature(
+							func(signingString string) (signature string, alg string, err error) {
+								return signingClient.Sign(context.TODO(), signingString)
+							},
+						),
+					),
+				),
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: invalid token's signature",
+			fields: fields{
+				clientRepository: &MockRepositoryCIAM{
+					Err: errors.New("foobar"),
+				},
+				clientKMS: signingClient,
+			},
+			args: args{
+				ctx: context.TODO(),
+				refreshToken: mustNewToken(
+					NewRefreshToken(
+						userID, WithSignature(
+							func(_ string) (signature string, alg string, err error) {
+								return "foo", "bar", nil
+							},
+						),
+					),
+				),
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: invalid input refresh token",
+			args: args{
+				ctx:          context.TODO(),
+				refreshToken: "foo",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := client{
+					clientRepository: tt.fields.clientRepository,
+					clientKMS:        tt.fields.clientKMS,
+					clientEmail:      tt.fields.clientEmail,
+				}
+				got, err := c.RefreshTokens(tt.args.ctx, tt.args.refreshToken)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("RefreshTokens() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if !tt.wantErr {
+					validateToken(
+						t, got.id, "id", tt.fields.clientKMS,
+						defaultExpirationDurationIdentitySec,
+					)
+					validateToken(
+						t, got.refresh, "refresh",
+						tt.fields.clientKMS, defaultExpirationDurationRefreshSec,
+					)
+					validateToken(
+						t, got.access, "access",
+						tt.fields.clientKMS, defaultExpirationDurationAccessSec,
+					)
+
+					if got.id.UserID() != got.access.UserID() || got.id.UserID() != got.refresh.UserID() {
+						t.Errorf("userID/sub was set inconsistently across the tokens")
+					}
+
+					if got.id.UserID() != userID {
+						t.Errorf("wront userID was set")
+					}
+				}
+			},
+		)
+	}
 }

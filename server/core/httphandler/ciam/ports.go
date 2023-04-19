@@ -79,7 +79,7 @@ func (m *MockRepositoryCIAM) ReadUser(_ context.Context, id string) (
 	found, isActive, emailVerified bool, email, fingerprint string, err error,
 ) {
 	if m.Err != nil {
-		return false, false, false, "", "", err
+		return false, false, false, "", "", m.Err
 	}
 	if u, ok := m.UserID[id]; ok {
 		return true, u.IsActive, u.EmailVerified, u.Email, u.Fingerprint, nil
@@ -89,7 +89,7 @@ func (m *MockRepositoryCIAM) ReadUser(_ context.Context, id string) (
 
 func (m *MockRepositoryCIAM) LookupUserByEmail(_ context.Context, email string) (id string, isActive bool, err error) {
 	if m.Err != nil {
-		return "", false, err
+		return "", false, m.Err
 	}
 	if u, ok := m.UserEmail[email]; ok {
 		return u.ID, u.IsActive, nil
@@ -101,7 +101,7 @@ func (m *MockRepositoryCIAM) LookupUserByFingerprint(_ context.Context, fingerpr
 	id string, isActive bool, err error,
 ) {
 	if m.Err != nil {
-		return "", false, err
+		return "", false, m.Err
 	}
 	if u, ok := m.UserFingerprint[fingerprint]; ok {
 		return u.ID, u.IsActive, nil
@@ -167,7 +167,7 @@ func (m *MockRepositoryCIAM) ReadOneTimeSecret(_ context.Context, userID string)
 	found bool, secret string, issuedAt time.Time, err error,
 ) {
 	if m.Err != nil {
-		return false, "", time.Time{}, err
+		return false, "", time.Time{}, m.Err
 	}
 	if v, ok := m.Secret[userID]; ok {
 		return ok, v.Secret, v.IssuedAt, nil
@@ -212,7 +212,7 @@ func (m MockTokenSigningClient) Sign(_ context.Context, _ string) (
 	signature string, alg string, err error,
 ) {
 	if m.Err != nil {
-		return "", "", err
+		return "", "", m.Err
 	}
 	return m.Signature, m.Alg, nil
 }

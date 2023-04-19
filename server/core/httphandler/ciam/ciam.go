@@ -287,6 +287,9 @@ func (c client) RefreshTokens(ctx context.Context, refreshToken string) (Tokens,
 	if !isActive {
 		return Tokens{}, errors.New("user was deactivated")
 	}
+	if email != "" && !emailVerified {
+		return Tokens{}, errors.New("user's email was not verified yet")
+	}
 	return c.issueTokens(ctx, t.UserID(), email, fingerprint, emailVerified)
 }
 
