@@ -38,14 +38,16 @@ func testSigninAnonymFlowUserDidNotExist(t *testing.T) {
 	validateToken(t, tokens.Access, "access", tokenSignClient, defaultExpirationDurationAccessSec)
 	validateToken(t, tokens.Refresh, "refresh", tokenSignClient, defaultExpirationDurationRefreshSec)
 
-	if tokens.ID.Sub() != tokens.Refresh.Sub() || tokens.ID.Sub() != tokens.Access.Sub() {
+	if tokens.ID.Payload().Sub != tokens.Refresh.Payload().Sub || tokens.ID.Payload().Sub != tokens.Access.Payload().Sub {
 		t.Errorf("sub does not match")
 	}
-	if err := utils.ValidateUUID(tokens.ID.Sub()); err != nil {
+	if err := utils.ValidateUUID(tokens.ID.Payload().Sub); err != nil {
 		t.Errorf("wrong sub format: %+v", err)
 	}
 
-	found, isActive, emailVerified, email, gotFingerprint, err := repoClient.ReadUser(context.TODO(), tokens.ID.Sub())
+	found, isActive, emailVerified, email, gotFingerprint, err := repoClient.ReadUser(
+		context.TODO(), tokens.ID.Payload().Sub,
+	)
 	if err != nil {
 		t.Errorf("unexpected error: CIAM repository")
 	}
@@ -61,13 +63,13 @@ func testSigninAnonymFlowUserDidNotExist(t *testing.T) {
 	if email != "" {
 		t.Errorf("user's email was set incorrectly")
 	}
-	if fingerprint != gotFingerprint || fingerprint != tokens.ID.Fingerprint() {
+	if fingerprint != gotFingerprint || fingerprint != *tokens.ID.Payload().Fingerprint {
 		t.Errorf("user's fingerprint was set incorrectly")
 	}
-	if tokens.Access.Role() != roleAnonymUser {
+	if *tokens.Access.Payload().Role != roleAnonymUser {
 		t.Errorf("user's role was set incorrectly")
 	}
-	if tokens.ID.Email() != "" {
+	if *tokens.ID.Payload().Email != "" {
 		t.Errorf("user's email was set incorrectly")
 	}
 }
@@ -75,7 +77,7 @@ func testSigninAnonymFlowUserDidNotExist(t *testing.T) {
 func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign MockTokenSigningClient, wantTTL int64) {
 	if err := tkn.Validate(
 		func(signingString, signature string) error {
-			return clientSign.Verify(nil, signature, signature)
+			return clientSign.Verify(context.TODO(), signingString, signature)
 		},
 	); err != nil {
 		t.Errorf("%s wrong signrature: %+v", tokenTyp, err)
@@ -85,19 +87,19 @@ func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign MockTokenS
 	if !ok {
 		t.Errorf("%s wrong token format", tokenTyp)
 	}
-	if tk.Header.Alg != clientSign.Alg {
+	if tk.header.Alg != clientSign.Alg {
 		t.Errorf("%s wrong header: alg", tokenTyp)
 	}
-	if tk.Header.Typ != typ {
+	if tk.header.Typ != typ {
 		t.Errorf("%s wrong header: typ", tokenTyp)
 	}
-	if tk.Payload.Aud != aud {
+	if tk.Payload().Aud != aud {
 		t.Errorf("%s wrong payload: aud", tokenTyp)
 	}
-	if tk.Payload.Iss != iss {
+	if tk.Payload().Iss != iss {
 		t.Errorf("%s wrong payload: iss", tokenTyp)
 	}
-	if tk.Payload.Exp-tk.Payload.Iat != wantTTL {
+	if tk.Payload().Exp-tk.Payload().Iat != wantTTL {
 		t.Errorf("%s wrong payload: iat and exp", tokenTyp)
 	}
 }
