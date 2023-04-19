@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func Test_token_String(t *testing.T) {
@@ -103,6 +104,136 @@ func Test_token_String(t *testing.T) {
 				}
 				if got != tt.want {
 					t.Errorf("String() got = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func Test_token_isExpired(t1 *testing.T) {
+	type fields struct {
+		header    JWTHeader
+		payload   JWTPayload
+		signature string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   bool
+	}{
+		{
+			name: "expired: exp set before iat",
+			fields: fields{
+				payload: JWTPayload{
+					Exp: 0,
+					Iat: 1,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "expired: exp before now",
+			fields: fields{
+				payload: JWTPayload{
+					Exp: time.Now().Add(-1 * time.Minute).UTC().Unix(),
+					Iat: time.Now().Add(-2 * time.Minute).UTC().Unix(),
+				},
+			},
+			want: true,
+		},
+		{
+			name: "valid",
+			fields: fields{
+				payload: JWTPayload{
+					Exp: time.Now().Add(1 * time.Minute).UTC().Unix(),
+					Iat: time.Now().Unix(),
+				},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t1.Run(
+			tt.name, func(t *testing.T) {
+				tkn := token{
+					header:    tt.fields.header,
+					payload:   tt.fields.payload,
+					signature: tt.fields.signature,
+				}
+				if got := tkn.isExpired(); got != tt.want {
+					t.Errorf("isExpired() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func Test_token_verifySignature(t *testing.T) {
+	type fields struct {
+		header    JWTHeader
+		payload   JWTPayload
+		signature string
+	}
+	type args struct {
+		verificationFn SignatureVerificationFn
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr error
+	}{
+		{
+			name: "invalid: corrupt token - no verification fn for signed token",
+			fields: fields{
+				header: JWTHeader{
+					Alg: "foo",
+					Typ: typ,
+				},
+				signature: "bar",
+			},
+			args:    args{},
+			wantErr: errors.New("corrupt JWT: alg does not match the signature"),
+		},
+		{
+			name: "invalid: corrupt token - signature is present for alg='none'",
+			fields: fields{
+				header: JWTHeader{
+					Alg: algNone,
+					Typ: typ,
+				},
+				signature: "bar",
+			},
+			args:    args{},
+			wantErr: errors.New("corrupt JWT: alg does not match the signature"),
+		},
+		{
+			name: "invalid: signature verification failed",
+			fields: fields{
+				header: JWTHeader{
+					Alg: "foo",
+					Typ: typ,
+				},
+				signature: "bar",
+			},
+			args: args{
+				verificationFn: func(signingString, signature string) error {
+					return errors.New("foobar")
+				},
+			},
+			wantErr: errors.New("foobar"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				tkn := token{
+					header:    tt.fields.header,
+					payload:   tt.fields.payload,
+					signature: tt.fields.signature,
+				}
+				if err := tkn.verifySignature(tt.args.verificationFn); !reflect.DeepEqual(err, tt.wantErr) {
+					t.Errorf("verifySignature() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			},
 		)
