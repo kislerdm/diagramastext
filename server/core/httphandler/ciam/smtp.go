@@ -99,3 +99,18 @@ Please ignore the email if you feel that it was received by mistake.`,
 
 	return o.Bytes(), nil
 }
+
+type MockSMTPClient struct {
+	Recipient string
+	Secret    string
+	Err       error
+}
+
+func (m *MockSMTPClient) SendSignInEmail(recipient, authSecret string) error {
+	if m.Err != nil {
+		return m.Err
+	}
+	m.Recipient = recipient
+	m.Secret = authSecret
+	return nil
+}

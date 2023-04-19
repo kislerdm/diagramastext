@@ -127,6 +127,8 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 		return nil, errors.New("email must be provided")
 	}
 
+	const defaultExpirationSecretSec = 600
+
 	var (
 		userID     string
 		err        error
@@ -157,8 +159,13 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 		if err != nil {
 			return nil, err
 		}
-		if found && iat.Add(time.Duration(defaultExpirationDurationIdentitySec)).After(time.Now().UTC()) {
+
+		if found && iat.Add(time.Duration(defaultExpirationSecretSec)).After(time.Now().UTC()) {
 			return newIDToken(userID, email, fingerprint, iat)
+		}
+
+		if err := c.clientRepository.DeleteOneTimeSecret(ctx, userID); err != nil {
+			return nil, err
 		}
 	}
 
