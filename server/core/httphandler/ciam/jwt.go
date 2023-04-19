@@ -8,70 +8,16 @@ import (
 	"time"
 )
 
-type Tokens struct {
-	ID      JWT
-	Refresh JWT
-	Access  JWT
+// JWT defines the JWT interface.
+// TODO(?): include prompt length, RPM and RPD in scopes
+type JWT interface {
+	String() (string, error)
+	Validate(fn SignatureVerificationFn) error
+	UserID() string
+	UserEmail() string
+	UserDeviceFingerprint() string
+	UserRole() Role
 }
-
-func (t Tokens) Serialize() ([]byte, error) {
-	var (
-		temp struct {
-			ID      *string `json:"id,omitempty"`
-			Refresh *string `json:"refresh,omitempty"`
-			Access  *string `json:"access,omitempty"`
-		}
-		s   string
-		err error
-	)
-	s, err = t.ID.String()
-	if err != nil {
-		return nil, err
-	}
-	temp.ID = &s
-
-	s, err = t.Refresh.String()
-	if err != nil {
-		return nil, err
-	}
-	temp.Refresh = &s
-
-	s, err = t.Access.String()
-	if err != nil {
-		return nil, err
-	}
-	temp.Access = &s
-
-	return json.Marshal(temp)
-}
-
-type JWTHeader struct {
-	Alg string `json:"alg"`
-	Typ string `json:"typ"`
-}
-
-type JWTPayload struct {
-	EmailVerified bool    `json:"email_verified,omitempty"`
-	Email         *string `json:"email,omitempty"`
-	Fingerprint   *string `json:"fingerprint,omitempty"`
-	Role          *Role   `json:"role,omitempty"`
-	Sub           string  `json:"sub"`
-	Iss           string  `json:"iss"`
-	Aud           string  `json:"aud"`
-	Iat           int64   `json:"iat"`
-	Exp           int64   `json:"exp"`
-}
-
-type Role uint8
-
-func (r Role) IsRegisteredUser() bool {
-	return r == roleRegisteredUser
-}
-
-const (
-	roleAnonymUser Role = iota
-	roleRegisteredUser
-)
 
 type OptFn func(JWT) error
 type SigningFn func(signingString string) (signature string, alg string, err error)
@@ -86,11 +32,11 @@ func WithCustomIat(iat time.Time) OptFn {
 
 func WithSignature(signFn SigningFn) OptFn {
 	return func(jwt JWT) (err error) {
-		signingString, err := signingString(jwt)
+		signingString, err := jwt.(*token).signingString()
 		if err != nil {
 			return
 		}
-		jwt.(*token).Signature, jwt.(*token).header.Alg, err = signFn(signingString)
+		jwt.(*token).signature, jwt.(*token).header.Alg, err = signFn(signingString)
 		return
 	}
 }
@@ -135,13 +81,6 @@ func NewAccessToken(userID string, emailVerified bool, optFns ...OptFn) (JWT, er
 	return o, nil
 }
 
-const (
-	typ     = "JWT"
-	algNone = "none"
-	iss     = "https://ciam.diagramastext.dev"
-	aud     = "https://diagramastext.dev"
-)
-
 func defaultToken(userID string, optFns ...OptFn) (*token, error) {
 	o := &token{
 		header: JWTHeader{
@@ -163,29 +102,67 @@ func defaultToken(userID string, optFns ...OptFn) (*token, error) {
 	return o, nil
 }
 
-type JWT interface {
-	String() (string, error)
-	Validate(fn SignatureVerificationFn) error
-	Header() JWTHeader
-	Payload() JWTPayload
+const (
+	typ     = "JWT"
+	algNone = "none"
+	iss     = "https://ciam.diagramastext.dev"
+	aud     = "https://diagramastext.dev"
+)
+
+var (
+	// OKTA defaults: https://support.okta.com/help/s/article/What-is-the-lifetime-of-the-JWT-tokens
+	defaultExpirationDurationIdentitySec = int64(time.Hour.Seconds())
+	defaultExpirationDurationAccessSec   = int64(time.Hour.Seconds())
+	defaultExpirationDurationRefreshSec  = 100 * 24 * int64(time.Hour.Seconds())
+)
+
+type JWTHeader struct {
+	Alg string `json:"alg"`
+	Typ string `json:"typ"`
+}
+
+type JWTPayload struct {
+	EmailVerified bool    `json:"email_verified,omitempty"`
+	Email         *string `json:"email,omitempty"`
+	Fingerprint   *string `json:"fingerprint,omitempty"`
+	Role          *Role   `json:"role,omitempty"`
+	Sub           string  `json:"sub"`
+	Iss           string  `json:"iss"`
+	Aud           string  `json:"aud"`
+	Iat           int64   `json:"iat"`
+	Exp           int64   `json:"exp"`
 }
 
 type token struct {
 	header    JWTHeader
 	payload   JWTPayload
-	Signature string
+	signature string
 }
 
-func (t token) Payload() JWTPayload {
-	return t.payload
+func (t token) UserEmail() string {
+	if t.payload.Email == nil {
+		return ""
+	}
+	return *t.payload.Email
 }
 
-func (t token) Header() JWTHeader {
-	return t.header
+func (t token) UserDeviceFingerprint() string {
+	if t.payload.Fingerprint == nil {
+		return ""
+	}
+	return *t.payload.Fingerprint
+}
+
+func (t token) UserID() string {
+	return t.payload.Sub
+}
+
+func (t token) UserRole() Role {
+	return *t.payload.Role
 }
 
 func (t token) String() (string, error) {
-	signingString, err := signingString(t)
+	signingString, err := t.signingString()
 	if err != nil {
 		return "", err
 	}
@@ -194,10 +171,10 @@ func (t token) String() (string, error) {
 		return signingString, nil
 	}
 
-	if t.Signature == "" {
+	if t.signature == "" {
 		return "", errors.New("signature is missing")
 	}
-	return signingString + "." + t.Signature, nil
+	return signingString + "." + t.signature, nil
 }
 
 func (t token) Validate(fn SignatureVerificationFn) error {
@@ -210,22 +187,34 @@ func (t token) Validate(fn SignatureVerificationFn) error {
 	return nil
 }
 
+func (t token) signingString() (string, error) {
+	header, err := json.Marshal(t.header)
+	if err != nil {
+		return "", err
+	}
+	payload, err := json.Marshal(t.payload)
+	if err != nil {
+		return "", err
+	}
+	return encodeSegment(header) + "." + encodeSegment(payload), nil
+}
+
 func (t token) verifySignature(verificationFn SignatureVerificationFn) error {
-	if (t.header.Alg != algNone && verificationFn == nil) || (t.header.Alg == algNone && t.Signature == "") {
+	if (t.header.Alg != algNone && verificationFn == nil) || (t.header.Alg == algNone && t.signature == "") {
 		return errors.New("corrupt JWT: alg does not match the signature")
 	}
-	signingString, err := signingString(t)
+	signingString, err := t.signingString()
 	if err != nil {
 		return err
 	}
-	if err := verificationFn(signingString, t.Signature); err != nil {
+	if err := verificationFn(signingString, t.signature); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (t token) isExpired() bool {
-	return t.Payload().Exp <= t.Payload().Iat || t.Payload().Exp < time.Now().UTC().Unix()
+	return t.payload.Exp <= t.payload.Iat || t.payload.Exp < time.Now().UTC().Unix()
 }
 
 func ParseToken(s string) (JWT, error) {
@@ -252,22 +241,10 @@ func ParseToken(s string) (JWT, error) {
 	}
 
 	if len(elements) == 3 {
-		o.Signature = elements[2]
+		o.signature = elements[2]
 	}
 
 	return &o, nil
-}
-
-func signingString(t JWT) (string, error) {
-	header, err := json.Marshal(t.Header())
-	if err != nil {
-		return "", err
-	}
-	payload, err := json.Marshal(t.Payload())
-	if err != nil {
-		return "", err
-	}
-	return encodeSegment(header) + "." + encodeSegment(payload), nil
 }
 
 func encodeSegment(seg []byte) string {
@@ -277,10 +254,3 @@ func encodeSegment(seg []byte) string {
 func decodeSegment(seg string) ([]byte, error) {
 	return base64.RawURLEncoding.DecodeString(seg)
 }
-
-var (
-	// OKTA defaults: https://support.okta.com/help/s/article/What-is-the-lifetime-of-the-JWT-tokens
-	defaultExpirationDurationIdentitySec = int64(time.Hour.Seconds())
-	defaultExpirationDurationAccessSec   = int64(time.Hour.Seconds())
-	defaultExpirationDurationRefreshSec  = 100 * 24 * int64(time.Hour.Seconds())
-)

@@ -13,7 +13,7 @@ func TestSigninAnonymFlow(t *testing.T) {
 }
 
 func testSigninAnonymFlowUserDidNotExist(t *testing.T) {
-	//GIVEN
+	// GIVEN
 	const fingerprint = "foo"
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
@@ -26,27 +26,27 @@ func testSigninAnonymFlowUserDidNotExist(t *testing.T) {
 
 	ciamClient := NewClient(repoClient, tokenSignClient, smtpClient)
 
-	//WHEN
+	// WHEN
 	tokens, err := ciamClient.SigninAnonym(context.TODO(), fingerprint)
 
-	//THEN
+	// THEN
 	if err != nil {
 		t.Errorf("unexpected error")
 	}
 
-	validateToken(t, tokens.ID, "id", tokenSignClient, defaultExpirationDurationIdentitySec)
-	validateToken(t, tokens.Access, "access", tokenSignClient, defaultExpirationDurationAccessSec)
-	validateToken(t, tokens.Refresh, "refresh", tokenSignClient, defaultExpirationDurationRefreshSec)
+	validateToken(t, tokens.id, "id", tokenSignClient, defaultExpirationDurationIdentitySec)
+	validateToken(t, tokens.access, "access", tokenSignClient, defaultExpirationDurationAccessSec)
+	validateToken(t, tokens.refresh, "refresh", tokenSignClient, defaultExpirationDurationRefreshSec)
 
-	if tokens.ID.Payload().Sub != tokens.Refresh.Payload().Sub || tokens.ID.Payload().Sub != tokens.Access.Payload().Sub {
+	if tokens.id.UserID() != tokens.refresh.UserID() || tokens.id.UserID() != tokens.access.UserID() {
 		t.Errorf("sub does not match")
 	}
-	if err := utils.ValidateUUID(tokens.ID.Payload().Sub); err != nil {
+	if err := utils.ValidateUUID(tokens.id.UserID()); err != nil {
 		t.Errorf("wrong sub format: %+v", err)
 	}
 
 	found, isActive, emailVerified, email, gotFingerprint, err := repoClient.ReadUser(
-		context.TODO(), tokens.ID.Payload().Sub,
+		context.TODO(), tokens.id.UserID(),
 	)
 	if err != nil {
 		t.Errorf("unexpected error: CIAM repository")
@@ -63,13 +63,13 @@ func testSigninAnonymFlowUserDidNotExist(t *testing.T) {
 	if email != "" {
 		t.Errorf("user's email was set incorrectly")
 	}
-	if fingerprint != gotFingerprint || fingerprint != *tokens.ID.Payload().Fingerprint {
+	if fingerprint != gotFingerprint || fingerprint != tokens.id.UserDeviceFingerprint() {
 		t.Errorf("user's fingerprint was set incorrectly")
 	}
-	if *tokens.Access.Payload().Role != roleAnonymUser {
+	if tokens.access.UserRole() != roleAnonymUser {
 		t.Errorf("user's role was set incorrectly")
 	}
-	if *tokens.ID.Payload().Email != "" {
+	if tokens.id.UserEmail() != "" {
 		t.Errorf("user's email was set incorrectly")
 	}
 }
@@ -93,13 +93,13 @@ func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign MockTokenS
 	if tk.header.Typ != typ {
 		t.Errorf("%s wrong header: typ", tokenTyp)
 	}
-	if tk.Payload().Aud != aud {
+	if tk.payload.Aud != aud {
 		t.Errorf("%s wrong payload: aud", tokenTyp)
 	}
-	if tk.Payload().Iss != iss {
+	if tk.payload.Iss != iss {
 		t.Errorf("%s wrong payload: iss", tokenTyp)
 	}
-	if tk.Payload().Exp-tk.Payload().Iat != wantTTL {
+	if tk.payload.Exp-tk.payload.Iat != wantTTL {
 		t.Errorf("%s wrong payload: iat and exp", tokenTyp)
 	}
 }
