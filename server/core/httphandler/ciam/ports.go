@@ -8,7 +8,7 @@ import (
 
 // RepositoryCIAM defines the communication port to persistence layer hosting users' data.
 type RepositoryCIAM interface {
-	CreateUser(ctx context.Context, id, email, fingerprint string) error
+	CreateUser(ctx context.Context, id, email, fingerprint string, isActive bool) error
 	ReadUser(ctx context.Context, id string) (
 		found, isActive, emailVerified bool, email, fingerprint string, err error,
 	)
@@ -16,10 +16,10 @@ type RepositoryCIAM interface {
 	LookupUserByEmail(ctx context.Context, email string) (id string, isActive bool, err error)
 	LookupUserByFingerprint(ctx context.Context, fingerprint string) (id string, isActive bool, err error)
 
-	UpdateUserSetActiveStatus(ctx context.Context, id string, isActive bool) error
 	UpdateUserSetEmailVerified(ctx context.Context, id string) error
 
-	CreateOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error
+	// WriteOneTimeSecret creates a new, or updates existing one-time secret.
+	WriteOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error
 	ReadOneTimeSecret(ctx context.Context, userID string) (found bool, secret string, issuedAt time.Time, err error)
 	DeleteOneTimeSecret(ctx context.Context, userID string) error
 }
@@ -59,7 +59,7 @@ func (m *MockRepositoryCIAM) setUser(u *User) {
 	m.UserID[u.ID] = u
 }
 
-func (m *MockRepositoryCIAM) CreateUser(_ context.Context, id, email, fingerprint string) error {
+func (m *MockRepositoryCIAM) CreateUser(_ context.Context, id, email, fingerprint string, isActive bool) error {
 	if m.Err != nil {
 		return m.Err
 	}
@@ -68,7 +68,7 @@ func (m *MockRepositoryCIAM) CreateUser(_ context.Context, id, email, fingerprin
 			ID:            id,
 			Email:         email,
 			Fingerprint:   fingerprint,
-			IsActive:      false,
+			IsActive:      isActive,
 			EmailVerified: false,
 		},
 	)
@@ -109,31 +109,11 @@ func (m *MockRepositoryCIAM) LookupUserByFingerprint(_ context.Context, fingerpr
 	return "", false, nil
 }
 
-func (m *MockRepositoryCIAM) UpdateUserSetActiveStatus(ctx context.Context, id string, isActive bool) error {
-	if m.Err != nil {
-		return m.Err
-	}
-	found, _, emailVerified, email, fingerprint, _ := m.ReadUser(ctx, id)
-	if !found {
-		return errors.New("user not found")
-	}
-	m.setUser(
-		&User{
-			ID:            id,
-			Email:         email,
-			Fingerprint:   fingerprint,
-			IsActive:      isActive,
-			EmailVerified: emailVerified,
-		},
-	)
-	return nil
-}
-
 func (m *MockRepositoryCIAM) UpdateUserSetEmailVerified(ctx context.Context, id string) error {
 	if m.Err != nil {
 		return m.Err
 	}
-	found, isActive, _, email, fingerprint, _ := m.ReadUser(ctx, id)
+	found, _, _, email, fingerprint, _ := m.ReadUser(ctx, id)
 	if !found {
 		return errors.New("user not found")
 	}
@@ -142,14 +122,14 @@ func (m *MockRepositoryCIAM) UpdateUserSetEmailVerified(ctx context.Context, id 
 			ID:            id,
 			Email:         email,
 			Fingerprint:   fingerprint,
-			IsActive:      isActive,
+			IsActive:      true,
 			EmailVerified: true,
 		},
 	)
 	return nil
 }
 
-func (m *MockRepositoryCIAM) CreateOneTimeSecret(_ context.Context, userID, secret string, createdAt time.Time) error {
+func (m *MockRepositoryCIAM) WriteOneTimeSecret(_ context.Context, userID, secret string, createdAt time.Time) error {
 	if m.Err != nil {
 		return m.Err
 	}
