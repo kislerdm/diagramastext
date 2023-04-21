@@ -106,10 +106,7 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 
 	if userID == "" {
 		userID = utils.NewUUID()
-		if err := c.clientRepository.CreateUser(ctx, userID, "", fingerprint); err != nil {
-			return Tokens{}, err
-		}
-		if err := c.clientRepository.UpdateUserSetActiveStatus(ctx, userID, true); err != nil {
+		if err := c.clientRepository.CreateUser(ctx, userID, "", fingerprint, true); err != nil {
 			return Tokens{}, err
 		}
 	}
@@ -150,7 +147,7 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 	switch userID == "" {
 	case true:
 		userID = utils.NewUUID()
-		if err := c.clientRepository.CreateUser(ctx, userID, email, fingerprint); err != nil {
+		if err := c.clientRepository.CreateUser(ctx, userID, email, fingerprint, false); err != nil {
 			return nil, err
 		}
 	default:
@@ -161,13 +158,8 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 		if err != nil {
 			return nil, err
 		}
-		if found {
-			if iat.Add(defaultExpirationSecret).After(time.Now().UTC()) {
-				return newIDToken(userID, email, fingerprint, iat)
-			}
-			if err := c.clientRepository.DeleteOneTimeSecret(ctx, userID); err != nil {
-				return nil, err
-			}
+		if found && iat.Add(defaultExpirationSecret).After(time.Now().UTC()) {
+			return newIDToken(userID, email, fingerprint, iat)
 		}
 	}
 
@@ -177,7 +169,7 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 	if err := c.clientEmail.SendSignInEmail(email, secret); err != nil {
 		return nil, err
 	}
-	if err := c.clientRepository.CreateOneTimeSecret(ctx, userID, secret, iat); err != nil {
+	if err := c.clientRepository.WriteOneTimeSecret(ctx, userID, secret, iat); err != nil {
 		return nil, err
 	}
 	return newIDToken(userID, email, fingerprint, iat)
@@ -210,10 +202,6 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 	}
 
 	if err := c.clientRepository.UpdateUserSetEmailVerified(ctx, t.UserID()); err != nil {
-		return Tokens{}, err
-	}
-
-	if err := c.clientRepository.UpdateUserSetActiveStatus(ctx, t.UserID(), true); err != nil {
 		return Tokens{}, err
 	}
 
