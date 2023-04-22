@@ -280,6 +280,17 @@ func (c Client) WriteSuccessFlag(ctx context.Context, requestID, userID, token s
 	return err
 }
 
+func (c Client) CreateUser(ctx context.Context, id, email, fingerprint string, isActive bool) error {
+	if id == "" {
+		return errors.New("id is required")
+	}
+	_, err := c.c.Exec(
+		ctx, "INSERT INTO "+c.tableUsers+" (user_id,email,web_fingerprint,is_active) VALUES ($1,$2,$3,$4)",
+		id, email, fingerprint, isActive,
+	)
+	return err
+}
+
 type mockDbClient struct {
 	err   error
 	query string
