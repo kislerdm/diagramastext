@@ -1006,3 +1006,119 @@ func TestClient_CreateUser(t *testing.T) {
 		)
 	}
 }
+
+func TestClient_ReadUser(t *testing.T) {
+	type fields struct {
+		c                         dbClient
+		tableWritePrompt          string
+		tableWriteModelPrediction string
+		tableWriteSuccessFlag     string
+		tableUsers                string
+		tableTokens               string
+	}
+	type args struct {
+		ctx context.Context
+		id  string
+	}
+	tests := []struct {
+		name              string
+		fields            fields
+		args              args
+		wantFound         bool
+		wantIsActive      bool
+		wantEmailVerified bool
+		wantEmail         string
+		wantFingerprint   string
+		wantErr           bool
+	}{
+		{
+			name: "happy path: user found",
+			fields: fields{
+				c: &mockDbClient{
+					query: "",
+					v: &mockRows{
+						tag: pgconn.NewCommandTag("SELECT"),
+						s:   &sync.RWMutex{},
+						v: [][]any{
+							{true, "foo@bar.baz", true, "qux"},
+						},
+					},
+				},
+				tableUsers: "users",
+			},
+			args: args{
+				ctx: context.TODO(),
+				id:  "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+			},
+			wantFound:         true,
+			wantIsActive:      true,
+			wantEmailVerified: true,
+			wantEmail:         "foo@bar.baz",
+			wantFingerprint:   "qux",
+			wantErr:           false,
+		},
+		{
+			name: "happy path: user not found",
+			fields: fields{
+				c: &mockDbClient{
+					query: "",
+					v: &mockRows{
+						tag: pgconn.NewCommandTag("SELECT"),
+						s:   &sync.RWMutex{},
+					},
+				},
+				tableUsers: "users",
+			},
+			args: args{
+				ctx: context.TODO(),
+				id:  "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+			},
+			wantFound:         false,
+			wantIsActive:      false,
+			wantEmailVerified: false,
+			wantEmail:         "",
+			wantFingerprint:   "",
+			wantErr:           false,
+		},
+		{
+			name:    "empty user id provided",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := Client{
+					c:                         tt.fields.c,
+					tableWritePrompt:          tt.fields.tableWritePrompt,
+					tableWriteModelPrediction: tt.fields.tableWriteModelPrediction,
+					tableWriteSuccessFlag:     tt.fields.tableWriteSuccessFlag,
+					tableUsers:                tt.fields.tableUsers,
+					tableTokens:               tt.fields.tableTokens,
+				}
+				gotFound, gotIsActive, gotEmailVerified, gotEmail, gotFingerprint, err := c.ReadUser(
+					tt.args.ctx, tt.args.id,
+				)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("ReadUser() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if gotFound != tt.wantFound {
+					t.Errorf("ReadUser() gotFound = %v, want %v", gotFound, tt.wantFound)
+				}
+				if gotIsActive != tt.wantIsActive {
+					t.Errorf("ReadUser() gotIsActive = %v, want %v", gotIsActive, tt.wantIsActive)
+				}
+				if gotEmailVerified != tt.wantEmailVerified {
+					t.Errorf("ReadUser() gotEmailVerified = %v, want %v", gotEmailVerified, tt.wantEmailVerified)
+				}
+				if gotEmail != tt.wantEmail {
+					t.Errorf("ReadUser() gotEmail = %v, want %v", gotEmail, tt.wantEmail)
+				}
+				if gotFingerprint != tt.wantFingerprint {
+					t.Errorf("ReadUser() gotFingerprint = %v, want %v", gotFingerprint, tt.wantFingerprint)
+				}
+			},
+		)
+	}
+}

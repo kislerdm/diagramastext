@@ -291,6 +291,36 @@ func (c Client) CreateUser(ctx context.Context, id, email, fingerprint string, i
 	return err
 }
 
+func (c Client) ReadUser(ctx context.Context, id string) (
+	found, isActive, emailVerified bool, email, fingerprint string, err error,
+) {
+	if id == "" {
+		err = errors.New("id is required")
+		return
+	}
+	rows, err := c.c.Query(
+		ctx, `SELECT 
+	is_active
+	,email
+    ,email_verified
+	,web_fingerprint
+FROM `+c.tableUsers+` WHERE user_id = $1`, id,
+	)
+	if err != nil {
+		return
+	}
+	if rows.Next() {
+		if err := rows.Scan(&isActive, &email, &emailVerified, &fingerprint); err != nil {
+			return false, false, false, "", "", err
+		}
+		rows.Close()
+
+		found = true
+		return
+	}
+	return false, false, false, "", "", nil
+}
+
 type mockDbClient struct {
 	err   error
 	query string
