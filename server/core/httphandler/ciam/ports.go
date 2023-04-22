@@ -16,6 +16,8 @@ type RepositoryCIAM interface {
 	LookupUserByEmail(ctx context.Context, email string) (id string, isActive bool, err error)
 	LookupUserByFingerprint(ctx context.Context, fingerprint string) (id string, isActive bool, err error)
 
+	// UpdateUserSetEmailVerified sets user's email verification status.
+	// Note: the user will be also set as active.
 	UpdateUserSetEmailVerified(ctx context.Context, id string) error
 
 	// WriteOneTimeSecret creates a new, or updates existing one-time secret.
