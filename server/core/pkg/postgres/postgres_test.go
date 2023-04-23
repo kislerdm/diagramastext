@@ -1143,6 +1143,7 @@ func TestClient_LookupUserByEmail(t *testing.T) {
 		wantId       string
 		wantIsActive bool
 		wantErr      bool
+		wantQuery    string
 	}{
 		{
 			name: "happy path: user found",
@@ -1174,6 +1175,7 @@ func TestClient_LookupUserByEmail(t *testing.T) {
 				email: "foo@bar.baz",
 			},
 			wantId:       "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+			wantQuery:    "SELECT user_id, is_active FROM users WHERE email = $1 ORDER BY created_at LIMIT 1",
 			wantIsActive: true,
 			wantErr:      false,
 		},
@@ -1193,6 +1195,7 @@ func TestClient_LookupUserByEmail(t *testing.T) {
 				email: "foo@bar.baz",
 			},
 			wantId:       "",
+			wantQuery:    "SELECT user_id, is_active FROM users WHERE email = $1 ORDER BY created_at LIMIT 1",
 			wantIsActive: false,
 			wantErr:      false,
 		},
@@ -1227,6 +1230,9 @@ func TestClient_LookupUserByEmail(t *testing.T) {
 				if gotIsActive != tt.wantIsActive {
 					t.Errorf("LookupUserByEmail() gotIsActive = %v, want %v", gotIsActive, tt.wantIsActive)
 				}
+				if err == nil && c.c.(*mockDbClient).query != tt.wantQuery {
+					t.Error("LookupUserByEmail() executed unexpected query")
+				}
 			},
 		)
 	}
@@ -1252,6 +1258,7 @@ func TestClient_LookupUserByFingerprint(t *testing.T) {
 		wantId       string
 		wantIsActive bool
 		wantErr      bool
+		wantQuery    string
 	}{
 		{
 			name: "happy path: user found",
@@ -1282,6 +1289,7 @@ func TestClient_LookupUserByFingerprint(t *testing.T) {
 				ctx:         context.TODO(),
 				fingerprint: "foo",
 			},
+			wantQuery:    "SELECT user_id, is_active FROM users WHERE fingerprint = $1 ORDER BY created_at LIMIT 1",
 			wantId:       "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
 			wantIsActive: true,
 			wantErr:      false,
@@ -1301,6 +1309,7 @@ func TestClient_LookupUserByFingerprint(t *testing.T) {
 				ctx:         context.TODO(),
 				fingerprint: "foo",
 			},
+			wantQuery:    "SELECT user_id, is_active FROM users WHERE fingerprint = $1 ORDER BY created_at LIMIT 1",
 			wantId:       "",
 			wantIsActive: false,
 			wantErr:      false,
@@ -1335,6 +1344,9 @@ func TestClient_LookupUserByFingerprint(t *testing.T) {
 				}
 				if gotIsActive != tt.wantIsActive {
 					t.Errorf("LookupUserByFingerprint() gotIsActive = %v, want %v", gotIsActive, tt.wantIsActive)
+				}
+				if err == nil && c.c.(*mockDbClient).query != tt.wantQuery {
+					t.Error("LookupUserByFingerprint() executed unexpected query")
 				}
 			},
 		)

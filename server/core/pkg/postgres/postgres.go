@@ -331,7 +331,7 @@ func (c Client) LookupUserByEmail(ctx context.Context, email string) (id string,
 			// The last registered user with the given email will be selected
 			// FIXME: shall this behaviour be sustained?
 			// FIXME: consider alternatives to ORDER BY for the sake of performance
-			` WHERE email = $1 ORDER BY created_at LIMIT 1`, id,
+			` WHERE email = $1 ORDER BY created_at LIMIT 1`, email,
 	)
 	if err != nil {
 		return
@@ -355,7 +355,7 @@ func (c Client) LookupUserByFingerprint(ctx context.Context, fingerprint string)
 			// The last registered user with the given fingerprint will be selected
 			// FIXME: shall this behaviour be sustained?
 			// FIXME: consider alternatives to ORDER BY for the sake of performance
-			` WHERE fingerprint = $1 ORDER BY created_at LIMIT 1`, id,
+			` WHERE fingerprint = $1 ORDER BY created_at LIMIT 1`, fingerprint,
 	)
 	if err != nil {
 		return
