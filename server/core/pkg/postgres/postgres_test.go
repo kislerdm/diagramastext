@@ -1122,3 +1122,112 @@ func TestClient_ReadUser(t *testing.T) {
 		)
 	}
 }
+
+func TestClient_LookupUserByEmail(t *testing.T) {
+	type fields struct {
+		c                         dbClient
+		tableWritePrompt          string
+		tableWriteModelPrediction string
+		tableWriteSuccessFlag     string
+		tableUsers                string
+		tableTokens               string
+	}
+	type args struct {
+		ctx   context.Context
+		email string
+	}
+	tests := []struct {
+		name         string
+		fields       fields
+		args         args
+		wantId       string
+		wantIsActive bool
+		wantErr      bool
+	}{
+		{
+			name: "happy path: user found",
+			fields: fields{
+				c: &mockDbClient{
+					v: &mockRows{
+						s:   &sync.RWMutex{},
+						tag: pgconn.NewCommandTag("SELECT"),
+						v: [][]any{
+							{
+								// user_id
+								"ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+								// is_active
+								true,
+							},
+							{
+								// user_id
+								"97375f24-91ed-4a70-adb6-4a5a4b19191c",
+								// is_active
+								false,
+							},
+						},
+					},
+				},
+				tableUsers: "users",
+			},
+			args: args{
+				ctx:   context.TODO(),
+				email: "foo@bar.baz",
+			},
+			wantId:       "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+			wantIsActive: true,
+			wantErr:      false,
+		},
+		{
+			name: "happy path: user not found",
+			fields: fields{
+				c: &mockDbClient{
+					v: &mockRows{
+						s:   &sync.RWMutex{},
+						tag: pgconn.NewCommandTag("SELECT"),
+					},
+				},
+				tableUsers: "users",
+			},
+			args: args{
+				ctx:   context.TODO(),
+				email: "foo@bar.baz",
+			},
+			wantId:       "",
+			wantIsActive: false,
+			wantErr:      false,
+		},
+		{
+			name: "unhappy path: email email provided",
+			args: args{
+				ctx:   context.TODO(),
+				email: "",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := Client{
+					c:                         tt.fields.c,
+					tableWritePrompt:          tt.fields.tableWritePrompt,
+					tableWriteModelPrediction: tt.fields.tableWriteModelPrediction,
+					tableWriteSuccessFlag:     tt.fields.tableWriteSuccessFlag,
+					tableUsers:                tt.fields.tableUsers,
+					tableTokens:               tt.fields.tableTokens,
+				}
+				gotId, gotIsActive, err := c.LookupUserByEmail(tt.args.ctx, tt.args.email)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("LookupUserByEmail() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if gotId != tt.wantId {
+					t.Errorf("LookupUserByEmail() gotId = %v, want %v", gotId, tt.wantId)
+				}
+				if gotIsActive != tt.wantIsActive {
+					t.Errorf("LookupUserByEmail() gotIsActive = %v, want %v", gotIsActive, tt.wantIsActive)
+				}
+			},
+		)
+	}
+}
