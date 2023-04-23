@@ -3,13 +3,10 @@ package postgres
 import (
 	"context"
 	"errors"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Config configuration of the postgres Client.
@@ -369,111 +366,13 @@ func (c Client) LookupUserByFingerprint(ctx context.Context, fingerprint string)
 	return
 }
 
-type mockDbClient struct {
-	err   error
-	query string
-	v     pgx.Rows
-}
-
-func (m *mockDbClient) Query(_ context.Context, query string, _ ...any) (pgx.Rows, error) {
-	m.query = query
-	if m.err != nil {
-		return nil, m.err
+func (c Client) UpdateUserSetEmailVerified(ctx context.Context, id string) error {
+	if id == "" {
+		return errors.New("id is required")
 	}
-	return m.v, nil
-}
-
-func (m *mockDbClient) Close(_ context.Context) error {
-	return m.err
-}
-
-func (m *mockDbClient) Exec(_ context.Context, query string, _ ...any) (pgconn.CommandTag, error) {
-	m.query = query
-	if m.err != nil {
-		return pgconn.CommandTag{}, m.err
-	}
-	return pgconn.NewCommandTag(strings.ToUpper(strings.Split(query, " ")[0])), nil
-}
-
-type dbClient interface {
-	Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, query string, args ...any) (pgx.Rows, error)
-	Close(ctx context.Context) error
-}
-
-type mockRows struct {
-	tag    pgconn.CommandTag
-	err    error
-	v      [][]any
-	rowCnt int
-	s      *sync.RWMutex
-}
-
-func (m *mockRows) Close() {
-	return
-}
-
-func (m *mockRows) Err() error {
-	return m.err
-}
-
-func (m *mockRows) CommandTag() pgconn.CommandTag {
-	return m.tag
-}
-
-func (m *mockRows) FieldDescriptions() []pgconn.FieldDescription {
-	return nil
-}
-
-func (m *mockRows) Next() bool {
-	m.s.Lock()
-	var f bool
-	if len(m.v) > m.rowCnt {
-		f = true
-	}
-	m.s.Unlock()
-	return f
-}
-
-func (m *mockRows) Scan(dest ...any) error {
-	if m.err != nil {
-		return m.err
-	}
-
-	m.s.Lock()
-	defer m.s.Unlock()
-	if len(m.v[m.rowCnt]) != len(dest) {
-		return errors.New(
-			"number of field descriptions must equal number of destinations, got " +
-				strconv.Itoa(len(m.v[m.rowCnt])) + " and " + strconv.Itoa(len(dest)),
-		)
-	}
-	for i, el := range m.v[m.rowCnt] {
-		switch dest[i].(type) {
-		case *string:
-			*dest[i].(*string) = el.(string)
-		case *bool:
-			*dest[i].(*bool) = el.(bool)
-		case *int:
-			*dest[i].(*int) = el.(int)
-		case *time.Time:
-			*dest[i].(*time.Time) = el.(time.Time)
-		}
-	}
-	m.rowCnt++
-	return nil
-}
-
-func (m *mockRows) Values() ([]any, error) {
-	m.s.Lock()
-	defer m.s.Unlock()
-	return m.v[m.rowCnt], m.Err()
-}
-
-func (m *mockRows) RawValues() [][]byte {
-	return nil
-}
-
-func (m *mockRows) Conn() *pgx.Conn {
-	return nil
+	_, err := c.c.Exec(
+		ctx, "UPDATE "+c.tableUsers+
+			" SET email_verified = TRUE, is_active = TRUE WHERE user_id = %1", id,
+	)
+	return err
 }

@@ -1352,3 +1352,80 @@ func TestClient_LookupUserByFingerprint(t *testing.T) {
 		)
 	}
 }
+
+func TestClient_UpdateUserSetEmailVerified(t *testing.T) {
+	type fields struct {
+		c                         dbClient
+		tableWritePrompt          string
+		tableWriteModelPrediction string
+		tableWriteSuccessFlag     string
+		tableUsers                string
+		tableTokens               string
+	}
+	type args struct {
+		ctx context.Context
+		id  string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				c:          &mockDbClient{},
+				tableUsers: "users",
+			},
+			args: args{
+				ctx: context.TODO(),
+				id:  "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+			},
+			wantErr: false,
+		},
+		{
+			name: "unhappy path: no user id provided",
+			fields: fields{
+				c:          &mockDbClient{},
+				tableUsers: "users",
+			},
+			args: args{
+				ctx: context.TODO(),
+				id:  "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: db error",
+			fields: fields{
+				c: &mockDbClient{
+					err: errors.New("foobar"),
+				},
+				tableUsers: "users",
+			},
+			args: args{
+				ctx: context.TODO(),
+				id:  "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := Client{
+					c:                         tt.fields.c,
+					tableWritePrompt:          tt.fields.tableWritePrompt,
+					tableWriteModelPrediction: tt.fields.tableWriteModelPrediction,
+					tableWriteSuccessFlag:     tt.fields.tableWriteSuccessFlag,
+					tableUsers:                tt.fields.tableUsers,
+					tableTokens:               tt.fields.tableTokens,
+				}
+				if err := c.UpdateUserSetEmailVerified(tt.args.ctx, tt.args.id); (err != nil) != tt.wantErr {
+					t.Errorf("UpdateUserSetEmailVerified() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
+	}
+}
