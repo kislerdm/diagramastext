@@ -345,6 +345,30 @@ func (c Client) LookupUserByEmail(ctx context.Context, email string) (id string,
 	return
 }
 
+func (c Client) LookupUserByFingerprint(ctx context.Context, fingerprint string) (id string, isActive bool, err error) {
+	if fingerprint == "" {
+		err = errors.New("fingerprint is required")
+		return
+	}
+	rows, err := c.c.Query(
+		ctx, `SELECT user_id, is_active FROM `+c.tableUsers+
+			// The last registered user with the given fingerprint will be selected
+			// FIXME: shall this behaviour be sustained?
+			// FIXME: consider alternatives to ORDER BY for the sake of performance
+			` WHERE fingerprint = $1 ORDER BY created_at LIMIT 1`, id,
+	)
+	if err != nil {
+		return
+	}
+	if rows.Next() {
+		if err = rows.Scan(&id, &isActive); err != nil {
+			return
+		}
+		rows.Close()
+	}
+	return
+}
+
 type mockDbClient struct {
 	err   error
 	query string
