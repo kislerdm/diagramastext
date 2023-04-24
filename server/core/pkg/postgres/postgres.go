@@ -424,3 +424,11 @@ func (c Client) ReadOneTimeSecret(ctx context.Context, userID string) (
 	found = true
 	return
 }
+
+func (c Client) DeleteOneTimeSecret(ctx context.Context, userID string) error {
+	if userID == "" {
+		return errors.New("userID is required")
+	}
+	_, err := c.c.Exec(ctx, "DELETE FROM "+c.tableOneTimeSecret+" WHERE user_id = $1", userID)
+	return err
+}

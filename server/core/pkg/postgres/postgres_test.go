@@ -1672,3 +1672,74 @@ func TestClient_ReadOneTimeSecret(t *testing.T) {
 		)
 	}
 }
+
+func TestClient_DeleteOneTimeSecret(t *testing.T) {
+	type fields struct {
+		c                         dbClient
+		tableWritePrompt          string
+		tableWriteModelPrediction string
+		tableWriteSuccessFlag     string
+		tableUsers                string
+		tableTokens               string
+		tableOneTimeSecret        string
+	}
+	type args struct {
+		ctx    context.Context
+		userID string
+	}
+	tests := []struct {
+		name      string
+		fields    fields
+		args      args
+		wantErr   bool
+		wantQuery string
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				c:                  &mockDbClient{},
+				tableOneTimeSecret: "secret",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				userID: "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+			},
+			wantErr:   false,
+			wantQuery: "DELETE FROM secret WHERE user_id = $1",
+		},
+		{
+			name: "unhappy path: no user ID provided",
+			fields: fields{
+				c:                  &mockDbClient{},
+				tableOneTimeSecret: "secret",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				userID: "",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := Client{
+					c:                         tt.fields.c,
+					tableWritePrompt:          tt.fields.tableWritePrompt,
+					tableWriteModelPrediction: tt.fields.tableWriteModelPrediction,
+					tableWriteSuccessFlag:     tt.fields.tableWriteSuccessFlag,
+					tableUsers:                tt.fields.tableUsers,
+					tableTokens:               tt.fields.tableTokens,
+					tableOneTimeSecret:        tt.fields.tableOneTimeSecret,
+				}
+				err := c.DeleteOneTimeSecret(tt.args.ctx, tt.args.userID)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("DeleteOneTimeSecret() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if err == nil && tt.wantQuery != "" && c.c.(*mockDbClient).query != tt.wantQuery {
+					t.Error("WriteOneTimeSecret() executed unexpected query")
+				}
+			},
+		)
+	}
+}
