@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ type Config struct {
 	TableSuccessStatus string `json:"table_success_status,omitempty"`
 	TableUsers         string `json:"table_users,omitempty"`
 	TableTokens        string `json:"table_tokens,omitempty"`
+	TableOneTimeSecret string `json:"table_one_time_secret,omitempty"`
 	SSLMode            string `json:"ssl_mode"`
 }
 
@@ -47,6 +49,9 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.TableTokens == "" {
 		return errors.New("table_tokens must be provided")
+	}
+	if cfg.TableOneTimeSecret == "" {
+		return errors.New("table_one_time_secret must be provided")
 	}
 	return validateSSLMode(cfg.SSLMode)
 }
@@ -102,6 +107,7 @@ func NewPostgresClient(ctx context.Context, cfg Config) (
 		tableWriteSuccessFlag:     cfg.TableSuccessStatus,
 		tableUsers:                cfg.TableUsers,
 		tableTokens:               cfg.TableTokens,
+		tableOneTimeSecret:        cfg.TableOneTimeSecret,
 	}, nil
 }
 
@@ -112,6 +118,7 @@ type Client struct {
 	tableWriteSuccessFlag     string
 	tableUsers                string
 	tableTokens               string
+	tableOneTimeSecret        string
 }
 
 func (c Client) GetDailySuccessfulResultsTimestampsByUserID(ctx context.Context, userID string) ([]time.Time, error) {
@@ -373,6 +380,24 @@ func (c Client) UpdateUserSetEmailVerified(ctx context.Context, id string) error
 	_, err := c.c.Exec(
 		ctx, "UPDATE "+c.tableUsers+
 			" SET email_verified = TRUE, is_active = TRUE WHERE user_id = %1", id,
+	)
+	return err
+}
+
+func (c Client) WriteOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error {
+	if userID == "" {
+		return errors.New("userID is required")
+	}
+	if secret == "" {
+		return errors.New("secret is required")
+	}
+	if reflect.DeepEqual(createdAt, time.Time{}) {
+		return errors.New("createdAt is required")
+	}
+	_, err := c.c.Exec(
+		ctx, "INSERT INTO "+c.tableOneTimeSecret+" (user_id, secret, created_at) VALUES ($1, $2, $3)"+
+			" ON CONFLICT DO UPDATE SET user_id = $1, secret = $2, created_at = $3",
+		userID, secret, createdAt,
 	)
 	return err
 }

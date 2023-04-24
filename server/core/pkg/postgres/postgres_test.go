@@ -22,6 +22,7 @@ func TestConfig_Validate(t *testing.T) {
 		TableSuccessStatus string
 		TableUsers         string
 		TableTokens        string
+		TableOneTimeSecret string
 		SSLMode            string
 	}
 	tests := []struct {
@@ -41,6 +42,7 @@ func TestConfig_Validate(t *testing.T) {
 				TableSuccessStatus: "qux",
 				TableUsers:         "quxx",
 				TableTokens:        "baz",
+				TableOneTimeSecret: "foobar",
 			},
 			wantErr: nil,
 		},
@@ -56,6 +58,7 @@ func TestConfig_Validate(t *testing.T) {
 				TableSuccessStatus: "qux",
 				TableUsers:         "quxx",
 				TableTokens:        "baz",
+				TableOneTimeSecret: "foobar",
 				SSLMode:            "verify-full",
 			},
 			wantErr: nil,
@@ -70,6 +73,9 @@ func TestConfig_Validate(t *testing.T) {
 				TablePrompt:        "foo",
 				TablePrediction:    "bar",
 				TableSuccessStatus: "qux",
+				TableUsers:         "quxx",
+				TableTokens:        "baz",
+				TableOneTimeSecret: "foobar",
 			},
 			wantErr: errors.New("host must be provided"),
 		},
@@ -83,6 +89,9 @@ func TestConfig_Validate(t *testing.T) {
 				TablePrompt:        "foo",
 				TablePrediction:    "bar",
 				TableSuccessStatus: "qux",
+				TableUsers:         "quxx",
+				TableTokens:        "baz",
+				TableOneTimeSecret: "foobar",
 			},
 			wantErr: errors.New("dbname must be provided"),
 		},
@@ -96,6 +105,9 @@ func TestConfig_Validate(t *testing.T) {
 				TablePrompt:        "foo",
 				TablePrediction:    "bar",
 				TableSuccessStatus: "qux",
+				TableUsers:         "",
+				TableTokens:        "baz",
+				TableOneTimeSecret: "foobar",
 			},
 			wantErr: errors.New("user must be provided"),
 		},
@@ -109,6 +121,9 @@ func TestConfig_Validate(t *testing.T) {
 				TablePrompt:        "",
 				TablePrediction:    "bar",
 				TableSuccessStatus: "qux",
+				TableUsers:         "users",
+				TableTokens:        "tokens",
+				TableOneTimeSecret: "foobar",
 			},
 			wantErr: errors.New("table_prompt must be provided"),
 		},
@@ -122,6 +137,9 @@ func TestConfig_Validate(t *testing.T) {
 				TablePrompt:        "foo",
 				TablePrediction:    "",
 				TableSuccessStatus: "qux",
+				TableUsers:         "users",
+				TableTokens:        "tokens",
+				TableOneTimeSecret: "foobar",
 			},
 			wantErr: errors.New("table_prediction must be provided"),
 		},
@@ -134,9 +152,44 @@ func TestConfig_Validate(t *testing.T) {
 				DBPassword:         "postgres",
 				TablePrompt:        "foo",
 				TablePrediction:    "bar",
+				TableUsers:         "users",
+				TableTokens:        "tokens",
 				TableSuccessStatus: "",
+				TableOneTimeSecret: "foobar",
 			},
 			wantErr: errors.New("table_success_status must be provided"),
+		},
+		{
+			name: "invalid: table_one_time_secret is missing",
+			fields: fields{
+				DBHost:             "localhost",
+				DBName:             "postgres",
+				DBUser:             "postgres",
+				DBPassword:         "postgres",
+				TablePrompt:        "foo",
+				TablePrediction:    "bar",
+				TableSuccessStatus: "qux",
+				TableUsers:         "users",
+				TableTokens:        "tokens",
+				TableOneTimeSecret: "",
+			},
+			wantErr: errors.New("table_one_time_secret must be provided"),
+		},
+		{
+			name: "invalid: table_tokens is missing",
+			fields: fields{
+				DBHost:             "localhost",
+				DBName:             "postgres",
+				DBUser:             "postgres",
+				DBPassword:         "postgres",
+				TablePrompt:        "foo",
+				TablePrediction:    "bar",
+				TableSuccessStatus: "qux",
+				TableUsers:         "users",
+				TableTokens:        "",
+				TableOneTimeSecret: "quxx",
+			},
+			wantErr: errors.New("table_tokens must be provided"),
 		},
 		{
 			name: "invalid: ssl mode is wrong",
@@ -151,6 +204,7 @@ func TestConfig_Validate(t *testing.T) {
 				TableSuccessStatus: "quxx",
 				TableUsers:         "quxx",
 				TableTokens:        "baz",
+				TableOneTimeSecret: "foobar",
 			},
 			wantErr: errors.New("ssl mode qux is not supported"),
 		},
@@ -171,6 +225,7 @@ func TestConfig_Validate(t *testing.T) {
 					TableSuccessStatus: tt.fields.TableSuccessStatus,
 					TableUsers:         tt.fields.TableUsers,
 					TableTokens:        tt.fields.TableTokens,
+					TableOneTimeSecret: tt.fields.TableOneTimeSecret,
 					SSLMode:            tt.fields.SSLMode,
 				}
 				err := cfg.Validate()
@@ -207,6 +262,7 @@ func TestNewRepositoryPostgres(t *testing.T) {
 					TableSuccessStatus: "qux",
 					TableUsers:         "quxx",
 					TableTokens:        "baz",
+					TableOneTimeSecret: "quxxx",
 				},
 			},
 			want: &Client{
@@ -216,6 +272,7 @@ func TestNewRepositoryPostgres(t *testing.T) {
 				tableWriteSuccessFlag:     "qux",
 				tableUsers:                "quxx",
 				tableTokens:               "baz",
+				tableOneTimeSecret:        "quxxx",
 			},
 			wantErr: false,
 		},
@@ -1424,6 +1481,106 @@ func TestClient_UpdateUserSetEmailVerified(t *testing.T) {
 				}
 				if err := c.UpdateUserSetEmailVerified(tt.args.ctx, tt.args.id); (err != nil) != tt.wantErr {
 					t.Errorf("UpdateUserSetEmailVerified() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
+	}
+}
+
+func TestClient_WriteOneTimeSecret(t *testing.T) {
+	type fields struct {
+		c                         dbClient
+		tableWritePrompt          string
+		tableWriteModelPrediction string
+		tableWriteSuccessFlag     string
+		tableUsers                string
+		tableTokens               string
+		tableOneTimeSecret        string
+	}
+	type args struct {
+		ctx       context.Context
+		userID    string
+		secret    string
+		createdAt time.Time
+	}
+	tests := []struct {
+		name      string
+		fields    fields
+		args      args
+		wantErr   bool
+		wantQuery string
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				c:                  &mockDbClient{},
+				tableOneTimeSecret: "secret",
+			},
+			args: args{
+				ctx:       context.TODO(),
+				userID:    "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+				secret:    "123456",
+				createdAt: time.Now().UTC().Add(-1 * time.Minute),
+			},
+			wantErr:   false,
+			wantQuery: "INSERT INTO secret (user_id, secret, created_at) VALUES ($1, $2, $3) ON CONFLICT DO UPDATE SET user_id = $1, secret = $2, created_at = $3",
+		},
+		{
+			name: "unhappy path: no user id provided",
+			fields: fields{
+				c:                  &mockDbClient{},
+				tableOneTimeSecret: "secret",
+			},
+			args: args{
+				ctx:       context.TODO(),
+				secret:    "123456",
+				createdAt: time.Now().UTC().Add(-1 * time.Minute),
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: no secret provided",
+			fields: fields{
+				c:                  &mockDbClient{},
+				tableOneTimeSecret: "secret",
+			},
+			args: args{
+				ctx:       context.TODO(),
+				userID:    "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+				createdAt: time.Now().UTC().Add(-1 * time.Minute),
+			},
+			wantErr: true,
+		},
+		{
+			name: "unhappy path: no createdAt provided",
+			fields: fields{
+				c:                  &mockDbClient{},
+				tableOneTimeSecret: "secret",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				userID: "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+				secret: "123456",
+			},
+			wantErr: true,
+		},
+	}
+	t.Parallel()
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := Client{
+					c:                  tt.fields.c,
+					tableOneTimeSecret: tt.fields.tableOneTimeSecret,
+				}
+				err := c.WriteOneTimeSecret(
+					tt.args.ctx, tt.args.userID, tt.args.secret, tt.args.createdAt,
+				)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("WriteOneTimeSecret() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if err == nil && tt.wantQuery != "" && c.c.(*mockDbClient).query != tt.wantQuery {
+					t.Error("WriteOneTimeSecret() executed unexpected query")
 				}
 			},
 		)
