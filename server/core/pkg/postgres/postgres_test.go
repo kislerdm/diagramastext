@@ -1586,3 +1586,89 @@ func TestClient_WriteOneTimeSecret(t *testing.T) {
 		)
 	}
 }
+
+func TestClient_ReadOneTimeSecret(t *testing.T) {
+	type fields struct {
+		c                         dbClient
+		tableWritePrompt          string
+		tableWriteModelPrediction string
+		tableWriteSuccessFlag     string
+		tableUsers                string
+		tableTokens               string
+		tableOneTimeSecret        string
+	}
+	type args struct {
+		ctx    context.Context
+		userID string
+	}
+	iat := time.Now().UTC().Add(-1 * time.Minute)
+	tests := []struct {
+		name         string
+		fields       fields
+		args         args
+		wantFound    bool
+		wantSecret   string
+		wantIssuedAt time.Time
+		wantErr      bool
+		wantQuery    string
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				c: &mockDbClient{
+					v: &mockRows{
+						tag: pgconn.NewCommandTag("SELECT"),
+						s:   &sync.RWMutex{},
+						v:   [][]any{{"123456", iat}},
+					},
+				},
+				tableOneTimeSecret: "secret",
+			},
+			args: args{
+				ctx:    context.TODO(),
+				userID: "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+			},
+			wantFound:    true,
+			wantSecret:   "123456",
+			wantIssuedAt: iat,
+			wantErr:      false,
+			wantQuery:    "SELECT secret, created_at FROM secret WHERE user_id = $1",
+		},
+		{
+			name:    "unhappy path: no user ID provided",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				c := Client{
+					c:                         tt.fields.c,
+					tableWritePrompt:          tt.fields.tableWritePrompt,
+					tableWriteModelPrediction: tt.fields.tableWriteModelPrediction,
+					tableWriteSuccessFlag:     tt.fields.tableWriteSuccessFlag,
+					tableUsers:                tt.fields.tableUsers,
+					tableTokens:               tt.fields.tableTokens,
+					tableOneTimeSecret:        tt.fields.tableOneTimeSecret,
+				}
+				gotFound, gotSecret, gotIssuedAt, err := c.ReadOneTimeSecret(tt.args.ctx, tt.args.userID)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("ReadOneTimeSecret() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if gotFound != tt.wantFound {
+					t.Errorf("ReadOneTimeSecret() gotFound = %v, want %v", gotFound, tt.wantFound)
+				}
+				if gotSecret != tt.wantSecret {
+					t.Errorf("ReadOneTimeSecret() gotSecret = %v, want %v", gotSecret, tt.wantSecret)
+				}
+				if !reflect.DeepEqual(gotIssuedAt, tt.wantIssuedAt) {
+					t.Errorf("ReadOneTimeSecret() gotIssuedAt = %v, want %v", gotIssuedAt, tt.wantIssuedAt)
+				}
+				if err == nil && tt.wantQuery != "" && c.c.(*mockDbClient).query != tt.wantQuery {
+					t.Error("WriteOneTimeSecret() executed unexpected query")
+				}
+			},
+		)
+	}
+}

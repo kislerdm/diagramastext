@@ -401,3 +401,26 @@ func (c Client) WriteOneTimeSecret(ctx context.Context, userID, secret string, c
 	)
 	return err
 }
+
+func (c Client) ReadOneTimeSecret(ctx context.Context, userID string) (
+	found bool, secret string, issuedAt time.Time, err error,
+) {
+	if userID == "" {
+		err = errors.New("userID is required")
+		return
+	}
+	var rows pgx.Rows
+	rows, err = c.c.Query(ctx, "SELECT secret, created_at FROM "+c.tableOneTimeSecret+" WHERE user_id = $1", userID)
+	if err != nil {
+		return
+	}
+
+	if rows.Next() {
+		if err := rows.Scan(&secret, &issuedAt); err != nil {
+			return false, "", time.Time{}, err
+		}
+		rows.Close()
+	}
+	found = true
+	return
+}
