@@ -13,6 +13,7 @@ import (
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
+	"github.com/kislerdm/diagramastext/server/core/httphandler/ciam"
 )
 
 type mockWriter struct {
@@ -1204,16 +1205,16 @@ func Test_httpHandler_checkQuota(t *testing.T) {
 func Test_httpHandler_response(t *testing.T) {
 	t.Run(
 		"shall have the Content-Type header set to application/json", func(t *testing.T) {
-			//GIVEN
+			// GIVEN
 			handler := httpHandler{
 				corsHeaders: corsHeaders{},
 			}
 			w := &mockWriter{Headers: httpHeaders(nil)}
 
-			//WHEN
+			// WHEN
 			handler.response(w, nil, nil)
 
-			//THEN
+			// THEN
 			if w.StatusCode != http.StatusOK {
 				t.Errorf("unexpected response status code")
 			}
@@ -1223,4 +1224,61 @@ func Test_httpHandler_response(t *testing.T) {
 			}
 		},
 	)
+}
+
+func Test_httpHandler_ciamHandler(t *testing.T) {
+	type fields struct {
+		diagramRenderingHandler   map[string]diagram.HTTPHandler
+		reportErrorFn             func(err error)
+		corsHeaders               corsHeaders
+		repositoryAPITokens       diagram.RepositoryToken
+		repositoryRequestsHistory diagram.RepositoryPrediction
+		ciam                      ciam.Client
+	}
+	type args struct {
+		w http.ResponseWriter
+		r *http.Request
+	}
+	tests := []struct {
+		name           string
+		fields         fields
+		args           args
+		wantStatusCode int
+	}{
+		{
+			name:   "unhappy path: not allowed method",
+			fields: fields{reportErrorFn: func(err error) {}},
+			args: args{
+				r: &http.Request{
+					Method: http.MethodGet,
+					URL:    &url.URL{Path: "/auth/foobar"},
+				},
+				w: &mockWriter{
+					Headers: httpHeaders(nil),
+				},
+			},
+			wantStatusCode: http.StatusMethodNotAllowed,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				h := httpHandler{
+					diagramRenderingHandler:   tt.fields.diagramRenderingHandler,
+					reportErrorFn:             tt.fields.reportErrorFn,
+					corsHeaders:               tt.fields.corsHeaders,
+					repositoryAPITokens:       tt.fields.repositoryAPITokens,
+					repositoryRequestsHistory: tt.fields.repositoryRequestsHistory,
+					ciam:                      tt.fields.ciam,
+				}
+				h.ciamHandler(tt.args.w, tt.args.r)
+				if tt.args.w.(*mockWriter).StatusCode != tt.wantStatusCode {
+					t.Errorf(
+						"unexpected status code. want = %d, got = %d", tt.wantStatusCode,
+						tt.args.w.(*mockWriter).StatusCode,
+					)
+				}
+			},
+		)
+	}
 }

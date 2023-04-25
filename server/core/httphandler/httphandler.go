@@ -12,6 +12,7 @@ import (
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/diagram/c4container"
 	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
+	"github.com/kislerdm/diagramastext/server/core/httphandler/ciam"
 )
 
 // NewHTTPHandler initialises HTTP handler.
@@ -19,6 +20,8 @@ func NewHTTPHandler(
 	clientModel diagram.ModelInference, clientRepositoryPrediction diagram.RepositoryPrediction,
 	httpClientDiagramRendering diagram.HTTPClient, corsHeaders map[string]string,
 	apiTokensRepository diagram.RepositoryToken,
+	// requirements for the CIAM handling logic
+	ciamClientRepository ciam.RepositoryCIAM, ciamClientKMS ciam.TokenSigningClient, ciamClientSMTP ciam.SMTPClient,
 ) (http.Handler, error) {
 	var l = log.New(os.Stderr, "", log.Lmicroseconds|log.LUTC|log.Lshortfile)
 
@@ -36,8 +39,10 @@ func NewHTTPHandler(
 		corsHeaders:   corsHeaders,
 		reportErrorFn: func(err error) { l.Println(err) },
 		// FIXME: add caching layer
+		// TODO: move handling logic for API tokens to the CIAM package
 		repositoryAPITokens:       apiTokensRepository,
 		repositoryRequestsHistory: clientRepositoryPrediction,
+		ciam:                      ciam.NewClient(ciamClientRepository, ciamClientKMS, ciamClientSMTP),
 	}, nil
 }
 
@@ -47,6 +52,7 @@ type httpHandler struct {
 	corsHeaders               corsHeaders
 	repositoryAPITokens       diagram.RepositoryToken
 	repositoryRequestsHistory diagram.RepositoryPrediction
+	ciam                      ciam.Client
 }
 
 func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
@@ -70,6 +76,7 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		pathStatus = "/status"
 		pathQuotas = "/quotas"
+		pathCIAM   = "/auth"
 	)
 
 	if r.Method == http.MethodOptions {
@@ -77,7 +84,10 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.URL.Path == pathStatus {
+	var user diagram.User
+
+	switch r.URL.Path {
+	case pathStatus:
 		switch r.Method {
 		case http.MethodGet:
 			h.response(w, nil, nil)
@@ -90,9 +100,15 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			)
 			return
 		}
+	case pathQuotas:
+		h.getQuotasUsage(w, r, &user)
+		return
+	case pathCIAM:
+		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathCIAM)
+		h.ciamHandler(w, r)
+		return
 	}
 
-	var user diagram.User
 	switch strings.HasPrefix(r.URL.Path, pathPrefixInternal) {
 	case false:
 		if err := h.authorizationAPI(r, &user); err != nil {
@@ -110,11 +126,6 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, pathPrefixDiagramGeneration) {
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixDiagramGeneration)
 		h.diagramRendering(w, r, &user)
-		return
-	}
-
-	if r.URL.Path == pathQuotas {
-		h.getQuotasUsage(w, r, &user)
 		return
 	}
 
@@ -285,6 +296,33 @@ func (h httpHandler) getQuotasUsage(w http.ResponseWriter, r *http.Request, user
 			w, nil, newInvalidMethodError(
 				errors.New("method "+r.Method+" not allowed for path: "+r.URL.Path),
 			),
+		)
+		return
+	}
+}
+
+func (h httpHandler) ciamHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		h.response(
+			w, nil, newInvalidMethodError(
+				errors.New("method "+r.Method+" not allowed for path: "+r.URL.Path),
+			),
+		)
+		return
+	}
+	switch r.URL.Path {
+	case "/anonym":
+		panic("todo: anonym logic")
+	case "/signin/init":
+		panic("todo: signin/init logic")
+	case "/signin/confirm":
+		panic("todo: signin/confirm logic")
+	case "/refresh":
+		panic("todo: refresh logic")
+	default:
+		h.response(
+			w, []byte(`{"error":"CIAM resource `+r.URL.Path+` not found"}`),
+			newHandlerNotExistsError(errors.New("CIAM: "+r.URL.Path+" not found")),
 		)
 		return
 	}
