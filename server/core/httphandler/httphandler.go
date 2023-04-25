@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
@@ -310,22 +309,80 @@ func (h httpHandler) ciamHandler(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+
 	switch r.URL.Path {
 	case "/anonym":
-		panic("todo: anonym logic")
+		h.ciamHandlerSigninAnonym(w, r)
 	case "/signin/init":
-		panic("todo: signin/init logic")
+		h.ciamHandlerSigninUserInit(w, r)
 	case "/signin/confirm":
-		panic("todo: signin/confirm logic")
+		h.ciamHandlerSigninUserConfirm(w, r)
 	case "/refresh":
-		panic("todo: refresh logic")
+		h.ciamRefreshTokens(w, r)
 	default:
 		h.response(
 			w, []byte(`{"error":"CIAM resource `+r.URL.Path+` not found"}`),
 			newHandlerNotExistsError(errors.New("CIAM: "+r.URL.Path+" not found")),
 		)
+	}
+	return
+}
+
+func (h httpHandler) ciamHandlerSigninAnonym(w http.ResponseWriter, r *http.Request) {
+	defer func() { _ = r.Body.Close() }()
+	var req ciamRequestAnonym
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.response(w, []byte(`{"error":"request parsing error"}`), newInputFormatValidationError(err))
 		return
 	}
+	if !req.IsValid() {
+		h.response(
+			w, []byte(`{"error":"invalid request"}`),
+			newInputContentValidationError(errors.New("invalid fingerprint")),
+		)
+		return
+	}
+
+	tokens, err := h.ciam.SigninAnonym(r.Context(), req.Fingerprint)
+	if err != nil {
+		h.response(
+			w, []byte(`{"error":"internal error"}`),
+			httpHandlerError{
+				Msg:      "internal error",
+				Type:     errorCIAMSigninAnonym,
+				HTTPCode: http.StatusInternalServerError,
+			},
+		)
+		return
+	}
+
+	o, err := tokens.Serialize()
+	if err != nil {
+		h.response(
+			w, []byte(`{"error":"internal error"}`),
+			httpHandlerError{
+				Msg:      err.Error(),
+				Type:     errorCIAMSigninAnonym,
+				HTTPCode: http.StatusInternalServerError,
+			},
+		)
+		return
+	}
+
+	h.response(w, o, nil)
+	return
+}
+
+func (h httpHandler) ciamHandlerSigninUserInit(w http.ResponseWriter, r *http.Request) {
+	panic("todo: signin/init logic")
+}
+
+func (h httpHandler) ciamHandlerSigninUserConfirm(w http.ResponseWriter, r *http.Request) {
+	panic("todo: signin/confirm logic")
+}
+
+func (h httpHandler) ciamRefreshTokens(w http.ResponseWriter, r *http.Request) {
+	panic("todo: refresh logic")
 }
 
 func readAuthHeaderValue(header http.Header) string {
@@ -336,112 +393,4 @@ func readAuthHeaderValue(header http.Header) string {
 	}
 	_, v, _ := strings.Cut(authHeader, "Bearer ")
 	return v
-}
-
-type corsHeaders map[string]string
-
-func (h corsHeaders) setHeaders(header http.Header) {
-	for k, v := range h {
-		header.Set(k, v)
-
-		if k == "Access-Control-Allow-Origin" && (v == "" || v == "'*'") {
-			header.Set(k, "*")
-		}
-	}
-}
-
-const (
-	errorInvalidMethod          = "Request:InvalidMethod"
-	errorNotExists              = "Request:HandlerNotExists"
-	errorNotAuthorizedNoToken   = "Request:AccessDenied:NoAPIToken"
-	errorInvalidRequest         = "InputValidation:InvalidContent"
-	errorInvalidPrompt          = "InputValidation:InvalidPrompt"
-	errorCoreLogic              = "Core:DiagramRendering"
-	errorResponseSerialisation  = "Response:DiagramSerialisation"
-	errorRepositoryToken        = "DrivenInterface:RepositoryToken"
-	errorQuotaValidation        = "Quota:ValidationError"
-	errorQuotaExceeded          = "Quota:Excess"
-	errorQuotaFetching          = "Quota:ReadingError"
-	errorQuotaDataSerialization = "Quota:SerializationError"
-)
-
-func newResponseSerialisationError(err error) error {
-	return httpHandlerError{
-		Msg:      err.Error(),
-		Type:     errorResponseSerialisation,
-		HTTPCode: http.StatusInternalServerError,
-	}
-}
-
-func newModelPredictionError(err error) error {
-	return httpHandlerError{
-		Msg:      err.Error(),
-		Type:     errorCoreLogic,
-		HTTPCode: http.StatusBadRequest,
-	}
-}
-
-func newCoreLogicError(err error) error {
-	return httpHandlerError{
-		Msg:      err.Error(),
-		Type:     errorCoreLogic,
-		HTTPCode: http.StatusInternalServerError,
-	}
-}
-
-func newHandlerNotExistsError(err error) error {
-	return httpHandlerError{
-		Msg:      err.Error(),
-		Type:     errorNotExists,
-		HTTPCode: http.StatusNotFound,
-	}
-}
-
-func newInvalidMethodError(err error) error {
-	return httpHandlerError{
-		Msg:      err.Error(),
-		Type:     errorInvalidMethod,
-		HTTPCode: http.StatusMethodNotAllowed,
-	}
-}
-
-func newInputFormatValidationError(err error) error {
-	msg := err.Error()
-
-	switch err.(type) {
-	case *json.SyntaxError:
-		msg = "faulty JSON"
-	}
-
-	return httpHandlerError{
-		Msg:      msg,
-		Type:     errorInvalidRequest,
-		HTTPCode: http.StatusBadRequest,
-	}
-}
-
-func newInputContentValidationError(err error) error {
-	return httpHandlerError{
-		Msg:      err.Error(),
-		Type:     errorInvalidPrompt,
-		HTTPCode: http.StatusUnprocessableEntity,
-	}
-}
-
-type httpHandlerError struct {
-	Msg      string
-	Type     string
-	HTTPCode int
-}
-
-func (e httpHandlerError) Error() string {
-	var o strings.Builder
-	writeStrings(&o, "[type:", e.Type, "][code:", strconv.Itoa(e.HTTPCode), "] ", e.Msg)
-	return o.String()
-}
-
-func writeStrings(o *strings.Builder, text ...string) {
-	for _, s := range text {
-		_, _ = o.WriteString(s)
-	}
 }
