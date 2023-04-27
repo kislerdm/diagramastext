@@ -261,6 +261,7 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				h := httpHandler{
 					diagramRenderingHandler: diagramRenderingHandler,
+					reportErrorFn:           tt.errorsCollector.Err,
 					corsHeaders:             corsHeaders,
 					repositoryAPITokens: &diagram.MockRepositoryToken{
 						V: "c40bad11-0822-4d84-9f61-44b9a97b0432",
@@ -1277,6 +1278,159 @@ func Test_httpHandler_ciamHandler(t *testing.T) {
 						"unexpected status code. want = %d, got = %d", tt.wantStatusCode,
 						tt.args.w.(*mockWriter).StatusCode,
 					)
+				}
+			},
+		)
+	}
+}
+
+func Test_httpHandler_ciamHandlerSigninAnonym(t *testing.T) {
+	type fields struct {
+		diagramRenderingHandler   map[string]diagram.HTTPHandler
+		corsHeaders               corsHeaders
+		repositoryAPITokens       diagram.RepositoryToken
+		repositoryRequestsHistory diagram.RepositoryPrediction
+		ciam                      ciam.Client
+	}
+	type args struct {
+		w http.ResponseWriter
+		r *http.Request
+	}
+	tests := []struct {
+		name            string
+		fields          fields
+		args            args
+		wantStatusCode  int
+		wantErr         error
+		wantBody        []byte
+		errorsCollector *errCollector
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				diagramRenderingHandler: nil,
+				ciam:                    &ciam.MockCIAMClient{},
+			},
+			args: args{
+				r: &http.Request{
+					Body: io.NopCloser(
+						strings.NewReader(`{"fingerprint": "9468a4a53a2f2fd9ea96db22dc9dd9bb6ce38b7c"}`),
+					),
+				},
+				w: &mockWriter{
+					Headers: httpHeaders(nil),
+				},
+			},
+			wantStatusCode:  http.StatusOK,
+			wantErr:         nil,
+			errorsCollector: &errCollector{},
+		},
+		{
+			name: "invalid input body: format",
+			fields: fields{
+				diagramRenderingHandler: nil,
+				ciam:                    &ciam.MockCIAMClient{},
+			},
+			args: args{
+				r: &http.Request{
+					Body: io.NopCloser(strings.NewReader(`{""}`)),
+				},
+				w: &mockWriter{
+					Headers: httpHeaders(nil),
+				},
+			},
+			wantStatusCode: http.StatusBadRequest,
+			wantBody:       []byte(`{"error":"request parsing error"}`),
+			wantErr: httpHandlerError{
+				Msg:      "faulty JSON",
+				Type:     errorInvalidRequest,
+				HTTPCode: http.StatusBadRequest,
+			},
+			errorsCollector: &errCollector{},
+		},
+		{
+			name: "invalid input body: content",
+			fields: fields{
+				diagramRenderingHandler: nil,
+				ciam:                    &ciam.MockCIAMClient{},
+			},
+			args: args{
+				r: &http.Request{
+					Body: io.NopCloser(strings.NewReader(`{"fingerprint":"foo"}`)),
+				},
+				w: &mockWriter{
+					Headers: httpHeaders(nil),
+				},
+			},
+			wantStatusCode:  http.StatusUnprocessableEntity,
+			wantBody:        []byte(`{"error":"invalid request"}`),
+			wantErr:         newInputContentValidationError(errors.New("invalid fingerprint")),
+			errorsCollector: &errCollector{},
+		},
+		{
+			name: "CIAM failure",
+			fields: fields{
+				diagramRenderingHandler: nil,
+				ciam: &ciam.MockCIAMClient{
+					Err: errors.New("foobar"),
+				},
+			},
+			args: args{
+				r: &http.Request{
+					Body: io.NopCloser(strings.NewReader(`{"fingerprint":"9468a4a53a2f2fd9ea96db22dc9dd9bb6ce38b7c"}`)),
+				},
+				w: &mockWriter{
+					Headers: httpHeaders(nil),
+				},
+			},
+			wantStatusCode: http.StatusInternalServerError,
+			wantBody:       []byte(`{"error":"internal error"}`),
+			wantErr: httpHandlerError{
+				Msg:      "foobar",
+				Type:     errorCIAMSigninAnonym,
+				HTTPCode: http.StatusInternalServerError,
+			},
+			errorsCollector: &errCollector{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				h := httpHandler{
+					diagramRenderingHandler:   tt.fields.diagramRenderingHandler,
+					reportErrorFn:             tt.errorsCollector.Err,
+					corsHeaders:               tt.fields.corsHeaders,
+					repositoryAPITokens:       tt.fields.repositoryAPITokens,
+					repositoryRequestsHistory: tt.fields.repositoryRequestsHistory,
+					ciam:                      tt.fields.ciam,
+				}
+				h.ciamHandlerSigninAnonym(tt.args.w, tt.args.r)
+
+				if tt.args.w.(*mockWriter).StatusCode != tt.wantStatusCode {
+					t.Errorf(
+						"unexpected status code. want = %d, got = %d", tt.wantStatusCode,
+						tt.args.w.(*mockWriter).StatusCode,
+					)
+				}
+
+				var wantBody []byte
+				wantBody = tt.wantBody
+				if wantBody == nil {
+					var err error
+					wantBody, err = tt.fields.ciam.(*ciam.MockCIAMClient).Tokens().Serialize()
+					if err != nil {
+						panic(err)
+					}
+				}
+
+				if !reflect.DeepEqual(tt.args.w.(*mockWriter).V, wantBody) {
+					t.Error("unexpected response body")
+				}
+
+				if !reflect.DeepEqual(tt.wantErr, tt.errorsCollector.V) {
+					t.Error("unexpected error collected")
 				}
 			},
 		)

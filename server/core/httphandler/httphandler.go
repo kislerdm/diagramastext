@@ -172,6 +172,16 @@ func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error
 	return h.checkQuota(r, user)
 }
 
+func readAuthHeaderValue(header http.Header) string {
+	const authorizationHeaderName = "Authorization"
+	authHeader := header.Get(authorizationHeaderName)
+	if authHeader == "" {
+		authHeader = header.Get(strings.ToLower(authorizationHeaderName))
+	}
+	_, v, _ := strings.Cut(authHeader, "Bearer ")
+	return v
+}
+
 func (h httpHandler) checkQuota(r *http.Request, user *diagram.User) error {
 	throttling, quotaExceeded, err := diagram.ValidateRequestsQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
 	if err != nil {
@@ -348,7 +358,7 @@ func (h httpHandler) ciamHandlerSigninAnonym(w http.ResponseWriter, r *http.Requ
 		h.response(
 			w, []byte(`{"error":"internal error"}`),
 			httpHandlerError{
-				Msg:      "internal error",
+				Msg:      err.Error(),
 				Type:     errorCIAMSigninAnonym,
 				HTTPCode: http.StatusInternalServerError,
 			},
@@ -357,6 +367,8 @@ func (h httpHandler) ciamHandlerSigninAnonym(w http.ResponseWriter, r *http.Requ
 	}
 
 	o, err := tokens.Serialize()
+	// TODO(?): remove error handling at this level
+	// motivation: if CIAM generated tokens, their integrity is guaranteed
 	if err != nil {
 		h.response(
 			w, []byte(`{"error":"internal error"}`),
@@ -383,14 +395,4 @@ func (h httpHandler) ciamHandlerSigninUserConfirm(w http.ResponseWriter, r *http
 
 func (h httpHandler) ciamRefreshTokens(w http.ResponseWriter, r *http.Request) {
 	panic("todo: refresh logic")
-}
-
-func readAuthHeaderValue(header http.Header) string {
-	const authorizationHeaderName = "Authorization"
-	authHeader := header.Get(authorizationHeaderName)
-	if authHeader == "" {
-		authHeader = header.Get(strings.ToLower(authorizationHeaderName))
-	}
-	_, v, _ := strings.Cut(authHeader, "Bearer ")
-	return v
 }

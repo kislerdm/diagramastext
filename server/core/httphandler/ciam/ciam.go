@@ -292,3 +292,69 @@ func generateOnetimeSecret() string {
 	}
 	return string(b)
 }
+
+type MockCIAMClient struct {
+	Err                        error
+	UserID, Email, Fingerprint string
+	tokens                     Tokens
+}
+
+func (m *MockCIAMClient) Tokens() Tokens {
+	return m.tokens
+}
+
+func (m *MockCIAMClient) output() (Tokens, error) {
+	if m.Err != nil {
+		return Tokens{}, m.Err
+	}
+
+	userID := m.UserID
+	if userID == "" {
+		userID = utils.NewUUID()
+	}
+
+	emailVerified := false
+	if m.Email != "" {
+		emailVerified = true
+	}
+
+	iat := time.Now().UTC()
+
+	acc, _ := NewAccessToken(userID, emailVerified, WithCustomIat(iat))
+	ref, _ := NewRefreshToken(userID, WithCustomIat(iat))
+	id, _ := NewIDToken(userID, m.Email, m.Fingerprint, emailVerified, 0, WithCustomIat(iat))
+
+	m.tokens = Tokens{
+		id:      id,
+		refresh: ref,
+		access:  acc,
+	}
+
+	return m.Tokens(), nil
+}
+
+func (m *MockCIAMClient) SigninAnonym(_ context.Context, fingerprint string) (Tokens, error) {
+	return m.output()
+}
+
+func (m *MockCIAMClient) SigninUser(_ context.Context, _, _ string) (identityToken JWT, err error) {
+	t, err := m.output()
+	if err != nil {
+		return nil, err
+	}
+	return t.id, nil
+}
+
+func (m *MockCIAMClient) IssueTokensAfterSecretConfirmation(_ context.Context, _, _ string) (
+	Tokens, error,
+) {
+	return m.output()
+}
+
+func (m *MockCIAMClient) RefreshTokens(_ context.Context, _ string) (Tokens, error) {
+	return m.output()
+}
+
+func (m *MockCIAMClient) ValidateToken(_ context.Context, _ string) error {
+	return m.Err
+}
