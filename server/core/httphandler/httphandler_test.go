@@ -43,6 +43,28 @@ func (c *errCollector) Err(err error) {
 	c.V = err
 }
 
+func mustCIAMClientAndJWTandTokenStr(email string) (ciam.Client, ciam.JWT, string) {
+	ciamClient := &ciam.MockCIAMClient{
+		UserID:      "4fa6ecab-1029-42aa-bce7-99800d6eb630",
+		Email:       email,
+		Fingerprint: "",
+	}
+
+	_, err := ciamClient.RefreshTokens(context.TODO(), "")
+	if err != nil {
+		panic(err)
+	}
+	tkn, err := ciamClient.ParseAndValidateToken(context.TODO(), "")
+	if err != nil {
+		panic(err)
+	}
+	token, err := tkn.String()
+	if err != nil {
+		panic(err)
+	}
+	return ciamClient, tkn, token
+}
+
 func Test_httpHandler_ServeHTTPStatus(t *testing.T) {
 	type fields struct {
 		diagramRenderingHandler map[string]diagram.HTTPHandler
@@ -218,6 +240,8 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 		V:          []byte(`{"svg":"foo"}`),
 	}
 
+	ciamClient, _, token := mustCIAMClientAndJWTandTokenStr("foo@bar.baz")
+
 	type args struct {
 		w          http.ResponseWriter
 		path       string
@@ -236,7 +260,7 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 					Headers: http.Header{},
 				},
 				path:       "/internal/generate/c4",
-				authHeader: "foobar",
+				authHeader: "Bearer " + token,
 			},
 			errorsCollector: &errCollector{},
 		},
@@ -267,6 +291,7 @@ func Test_httpHandler_ServeHTTPDiagramRenderingHappyPath(t *testing.T) {
 						V: "c40bad11-0822-4d84-9f61-44b9a97b0432",
 					},
 					repositoryRequestsHistory: &diagram.MockRepositoryPrediction{},
+					ciam:                      ciamClient,
 				}
 				h.ServeHTTP(
 					tt.args.w, &http.Request{
@@ -793,6 +818,104 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 	}
 }
 
+func Test_httpHandler_authorizationWebclient(t *testing.T) {
+	type fields struct {
+		ciam ciam.Client
+	}
+	type args struct {
+		r    *http.Request
+		user *diagram.User
+	}
+
+	ciamClient, _, token := mustCIAMClientAndJWTandTokenStr("foo@bar.baz")
+	userID := ciamClient.(*ciam.MockCIAMClient).UserID
+
+	tests := []struct {
+		name     string
+		fields   fields
+		args     args
+		want     error
+		wantUser *diagram.User
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				ciam: ciamClient,
+			},
+			args: args{
+				r: &http.Request{
+					Header: httpHeaders(
+						map[string]string{
+							"Authorization": "Bearer " + token,
+						},
+					),
+				},
+				user: &diagram.User{},
+			},
+			want: nil,
+			wantUser: &diagram.User{
+				ID:           userID,
+				IsRegistered: true,
+			},
+		},
+		{
+			name: "unhappy path: no token",
+			args: args{
+				r:    &http.Request{},
+				user: &diagram.User{},
+			},
+			want: httpHandlerError{
+				Msg:      "no authorization token provided",
+				Type:     errorNotAuthorizedNoToken,
+				HTTPCode: http.StatusUnauthorized,
+			},
+			wantUser: &diagram.User{},
+		},
+		{
+			name: "unhappy path: invalid token",
+			fields: fields{
+				ciam: &ciam.MockCIAMClient{
+					Err: errors.New("foobar"),
+				},
+			},
+			args: args{
+				r: &http.Request{
+					Header: httpHeaders(
+						map[string]string{
+							"Authorization": "Bearer foobar",
+						},
+					),
+				},
+				user: &diagram.User{},
+			},
+			want: httpHandlerError{
+				Msg:      "invalid access token",
+				Type:     errorNotAuthorizedInvalidToken,
+				HTTPCode: http.StatusUnauthorized,
+			},
+			wantUser: &diagram.User{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				h := httpHandler{
+					ciam: tt.fields.ciam,
+				}
+
+				if got := h.authorizationWebclient(tt.args.r, tt.args.user); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("unexpected error message collected")
+					return
+				}
+
+				if !reflect.DeepEqual(tt.args.user, tt.wantUser) {
+					t.Errorf("unexpected user data fetched")
+				}
+			},
+		)
+	}
+}
+
 func Test_readAuthHeaderValue(t *testing.T) {
 	type args struct {
 		header http.Header
@@ -901,17 +1024,24 @@ func Test_httpHandler_HandlerNotFound(t *testing.T) {
 			// GIVEN
 			errs := &errCollector{}
 
+			ciamClient, _, token := mustCIAMClientAndJWTandTokenStr("foo@bar.baz")
+
 			handler := httpHandler{
 				reportErrorFn:             errs.Err,
 				repositoryAPITokens:       diagram.MockRepositoryToken{V: "bar"},
 				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
 				corsHeaders:               corsHeaders{},
+				ciam:                      ciamClient,
 			}
 
 			r := &http.Request{
 				Method: http.MethodGet,
 				URL:    &url.URL{Path: "/internal/foo/bar/qux/unknown"},
-				Header: httpHeaders(nil),
+				Header: httpHeaders(
+					map[string]string{
+						"Authorization": "Bearer " + token,
+					},
+				),
 			}
 
 			w := &mockWriter{
@@ -1393,11 +1523,10 @@ func Test_httpHandler_ciamHandlerSigninAnonym(t *testing.T) {
 			errorsCollector: &errCollector{},
 		},
 	}
+	t.Parallel()
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				t.Parallel()
-
 				h := httpHandler{
 					diagramRenderingHandler:   tt.fields.diagramRenderingHandler,
 					reportErrorFn:             tt.errorsCollector.Err,

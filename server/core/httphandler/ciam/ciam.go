@@ -26,8 +26,8 @@ type Client interface {
 	// RefreshTokens refreshes access token given the refresh token.
 	RefreshTokens(ctx context.Context, refreshToken string) (Tokens, error)
 
-	// ValidateToken validates JWT.
-	ValidateToken(ctx context.Context, token string) error
+	// ParseAndValidateToken validates JWT.
+	ParseAndValidateToken(ctx context.Context, token string) (JWT, error)
 }
 
 type Tokens struct {
@@ -240,16 +240,19 @@ func (c client) issueTokens(ctx context.Context, userID, email, fingerprint stri
 	}, nil
 }
 
-func (c client) ValidateToken(ctx context.Context, token string) error {
+func (c client) ParseAndValidateToken(ctx context.Context, token string) (JWT, error) {
 	t, err := ParseToken(token)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return t.Validate(
+	if err := t.Validate(
 		func(signingString, signature string) error {
 			return c.clientKMS.Verify(ctx, signingString, signature)
 		},
-	)
+	); err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 func (c client) RefreshTokens(ctx context.Context, refreshToken string) (Tokens, error) {
@@ -333,7 +336,7 @@ func (m *MockCIAMClient) output() (Tokens, error) {
 	return m.Tokens(), nil
 }
 
-func (m *MockCIAMClient) SigninAnonym(_ context.Context, fingerprint string) (Tokens, error) {
+func (m *MockCIAMClient) SigninAnonym(_ context.Context, _ string) (Tokens, error) {
 	return m.output()
 }
 
@@ -355,6 +358,10 @@ func (m *MockCIAMClient) RefreshTokens(_ context.Context, _ string) (Tokens, err
 	return m.output()
 }
 
-func (m *MockCIAMClient) ValidateToken(_ context.Context, _ string) error {
-	return m.Err
+func (m *MockCIAMClient) ParseAndValidateToken(_ context.Context, _ string) (JWT, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	// FIXME: make stateless method
+	return m.tokens.access, nil
 }

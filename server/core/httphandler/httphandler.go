@@ -134,9 +134,29 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-func (h httpHandler) authorizationWebclient(_ *http.Request, user *diagram.User) error {
-	user.ID = "00000000-0000-0000-0000-000000000000"
-	// TODO: add JWT authN
+func (h httpHandler) authorizationWebclient(r *http.Request, user *diagram.User) error {
+	authToken := readAuthHeaderValue(r.Header)
+
+	if authToken == "" {
+		return httpHandlerError{
+			Msg:      "no authorization token provided",
+			Type:     errorNotAuthorizedNoToken,
+			HTTPCode: http.StatusUnauthorized,
+		}
+	}
+
+	t, err := h.ciam.ParseAndValidateToken(r.Context(), authToken)
+	if err != nil {
+		return httpHandlerError{
+			Msg:      "invalid access token",
+			Type:     errorNotAuthorizedInvalidToken,
+			HTTPCode: http.StatusUnauthorized,
+		}
+	}
+
+	user.ID = t.UserID()
+	user.IsRegistered = t.UserRole().IsRegisteredUser()
+
 	return nil
 }
 
