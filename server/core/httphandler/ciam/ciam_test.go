@@ -773,11 +773,23 @@ func Test_client_ValidateToken(t *testing.T) {
 
 	const userID = "4fa6ecab-1029-42aa-bce7-99800d6eb630"
 
+	accessToken, err := NewAccessToken(
+		userID, true, WithSignature(
+			func(signingString string) (signature string, alg string, err error) {
+				return signingClient.Sign(context.TODO(), signingString)
+			},
+		),
+	)
+	if err != nil {
+		panic(err)
+	}
+
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
+		name      string
+		fields    fields
+		args      args
+		wantErr   bool
+		wantToken JWT
 	}{
 		{
 			name: "token valid",
@@ -785,18 +797,11 @@ func Test_client_ValidateToken(t *testing.T) {
 				clientKMS: signingClient,
 			},
 			args: args{
-				ctx: context.TODO(),
-				token: mustNewTokenStr(
-					NewAccessToken(
-						userID, true, WithSignature(
-							func(signingString string) (signature string, alg string, err error) {
-								return signingClient.Sign(context.TODO(), signingString)
-							},
-						),
-					),
-				),
+				ctx:   context.TODO(),
+				token: mustNewTokenStr(accessToken, nil),
 			},
-			wantErr: false,
+			wantErr:   false,
+			wantToken: accessToken,
 		},
 		{
 			name: "token invalid: signature",
@@ -804,10 +809,8 @@ func Test_client_ValidateToken(t *testing.T) {
 				clientKMS: signingClient,
 			},
 			args: args{
-				ctx: context.TODO(),
-				token: mustNewTokenStr(
-					NewAccessToken(userID, true),
-				),
+				ctx:   context.TODO(),
+				token: mustNewTokenStr(NewAccessToken(userID, true)),
 			},
 			wantErr: true,
 		},
@@ -831,8 +834,12 @@ func Test_client_ValidateToken(t *testing.T) {
 					clientKMS:        tt.fields.clientKMS,
 					clientEmail:      tt.fields.clientEmail,
 				}
-				if err := c.ValidateToken(tt.args.ctx, tt.args.token); (err != nil) != tt.wantErr {
-					t.Errorf("ValidateToken() error = %v, wantErr %v", err, tt.wantErr)
+				tkn, err := c.ParseAndValidateToken(tt.args.ctx, tt.args.token)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("ParseAndValidateToken() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if !reflect.DeepEqual(tkn, tt.wantToken) {
+					t.Error("ParseAndValidateToken() unexpected token result")
 				}
 			},
 		)

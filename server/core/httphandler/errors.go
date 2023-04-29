@@ -8,19 +8,20 @@ import (
 )
 
 const (
-	errorInvalidMethod          = "Request:InvalidMethod"
-	errorNotExists              = "Request:HandlerNotExists"
-	errorNotAuthorizedNoToken   = "Request:AccessDenied:NoAPIToken"
-	errorInvalidRequest         = "InputValidation:InvalidContent"
-	errorInvalidPrompt          = "InputValidation:InvalidPrompt"
-	errorCoreLogic              = "Core:DiagramRendering"
-	errorResponseSerialisation  = "Response:DiagramSerialisation"
-	errorRepositoryToken        = "DrivenInterface:RepositoryToken"
-	errorQuotaValidation        = "Quota:ValidationError"
-	errorQuotaExceeded          = "Quota:Excess"
-	errorQuotaFetching          = "Quota:ReadingError"
-	errorQuotaDataSerialization = "Quota:SerializationError"
-	errorCIAMSigninAnonym       = "CIAM:Signin:Anonym"
+	errorInvalidMethod             = "Request:InvalidMethod"
+	errorNotExists                 = "Request:HandlerNotExists"
+	errorNotAuthorizedNoToken      = "Request:AccessDenied:NoAPIToken"
+	errorNotAuthorizedInvalidToken = "Request:AccessDenied:InvalidToken"
+	errorInvalidRequest            = "InputValidation:InvalidContent"
+	errorInvalidPrompt             = "InputValidation:InvalidPrompt"
+	errorCoreLogic                 = "Core:DiagramRendering"
+	errorResponseSerialisation     = "Response:DiagramSerialisation"
+	errorRepositoryToken           = "DrivenInterface:RepositoryToken"
+	errorQuotaValidation           = "Quota:ValidationError"
+	errorQuotaExceeded             = "Quota:Excess"
+	errorQuotaFetching             = "Quota:ReadingError"
+	errorQuotaDataSerialization    = "Quota:SerializationError"
+	errorCIAMSigninAnonym          = "CIAM:Signin:Anonym"
 )
 
 func newResponseSerialisationError(err error) error {
