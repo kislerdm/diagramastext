@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/config"
 	"github.com/kislerdm/diagramastext/server/core/httphandler"
 	"github.com/kislerdm/diagramastext/server/core/pkg/gcpsecretsmanager"
@@ -22,6 +23,8 @@ import (
 var (
 	postgresClient *postgres.Client
 	handler        http.Handler
+	ciamKMSClient  ciam.TokenSigningClient
+	ciamSMTPClient ciam.SMTPClient
 )
 
 func init() {
@@ -64,6 +67,7 @@ func init() {
 			TableSuccessStatus: cfg.RepositoryPredictionConfig.TableSuccessStatus,
 			TableUsers:         cfg.RepositoryPredictionConfig.TableUsers,
 			TableTokens:        cfg.RepositoryPredictionConfig.TableAPITokens,
+			TableOneTimeSecret: cfg.CIAM.TableOneTimeSecret,
 			SSLMode:            cfg.RepositoryPredictionConfig.SSLMode,
 		},
 	)
@@ -77,6 +81,17 @@ func init() {
 			log.Fatal(err)
 		}
 	}
+
+	ciamKMSClient, err = ciam.NewTokenSigningClientEd25519(cfg.CIAM.PrivateKey, cfg.CIAM.PublicKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ciamSMTPClient = ciam.NewSMTClient(
+		cfg.CIAM.SmtpUser, cfg.CIAM.SmtpPassword, cfg.CIAM.SmtpHost, cfg.CIAM.SmtpPort, cfg.CIAM.SmtpSenderEmail,
+	)
+
+	ciamClient := ciam.NewClient(postgresClient, ciamKMSClient, ciamSMTPClient)
 
 	handler, err = httphandler.NewHTTPHandler(
 		modelInferenceClient,
@@ -93,6 +108,7 @@ func init() {
 		),
 		corsHeaders,
 		postgresClient,
+		ciamClient,
 	)
 	if err != nil {
 		log.Fatal(err)
