@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
-	"github.com/kislerdm/diagramastext/server/core/httphandler/ciam"
 )
 
 type mockWriter struct {

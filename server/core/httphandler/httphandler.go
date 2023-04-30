@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/diagram/c4container"
 	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
-	"github.com/kislerdm/diagramastext/server/core/httphandler/ciam"
 )
 
 // NewHTTPHandler initialises HTTP handler.
