@@ -20,7 +20,7 @@ func NewHTTPHandler(
 	httpClientDiagramRendering diagram.HTTPClient, corsHeaders map[string]string,
 	apiTokensRepository diagram.RepositoryToken,
 	// requirements for the CIAM handling logic
-	ciamClientRepository ciam.RepositoryCIAM, ciamClientKMS ciam.TokenSigningClient, ciamClientSMTP ciam.SMTPClient,
+	ciamClient ciam.Client,
 ) (http.Handler, error) {
 	var l = log.New(os.Stderr, "", log.Lmicroseconds|log.LUTC|log.Lshortfile)
 
@@ -41,7 +41,7 @@ func NewHTTPHandler(
 		// TODO: move handling logic for API tokens to the CIAM package
 		repositoryAPITokens:       apiTokensRepository,
 		repositoryRequestsHistory: clientRepositoryPrediction,
-		ciam:                      ciam.NewClient(ciamClientRepository, ciamClientKMS, ciamClientSMTP),
+		ciam:                      ciamClient,
 	}, nil
 }
 
