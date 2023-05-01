@@ -47,6 +47,8 @@ services:
       CORS_HEADERS: '{"Access-Control-Allow-Origin":"http://localhost:${PORT_CLIENT}","Access-Control-Allow-Methods":"POST,OPTIONS","Access-Control-Allow-Headers":"Content-Type,Authorization"}'
       PORT: 9000
       GOOGLE_APPLICATION_CREDENTIALS: '/key.json'
+      # set dev environment to generate CIAM crypto keys to sign and validate JWT
+      ENV: dev
     ports:
       - ${PORT_SERVER}:9000
     volumes:
