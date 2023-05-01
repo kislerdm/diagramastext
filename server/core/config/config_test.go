@@ -2,17 +2,29 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 )
 
+func mustSerialize(v interface{}) []byte {
+	o, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return o
+}
+
 func Test_loadDefaultConfig(t *testing.T) {
 	type args struct {
 		ctx                  context.Context
 		clientSecretsManager diagram.RepositorySecretsVault
 	}
+
+	keyPriv, keyPub := generateDevCertificateKeysPair()
+
 	tests := []struct {
 		name    string
 		args    args
@@ -24,13 +36,26 @@ func Test_loadDefaultConfig(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientSecretsManager: diagram.MockRepositorySecretsVault{
-					V: []byte(`{
-"db_host": "localhost",
-"db_name": "postgres",
-"db_user": "postgres",
-"db_password": "postgres",
-"model_api_key": "foobar"
-}`),
+					V: mustSerialize(
+						secret{
+							repositoryPredictionConfig: repositoryPredictionConfig{
+								DBHost:     "localhost",
+								DBName:     "postgres",
+								DBUser:     "postgres",
+								DBPassword: "postgres",
+							},
+							ciamConfigStore: ciamConfigStore{
+								PrivateKey:      keyPriv,
+								PublicKey:       keyPub,
+								SmtpUser:        "foo@bar.baz",
+								SmtpPassword:    "qux",
+								SmtpHost:        "smtphost",
+								SmtpPort:        "573",
+								SmtpSenderEmail: "support@bar.baz",
+							},
+							APIKey: "foobar",
+						},
+					),
 				},
 			},
 			envVars: map[string]string{
@@ -52,6 +77,16 @@ func Test_loadDefaultConfig(t *testing.T) {
 				ModelInferenceConfig: modelInferenceConfig{
 					Token: "foobar",
 				},
+				CIAM: ciamCfg{
+					TableOneTimeSecret: tableOneTimeSecret,
+					SmtpUser:           "foo@bar.baz",
+					SmtpPassword:       "qux",
+					SmtpHost:           "smtphost",
+					SmtpPort:           "573",
+					SmtpSenderEmail:    "support@bar.baz",
+					PrivateKey:         keyPriv,
+					PublicKey:          keyPub,
+				},
 			},
 		},
 		{
@@ -59,13 +94,26 @@ func Test_loadDefaultConfig(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientSecretsManager: diagram.MockRepositorySecretsVault{
-					V: []byte(`{
-"db_host": "localhost",
-"db_name": "postgres",
-"db_user": "postgres",
-"db_password": "postgres",
-"model_api_key": "foobar"
-}`),
+					V: mustSerialize(
+						secret{
+							repositoryPredictionConfig: repositoryPredictionConfig{
+								DBHost:     "localhost",
+								DBName:     "postgres",
+								DBUser:     "postgres",
+								DBPassword: "postgres",
+							},
+							ciamConfigStore: ciamConfigStore{
+								PrivateKey:      keyPriv,
+								PublicKey:       keyPub,
+								SmtpUser:        "foo@bar.baz",
+								SmtpPassword:    "qux",
+								SmtpHost:        "smtphost",
+								SmtpPort:        "573",
+								SmtpSenderEmail: "support@bar.baz",
+							},
+							APIKey: "foobar",
+						},
+					),
 				},
 			},
 			envVars: map[string]string{
@@ -81,7 +129,13 @@ func Test_loadDefaultConfig(t *testing.T) {
 				"TABLE_SUCCESS_STATUS":   "qux",
 				"TABLE_USERS":            "u",
 				"TABLE_API_TOKENS":       "t",
+				"TABLE_ONE_TIME_SECRET":  "s",
 				"SSL_MODE":               "disable",
+				"CIAM_SMTP_USER":         "r",
+				"CIAM_SMTP_PASSWORD":     "t",
+				"CIAM_SMTP_HOST":         "yy",
+				"CIAM_SMTP_PORT":         "44",
+				"CIAM_SMTP_SENDER_EMAIL": "dfdf",
 			},
 			want: &Config{
 				RepositoryPredictionConfig: repositoryPredictionConfig{
@@ -96,6 +150,16 @@ func Test_loadDefaultConfig(t *testing.T) {
 					TableAPITokens:     "t",
 					SSLMode:            "disable",
 				},
+				CIAM: ciamCfg{
+					TableOneTimeSecret: "s",
+					SmtpUser:           "foo@bar.baz",
+					SmtpPassword:       "qux",
+					SmtpHost:           "smtphost",
+					SmtpPort:           "573",
+					SmtpSenderEmail:    "support@bar.baz",
+					PrivateKey:         keyPriv,
+					PublicKey:          keyPub,
+				},
 				ModelInferenceConfig: modelInferenceConfig{
 					Token:     "foobar",
 					MaxTokens: 100,
@@ -108,17 +172,23 @@ func Test_loadDefaultConfig(t *testing.T) {
 				ctx: context.TODO(),
 			},
 			envVars: map[string]string{
-				"MODEL_API_KEY":        "foobar",
-				"MODEL_MAX_TOKENS":     "100",
-				"DB_HOST":              "localhost",
-				"DB_DBNAME":            "postgres",
-				"DB_USER":              "postgres",
-				"DB_PASSWORD":          "postgres",
-				"TABLE_PROMPT":         "foo",
-				"TABLE_PREDICTION":     "bar",
-				"TABLE_SUCCESS_STATUS": "qux",
-				"TABLE_USERS":          "u",
-				"TABLE_API_TOKENS":     "t",
+				"MODEL_API_KEY":          "foobar",
+				"MODEL_MAX_TOKENS":       "100",
+				"DB_HOST":                "localhost",
+				"DB_DBNAME":              "postgres",
+				"DB_USER":                "postgres",
+				"DB_PASSWORD":            "postgres",
+				"TABLE_PROMPT":           "foo",
+				"TABLE_PREDICTION":       "bar",
+				"TABLE_SUCCESS_STATUS":   "qux",
+				"TABLE_USERS":            "u",
+				"TABLE_ONE_TIME_SECRET":  "s",
+				"TABLE_API_TOKENS":       "t",
+				"CIAM_SMTP_USER":         "r",
+				"CIAM_SMTP_PASSWORD":     "t",
+				"CIAM_SMTP_HOST":         "yy",
+				"CIAM_SMTP_PORT":         "44",
+				"CIAM_SMTP_SENDER_EMAIL": "dfdf",
 			},
 			want: &Config{
 				RepositoryPredictionConfig: repositoryPredictionConfig{
@@ -136,6 +206,14 @@ func Test_loadDefaultConfig(t *testing.T) {
 				ModelInferenceConfig: modelInferenceConfig{
 					Token:     "foobar",
 					MaxTokens: 100,
+				},
+				CIAM: ciamCfg{
+					TableOneTimeSecret: "s",
+					SmtpUser:           "r",
+					SmtpPassword:       "t",
+					SmtpHost:           "yy",
+					SmtpPort:           "44",
+					SmtpSenderEmail:    "dfdf",
 				},
 			},
 		},
@@ -156,4 +234,33 @@ func Test_loadDefaultConfig(t *testing.T) {
 			},
 		)
 	}
+
+	t.Run(
+		"shall set CIAM keys if ENV envvar is set to 'dev'", func(t *testing.T) {
+			// GIVEN
+			t.Setenv("ENV", "dev")
+
+			// WHEN
+			got := LoadDefaultConfig(context.TODO(), nil)
+
+			// THEN
+			if got.CIAM.PublicKey == nil || got.CIAM.PrivateKey == nil {
+				t.Error("CIAM signing keys are not defined for dev environment")
+			}
+		},
+	)
+	t.Run(
+		"shall set CIAM keys if ENV envvar is set to 'development'", func(t *testing.T) {
+			// GIVEN
+			t.Setenv("ENV", "development")
+
+			// WHEN
+			got := LoadDefaultConfig(context.TODO(), nil)
+
+			// THEN
+			if got.CIAM.PublicKey == nil || got.CIAM.PrivateKey == nil {
+				t.Error("CIAM signing keys are not defined for dev environment")
+			}
+		},
+	)
 }
