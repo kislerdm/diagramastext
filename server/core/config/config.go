@@ -37,14 +37,14 @@ type repositoryPredictionConfig struct {
 }
 
 type ciamConfigStore struct {
-	PrivateKey         *string `json:"private_key"`
-	PublicKey          *string `json:"public_key"`
-	SmtpUser           string  `json:"smtp_user"`
-	SmtpPassword       string  `json:"smtp_password"`
-	SmtpHost           string  `json:"smtp_host"`
-	SmtpPort           string  `json:"smtp_port"`
-	SmtpSenderEmail    string  `json:"smtp_sender_email"`
-	TableOneTimeSecret string  `json:"table_one_time_secret"`
+	PrivateKey         []byte `json:"private_key"`
+	PublicKey          []byte `json:"public_key"`
+	SmtpUser           string `json:"smtp_user"`
+	SmtpPassword       string `json:"smtp_password"`
+	SmtpHost           string `json:"smtp_host"`
+	SmtpPort           string `json:"smtp_port"`
+	SmtpSenderEmail    string `json:"smtp_sender_email"`
+	TableOneTimeSecret string `json:"table_one_time_secret"`
 }
 
 type secret struct {
@@ -113,8 +113,8 @@ func loadFromSecretsManager(
 		cfg.RepositoryPredictionConfig.DBPassword = s.DBPassword
 
 		if s.PrivateKey != nil && s.PublicKey != nil {
-			cfg.CIAM.PrivateKey = []byte(*s.PrivateKey)
-			cfg.CIAM.PublicKey = []byte(*s.PublicKey)
+			cfg.CIAM.PrivateKey = s.PrivateKey
+			cfg.CIAM.PublicKey = s.PublicKey
 		}
 
 		cfg.CIAM.SmtpUser = s.SmtpUser
@@ -162,7 +162,7 @@ func loadEnvVarConfig(cfg *Config) {
 	}
 
 	if v := os.Getenv("ENV"); strings.HasPrefix(strings.ToLower(v), "dev") {
-		cfg.CIAM.PublicKey, cfg.CIAM.PrivateKey = generateDevCertificateKeysPair()
+		cfg.CIAM.PrivateKey, cfg.CIAM.PublicKey = generateDevCertificateKeysPair()
 	}
 
 	if v := os.Getenv("CIAM_SMTP_USER"); v != "" {
@@ -186,7 +186,7 @@ func loadEnvVarConfig(cfg *Config) {
 	}
 }
 
-func generateDevCertificateKeysPair() ([]byte, []byte) {
+func generateDevCertificateKeysPair() (keyPriv []byte, keyPub []byte) {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		panic(err)
