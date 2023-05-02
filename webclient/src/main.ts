@@ -32,8 +32,7 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
         };
 
     const user = new User();
-    const promptLengthLimit = definePromptLengthLimit(cfg, user);
-
+    const promptLengthLimit = new PromptLengthLimit(cfg.promptMinLength, user.quotas.prompt_length_max);
 
     mountPoint.innerHTML = `${Header}
 
@@ -205,19 +204,16 @@ export class PromptLengthLimit {
     }
 }
 
-function definePromptLengthLimit(cfg: Config, user: User): PromptLengthLimit {
-    if (user.is_registered()) {
-        return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserRegistered)
-    }
-    return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserBase)
-}
-
 export function Input(idTrigger: string,
                       idCounter: string,
                       promptLengthLimit: PromptLengthLimit,
                       placeholder: string): string {
-    function textAreaLengthMax(v: number): number {
+    function textAreaLengthMax(v: number | undefined | null): number {
         const multiplier = 1.2;
+        const defaultMax = 100;
+        if (v === undefined || v === null) {
+            return defaultMax;
+        }
         return Math.round(v * multiplier);
     }
 

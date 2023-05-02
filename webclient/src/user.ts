@@ -1,15 +1,85 @@
+import {getCookie, setCookie} from 'typescript-cookie';
+
 const defaultNA = "NA";
 
+type jwt_header = {
+    alg: string
+    typ: string
+}
+
+type user_quotas = {
+    prompt_length_max: number
+    rpm: number
+    rpd: number
+}
+
+type jwt_payload = {
+    email_verified: string
+    email: string
+    fingerprint: string
+    role: string
+    quotas: user_quotas
+    sub: string
+    iss: string
+    aud: string
+    iat: bigint
+    exp: bigint
+}
+
+type jwt = {
+    header: jwt_header
+    payload: jwt_payload
+    signature: string
+}
+
+type tokens = {
+    identity: jwt
+    access: jwt
+    refresh: jwt
+};
+
+type tokensCache = {
+    identity: string
+    access: string
+    refresh: string
+};
+
+
+function fromBase64(v: string): string {
+    return Buffer.from(v, "base64").toString('binary');
+}
+
 export class User {
+    _cookie_tokens_key = "tokens";
+    _cookie_tokens_exp_days = 7;
+
     private readonly _id: string
     private readonly _fingerprint: string
+    private readonly _tokens: tokens | undefined
+    readonly quotas: user_quotas
 
     constructor() {
+        this.quotas = {
+            prompt_length_max: 100,
+            rpm: 1,
+            rpd: 1,
+        };
+        this._id = defaultNA;
+
+        this._tokens = this.get_tokens_cache();
+        const acc = this._tokens?.access;
+        if (acc) {
+            this._id = acc.payload.sub;
+            this.quotas = acc.payload.quotas;
+        }
+
+        // TODO: add verification of the fingerprint
+        // if the current fingerprint does not match the one in token
+        // the CIAM shall be called to update the fingerprint and issue new tokens,
+        // or to create a new anonym user
         // @ts-ignore
         const userAgent = import.meta.env.DEV ? "NA" : navigator.userAgent;
-
         this._fingerprint = get_fingerprint(userAgent);
-        this._id = defaultNA;
     }
 
     is_registered() {
@@ -18,6 +88,29 @@ export class User {
 
     login() {
         throw Error("method mot implemented")
+    }
+
+    private get_tokens_cache(): tokens | undefined {
+        const s = getCookie(this._cookie_tokens_key);
+        if (s === undefined) {
+            return undefined;
+        }
+        const tkn: tokensCache = JSON.parse(s);
+        return {
+            access: JSON.parse(fromBase64(tkn.access)),
+            identity: JSON.parse(fromBase64(tkn.identity)),
+            refresh: JSON.parse(fromBase64(tkn.refresh)),
+        };
+    }
+
+    private set_tokens_cache(ciamReposponseTokens: string) {
+        setCookie(this._cookie_tokens_key, ciamReposponseTokens, {
+            expires: this._cookie_tokens_exp_days,
+            sameSite: "strict",
+            secure: true,
+            path: "/",
+            // TODO: add domain verification
+        });
     }
 }
 
