@@ -17,6 +17,7 @@ type JWT interface {
 	UserEmail() string
 	UserDeviceFingerprint() string
 	UserRole() Role
+	UserQuotas() Quotas
 }
 
 type OptFn func(JWT) error
@@ -75,11 +76,14 @@ func NewAccessToken(userID string, emailVerified bool, optFns ...OptFn) (JWT, er
 	if err != nil {
 		return nil, err
 	}
-	tmp := roleAnonymUser
+	tmpQuotas := QuotasAnonymUser
+	tmpRole := roleAnonymUser
 	if emailVerified {
-		tmp = roleRegisteredUser
+		tmpQuotas = QuotasRegisteredUser
+		tmpRole = roleRegisteredUser
 	}
-	o.payload.Role = &tmp
+	o.payload.Quotas = &tmpQuotas
+	o.payload.Role = &tmpRole
 	o.payload.Exp = o.payload.Iat + defaultExpirationDurationAccessSec
 	return o, nil
 }
@@ -124,11 +128,18 @@ type JWTHeader struct {
 	Typ string `json:"typ"`
 }
 
+type Quotas struct {
+	PromptLengthMax   uint16 `json:"prompt_length_max"`
+	RequestsPerMinute uint16 `json:"rpm"`
+	RequestsPerDay    uint16 `json:"rpd"`
+}
+
 type JWTPayload struct {
 	EmailVerified bool    `json:"email_verified,omitempty"`
 	Email         *string `json:"email,omitempty"`
 	Fingerprint   *string `json:"fingerprint,omitempty"`
 	Role          *Role   `json:"role,omitempty"`
+	Quotas        *Quotas `json:"quotas,omitempty"`
 	Sub           string  `json:"sub"`
 	Iss           string  `json:"iss"`
 	Aud           string  `json:"aud"`
@@ -162,6 +173,10 @@ func (t token) UserID() string {
 
 func (t token) UserRole() Role {
 	return *t.payload.Role
+}
+
+func (t token) UserQuotas() Quotas {
+	return *t.payload.Quotas
 }
 
 func (t token) String() (string, error) {

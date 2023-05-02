@@ -352,8 +352,9 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 	}
 
 	type args struct {
-		w http.ResponseWriter
-		r *http.Request
+		w    http.ResponseWriter
+		r    *http.Request
+		user *diagram.User
 	}
 	tests := []struct {
 		name            string
@@ -388,6 +389,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt":"foobar"}`)),
 				},
+				user: &diagram.User{Quotas: ciam.QuotasAnonymUser},
 			},
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
@@ -473,6 +475,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt":"a"}`)),
 				},
+				user: &diagram.User{Quotas: ciam.QuotasAnonymUser},
 			},
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
@@ -539,6 +542,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt":"foobar"}`)),
 				},
+				user: &diagram.User{Quotas: ciam.QuotasAnonymUser},
 			},
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
@@ -569,6 +573,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt": "foobar"}`)),
 				},
+				user: &diagram.User{Quotas: ciam.QuotasAnonymUser},
 			},
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
@@ -599,6 +604,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 					},
 					Body: io.NopCloser(strings.NewReader(`{"prompt": "foobar"}`)),
 				},
+				user: &diagram.User{Quotas: ciam.QuotasAnonymUser},
 			},
 			wantW: &mockWriter{
 				Headers:    httpHeaders(corsHeaders),
@@ -647,7 +653,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 					reportErrorFn:           tt.errorsCollector.Err,
 					corsHeaders:             tt.fields.corsHeaders,
 				}
-				h.diagramRendering(tt.args.w, tt.args.r, &diagram.User{})
+				h.diagramRendering(tt.args.w, tt.args.r, tt.args.user)
 
 				if tt.args.w.(*mockWriter).StatusCode != tt.wantW.(*mockWriter).StatusCode {
 					t.Errorf("unexpected response status code")
@@ -732,8 +738,9 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 			want: nil,
 			wantUser: &diagram.User{
 				ID:           "bar",
-				IsRegistered: true,
 				APIToken:     "foo",
+				IsRegistered: true,
+				Quotas:       ciam.QuotasRegisteredUser,
 			},
 		},
 		{
@@ -856,6 +863,7 @@ func Test_httpHandler_authorizationWebclient(t *testing.T) {
 			wantUser: &diagram.User{
 				ID:           userID,
 				IsRegistered: true,
+				Quotas:       ciam.QuotasRegisteredUser,
 			},
 		},
 		{
@@ -1228,9 +1236,9 @@ func Test_getQuotasUsage(t *testing.T) {
 	)
 }
 
-func repeatTimestamp(ts time.Time, nElements int) []time.Time {
+func repeatTimestamp(ts time.Time, nElements uint16) []time.Time {
 	o := make([]time.Time, nElements)
-	var i int
+	var i uint16
 	for i < nElements {
 		o[i] = ts
 		i++
@@ -1262,8 +1270,10 @@ func Test_httpHandler_checkQuota(t *testing.T) {
 				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
 			},
 			args: args{
-				r:    &http.Request{},
-				user: &diagram.User{},
+				r: &http.Request{},
+				user: &diagram.User{
+					Quotas: ciam.QuotasAnonymUser,
+				},
 			},
 			wantErr: nil,
 		},
@@ -1271,12 +1281,12 @@ func Test_httpHandler_checkQuota(t *testing.T) {
 			name: "shall yield quota excess",
 			fields: fields{
 				repositoryRequestsHistory: diagram.MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(time.Now().UTC(), 100),
+					Timestamps: repeatTimestamp(time.Now().UTC(), ciam.QuotasAnonymUser.RequestsPerDay),
 				},
 			},
 			args: args{
 				r:    &http.Request{},
-				user: &diagram.User{},
+				user: &diagram.User{Quotas: ciam.QuotasAnonymUser},
 			},
 			wantErr: httpHandlerError{
 				Msg:      "quota exceeded",
@@ -1288,12 +1298,12 @@ func Test_httpHandler_checkQuota(t *testing.T) {
 			name: "shall yield throttling error",
 			fields: fields{
 				repositoryRequestsHistory: diagram.MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(time.Now().UTC(), 5),
+					Timestamps: repeatTimestamp(time.Now().UTC(), ciam.QuotasAnonymUser.RequestsPerMinute),
 				},
 			},
 			args: args{
 				r:    &http.Request{},
-				user: &diagram.User{},
+				user: &diagram.User{Quotas: ciam.QuotasAnonymUser},
 			},
 			wantErr: httpHandlerError{
 				Msg:      "throttling quota exceeded",

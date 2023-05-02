@@ -122,8 +122,8 @@ func testSigninAnonymFlowUserDidNotExist(t *testing.T) {
 	if fingerprint != gotFingerprint || fingerprint != tokens.id.UserDeviceFingerprint() {
 		t.Errorf("user's fingerprint was set incorrectly")
 	}
-	if tokens.access.UserRole() != roleAnonymUser {
-		t.Errorf("user's role was set incorrectly")
+	if !reflect.DeepEqual(tokens.access.UserQuotas(), QuotasAnonymUser) {
+		t.Errorf("user's quotas were set incorrectly")
 	}
 	if tokens.id.UserEmail() != "" {
 		t.Errorf("user's email was set incorrectly")
@@ -178,8 +178,8 @@ func testSigninAnonymFlowUserExisted(t *testing.T) {
 	if fingerprint != tokens.id.UserDeviceFingerprint() {
 		t.Errorf("user's fingerprint was set incorrectly")
 	}
-	if tokens.access.UserRole() != roleAnonymUser {
-		t.Errorf("user's role was set incorrectly")
+	if !reflect.DeepEqual(tokens.access.UserQuotas(), QuotasAnonymUser) {
+		t.Errorf("user's quotas were set incorrectly")
 	}
 	if tokens.id.UserEmail() != "" {
 		t.Errorf("user's email was set incorrectly")
@@ -753,6 +753,10 @@ func Test_client_IssueTokensAfterSecretConfirmationHappyPath(t *testing.T) {
 	if found || secret.Secret == gotSecretStr {
 		t.Errorf("one-time secret was not removed from the repo")
 	}
+
+	if !reflect.DeepEqual(tokens.access.UserQuotas(), QuotasRegisteredUser) {
+		t.Errorf("user's quotas were set incorrectly")
+	}
 }
 
 func Test_client_ValidateToken(t *testing.T) {
@@ -1139,7 +1143,7 @@ func TestTokens_Serialize(t *testing.T) {
 					),
 				),
 			},
-			want:    []byte(`{"id":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZW1haWwiOiJiYXJAYmF6LnF1eHgiLCJmaW5nZXJwcmludCI6ImZvbyIsInN1YiI6IjRmYTZlY2FiLTEwMjktNDJhYS1iY2U3LTk5ODAwZDZlYjYzMCIsImlzcyI6Imh0dHBzOi8vY2lhbS5kaWFncmFtYXN0ZXh0LmRldiIsImF1ZCI6Imh0dHBzOi8vZGlhZ3JhbWFzdGV4dC5kZXYiLCJpYXQiOjAsImV4cCI6MzYwMH0.qux","refresh":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0ZmE2ZWNhYi0xMDI5LTQyYWEtYmNlNy05OTgwMGQ2ZWI2MzAiLCJpc3MiOiJodHRwczovL2NpYW0uZGlhZ3JhbWFzdGV4dC5kZXYiLCJhdWQiOiJodHRwczovL2RpYWdyYW1hc3RleHQuZGV2IiwiaWF0IjowLCJleHAiOjg2NDAwMDB9.qux","access":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoxLCJzdWIiOiI0ZmE2ZWNhYi0xMDI5LTQyYWEtYmNlNy05OTgwMGQ2ZWI2MzAiLCJpc3MiOiJodHRwczovL2NpYW0uZGlhZ3JhbWFzdGV4dC5kZXYiLCJhdWQiOiJodHRwczovL2RpYWdyYW1hc3RleHQuZGV2IiwiaWF0IjowLCJleHAiOjM2MDB9.qux"}`),
+			want:    []byte(`{"id":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZW1haWwiOiJiYXJAYmF6LnF1eHgiLCJmaW5nZXJwcmludCI6ImZvbyIsInN1YiI6IjRmYTZlY2FiLTEwMjktNDJhYS1iY2U3LTk5ODAwZDZlYjYzMCIsImlzcyI6Imh0dHBzOi8vY2lhbS5kaWFncmFtYXN0ZXh0LmRldiIsImF1ZCI6Imh0dHBzOi8vZGlhZ3JhbWFzdGV4dC5kZXYiLCJpYXQiOjAsImV4cCI6MzYwMH0.qux","refresh":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0ZmE2ZWNhYi0xMDI5LTQyYWEtYmNlNy05OTgwMGQ2ZWI2MzAiLCJpc3MiOiJodHRwczovL2NpYW0uZGlhZ3JhbWFzdGV4dC5kZXYiLCJhdWQiOiJodHRwczovL2RpYWdyYW1hc3RleHQuZGV2IiwiaWF0IjowLCJleHAiOjg2NDAwMDB9.qux","access":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoxLCJxdW90YXMiOnsicHJvbXB0X2xlbmd0aF9tYXgiOjMwMCwicnBtIjozLCJycGQiOjIwfSwic3ViIjoiNGZhNmVjYWItMTAyOS00MmFhLWJjZTctOTk4MDBkNmViNjMwIiwiaXNzIjoiaHR0cHM6Ly9jaWFtLmRpYWdyYW1hc3RleHQuZGV2IiwiYXVkIjoiaHR0cHM6Ly9kaWFncmFtYXN0ZXh0LmRldiIsImlhdCI6MCwiZXhwIjozNjAwfQ.qux"}`),
 			wantErr: false,
 		},
 	}

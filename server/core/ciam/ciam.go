@@ -207,7 +207,7 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 
 	_ = c.clientRepository.DeleteOneTimeSecret(ctx, t.UserID())
 
-	return c.issueTokens(ctx, t.UserID(), t.UserEmail(), t.UserDeviceFingerprint(), false)
+	return c.issueTokens(ctx, t.UserID(), t.UserEmail(), t.UserDeviceFingerprint(), true)
 }
 
 func (c client) issueTokens(ctx context.Context, userID, email, fingerprint string, emailVerified bool) (

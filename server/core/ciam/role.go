@@ -10,3 +10,16 @@ const (
 	roleAnonymUser Role = iota
 	roleRegisteredUser
 )
+
+var (
+	QuotasAnonymUser = Quotas{
+		PromptLengthMax:   100,
+		RequestsPerMinute: 1,
+		RequestsPerDay:    5,
+	}
+	QuotasRegisteredUser = Quotas{
+		PromptLengthMax:   300,
+		RequestsPerMinute: 3,
+		RequestsPerDay:    20,
+	}
+)

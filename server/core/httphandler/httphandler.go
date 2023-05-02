@@ -156,6 +156,7 @@ func (h httpHandler) authorizationWebclient(r *http.Request, user *diagram.User)
 
 	user.ID = t.UserID()
 	user.IsRegistered = t.UserRole().IsRegisteredUser()
+	user.Quotas = t.UserQuotas()
 
 	return nil
 }
@@ -188,6 +189,7 @@ func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error
 	user.ID = userID
 	user.IsRegistered = true
 	user.APIToken = authToken
+	user.Quotas = ciam.QuotasRegisteredUser
 
 	return h.checkQuota(r, user)
 }

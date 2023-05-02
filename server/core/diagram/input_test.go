@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/kislerdm/diagramastext/server/core/ciam"
 )
 
 func randomString(length int) string {
@@ -24,56 +26,47 @@ func Test_inquiry_Validate(t *testing.T) {
 		Prompt string
 		User   *User
 	}
+
+	const promptLengthMax = 100
+
 	tests := []struct {
 		name    string
 		fields  fields
 		wantErr bool
 	}{
 		{
-			name: "base user: happy path",
+			name: "happy path",
 			fields: fields{
-				Prompt: randomString(quotaBaseUserPromptLengthMax - 1),
-				User:   &User{},
+				Prompt: randomString(promptLengthMax - 1),
+				User: &User{
+					Quotas: ciam.Quotas{
+						PromptLengthMax: promptLengthMax,
+					},
+				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "base user: unhappy path - too long",
+			name: "unhappy path - too long",
 			fields: fields{
-				Prompt: randomString(quotaBaseUserPromptLengthMax + 1),
-				User:   &User{},
+				Prompt: randomString(promptLengthMax + 1),
+				User: &User{
+					Quotas: ciam.Quotas{
+						PromptLengthMax: promptLengthMax,
+					},
+				},
 			},
 			wantErr: true,
 		},
 		{
-			name: "base user: unhappy path - too short",
+			name: "unhappy path - too short",
 			fields: fields{
 				Prompt: randomString(promptLengthMin - 1),
-				User:   &User{},
-			},
-			wantErr: true,
-		},
-		{
-			name: "registered user: happy path",
-			fields: fields{
-				Prompt: randomString(quotaRegisteredUserPromptLengthMax - 1),
-				User:   &User{IsRegistered: true},
-			},
-			wantErr: false,
-		},
-		{
-			name: "registered user: unhappy path -  too long",
-			fields: fields{
-				Prompt: randomString(quotaRegisteredUserPromptLengthMax + 1),
-				User:   &User{IsRegistered: true},
-			},
-			wantErr: true,
-		},
-		{
-			name: "registered user: unhappy path -  too short",
-			fields: fields{
-				Prompt: randomString(promptLengthMin - 1),
-				User:   &User{IsRegistered: true},
+				User: &User{
+					Quotas: ciam.Quotas{
+						PromptLengthMax: promptLengthMax,
+					},
+				},
 			},
 			wantErr: true,
 		},
@@ -99,7 +92,9 @@ func TestNewInput(t *testing.T) {
 		user   *User
 	}
 
-	validPrompt := randomString(quotaBaseUserPromptLengthMax - 1)
+	const promptLengthMax = 100
+
+	validPrompt := randomString(promptLengthMax - 1)
 
 	tests := []struct {
 		name    string
@@ -111,11 +106,15 @@ func TestNewInput(t *testing.T) {
 			name: "happy path",
 			args: args{
 				prompt: validPrompt,
-				user:   &User{ID: "00000000-0000-0000-0000-000000000000", IsRegistered: false},
+				user: &User{
+					ID: "00000000-0000-0000-0000-000000000000", Quotas: ciam.Quotas{PromptLengthMax: promptLengthMax},
+				},
 			},
 			want: &inquiry{
 				Prompt: validPrompt,
-				User:   &User{ID: "00000000-0000-0000-0000-000000000000", IsRegistered: false},
+				User: &User{
+					ID: "00000000-0000-0000-0000-000000000000", Quotas: ciam.Quotas{PromptLengthMax: promptLengthMax},
+				},
 			},
 			wantErr: false,
 		},
@@ -123,7 +122,9 @@ func TestNewInput(t *testing.T) {
 			name: "unhappy path: invalid prompt",
 			args: args{
 				prompt: randomString(promptLengthMin - 1),
-				user:   &User{ID: "00000000-0000-0000-0000-000000000000", IsRegistered: false},
+				user: &User{
+					ID: "00000000-0000-0000-0000-000000000000", Quotas: ciam.Quotas{PromptLengthMax: promptLengthMax},
+				},
 			},
 			want:    nil,
 			wantErr: true,
@@ -231,6 +232,12 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 		clientRepository RepositoryPrediction
 		user             *User
 	}
+
+	const (
+		quotaRPMMax = 2
+		quotaRPDMax = 10
+	)
+
 	tests := []struct {
 		name              string
 		args              args
@@ -239,22 +246,16 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 		wantErr           bool
 	}{
 		{
-			name: "no request made so far: non registered",
+			name: "no request made so far",
 			args: args{
 				ctx:              context.TODO(),
 				clientRepository: MockRepositoryPrediction{},
-				user:             &User{},
-			},
-			wantThrottling:    false,
-			wantQuotaExceeded: false,
-			wantErr:           false,
-		},
-		{
-			name: "no request made so far: registered user",
-			args: args{
-				ctx:              context.TODO(),
-				clientRepository: MockRepositoryPrediction{},
-				user:             &User{IsRegistered: true},
+				user: &User{
+					Quotas: ciam.Quotas{
+						RequestsPerMinute: quotaRPMMax,
+						RequestsPerDay:    quotaRPDMax,
+					},
+				},
 			},
 			wantThrottling:    false,
 			wantQuotaExceeded: false,
@@ -265,9 +266,14 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(genNowMinute(), quotaRegisteredUserRPM),
+					Timestamps: repeatTimestamp(genNowMinute(), quotaRPMMax+1),
 				},
-				user: &User{IsRegistered: true},
+				user: &User{
+					Quotas: ciam.Quotas{
+						RequestsPerMinute: quotaRPMMax,
+						RequestsPerDay:    quotaRPDMax,
+					},
+				},
 			},
 			wantThrottling:    true,
 			wantQuotaExceeded: false,
@@ -278,9 +284,14 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(genNowDate(), quotaRegisteredUserRPD),
+					Timestamps: repeatTimestamp(genNowDate(), quotaRPDMax+1),
 				},
-				user: &User{IsRegistered: true},
+				user: &User{
+					Quotas: ciam.Quotas{
+						RequestsPerMinute: quotaRPMMax,
+						RequestsPerDay:    quotaRPDMax,
+					},
+				},
 			},
 			wantThrottling:    true,
 			wantQuotaExceeded: true,
@@ -293,7 +304,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 				clientRepository: MockRepositoryPrediction{
 					Err: errors.New("foo"),
 				},
-				user: &User{IsRegistered: true},
+				user: &User{},
 			},
 			wantThrottling:    false,
 			wantQuotaExceeded: false,
@@ -326,9 +337,9 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 	}
 }
 
-func repeatTimestamp(ts time.Time, nElements int) []time.Time {
+func repeatTimestamp(ts time.Time, nElements uint16) []time.Time {
 	o := make([]time.Time, nElements)
-	var i int
+	var i uint16
 	for i < nElements {
 		o[i] = ts
 		i++
@@ -397,119 +408,19 @@ func Test_sliceWithinWindow(t *testing.T) {
 
 var quotasController = newQuotaIssuer()
 
-func TestGetQuotaUsageBaseUser(t *testing.T) {
+func TestGetQuotaUsage(t *testing.T) {
 	type args struct {
 		ctx              context.Context
 		clientRepository RepositoryPrediction
 	}
-	user := &User{}
-	tests := []struct {
-		name    string
-		args    args
-		want    QuotasUsage
-		wantErr bool
-	}{
-		{
-			name: "no previous requests",
-			args: args{
-				ctx:              context.TODO(),
-				clientRepository: MockRepositoryPrediction{},
-			},
-			want:    quotasController.quotaUsage(user),
-			wantErr: false,
-		},
-		{
-			name: "a single requests",
-			args: args{
-				ctx: context.TODO(),
-				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(quotasController.minuteNow, 1),
-				},
-			},
-			want: QuotasUsage{
-				PromptLengthMax: quotaPromptLengthMax(user),
-				RateMinute: QuotaRequestsConsumption{
-					Limit: quotaBaseUserRPM,
-					Used:  1,
-					Reset: quotasController.minuteNext.Unix(),
-				},
-				RateDay: QuotaRequestsConsumption{
-					Limit: quotaBaseUserRPD,
-					Used:  1,
-					Reset: quotasController.dayNext.Unix(),
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "daily quota exceeded",
-			args: args{
-				ctx: context.TODO(),
-				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(quotasController.minuteNow, quotaBaseUserRPD),
-				},
-			},
-			want: QuotasUsage{
-				PromptLengthMax: quotaPromptLengthMax(user),
-				RateMinute: QuotaRequestsConsumption{
-					Limit: quotaBaseUserRPM,
-					Used:  quotaBaseUserRPM,
-					Reset: quotasController.dayNext.Unix(),
-				},
-				RateDay: QuotaRequestsConsumption{
-					Limit: quotaBaseUserRPD,
-					Used:  quotaBaseUserRPD,
-					Reset: quotasController.dayNext.Unix(),
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "throttling quota exceeded",
-			args: args{
-				ctx: context.TODO(),
-				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(quotasController.minuteNow, quotaBaseUserRPM),
-				},
-			},
-			want: QuotasUsage{
-				PromptLengthMax: quotaPromptLengthMax(user),
-				RateMinute: QuotaRequestsConsumption{
-					Limit: quotaBaseUserRPM,
-					Used:  quotaBaseUserRPM,
-					Reset: quotasController.minuteNext.Unix(),
-				},
-				RateDay: QuotaRequestsConsumption{
-					Limit: quotaBaseUserRPD,
-					Used:  quotaBaseUserRPM,
-					Reset: quotasController.dayNext.Unix(),
-				},
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(
-			tt.name, func(t *testing.T) {
-				got, err := GetQuotaUsage(tt.args.ctx, tt.args.clientRepository, user)
-				if (err != nil) != tt.wantErr {
-					t.Errorf("GetQuotaUsage() error = %v, wantErr %v", err, tt.wantErr)
-					return
-				}
-				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("GetQuotaUsage() got = %v, want %v", got, tt.want)
-				}
-			},
-		)
-	}
-}
 
-func TestGetQuotaUsageRegisteredUser(t *testing.T) {
-	type args struct {
-		ctx              context.Context
-		clientRepository RepositoryPrediction
+	user := &User{
+		Quotas: ciam.Quotas{
+			RequestsPerMinute: 1,
+			RequestsPerDay:    10,
+		},
 	}
-	user := &User{IsRegistered: true}
+
 	tests := []struct {
 		name    string
 		args    args
@@ -534,14 +445,14 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 				},
 			},
 			want: QuotasUsage{
-				PromptLengthMax: quotaPromptLengthMax(user),
+				PromptLengthMax: user.Quotas.PromptLengthMax,
 				RateMinute: QuotaRequestsConsumption{
-					Limit: quotaRegisteredUserRPM,
+					Limit: user.Quotas.RequestsPerMinute,
 					Used:  1,
 					Reset: quotasController.minuteNext.Unix(),
 				},
 				RateDay: QuotaRequestsConsumption{
-					Limit: quotaRegisteredUserRPD,
+					Limit: user.Quotas.RequestsPerDay,
 					Used:  1,
 					Reset: quotasController.dayNext.Unix(),
 				},
@@ -553,19 +464,19 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(quotasController.minuteNow, quotaRegisteredUserRPD),
+					Timestamps: repeatTimestamp(quotasController.minuteNow, user.Quotas.RequestsPerDay),
 				},
 			},
 			want: QuotasUsage{
-				PromptLengthMax: quotaPromptLengthMax(user),
+				PromptLengthMax: user.Quotas.PromptLengthMax,
 				RateMinute: QuotaRequestsConsumption{
-					Limit: quotaRegisteredUserRPM,
-					Used:  quotaRegisteredUserRPM,
+					Limit: user.Quotas.RequestsPerMinute,
+					Used:  user.Quotas.RequestsPerMinute,
 					Reset: quotasController.dayNext.Unix(),
 				},
 				RateDay: QuotaRequestsConsumption{
-					Limit: quotaRegisteredUserRPD,
-					Used:  quotaRegisteredUserRPD,
+					Limit: user.Quotas.RequestsPerDay,
+					Used:  user.Quotas.RequestsPerDay,
 					Reset: quotasController.dayNext.Unix(),
 				},
 			},
@@ -576,19 +487,19 @@ func TestGetQuotaUsageRegisteredUser(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				clientRepository: MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(quotasController.minuteNow, quotaRegisteredUserRPM),
+					Timestamps: repeatTimestamp(quotasController.minuteNow, user.Quotas.RequestsPerMinute),
 				},
 			},
 			want: QuotasUsage{
-				PromptLengthMax: quotaPromptLengthMax(user),
+				PromptLengthMax: user.Quotas.PromptLengthMax,
 				RateMinute: QuotaRequestsConsumption{
-					Limit: quotaRegisteredUserRPM,
-					Used:  quotaRegisteredUserRPM,
+					Limit: user.Quotas.RequestsPerMinute,
+					Used:  user.Quotas.RequestsPerMinute,
 					Reset: quotasController.minuteNext.Unix(),
 				},
 				RateDay: QuotaRequestsConsumption{
-					Limit: quotaRegisteredUserRPD,
-					Used:  quotaRegisteredUserRPM,
+					Limit: user.Quotas.RequestsPerDay,
+					Used:  user.Quotas.RequestsPerMinute,
 					Reset: quotasController.dayNext.Unix(),
 				},
 			},
