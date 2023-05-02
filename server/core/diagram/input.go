@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
@@ -14,6 +15,7 @@ type User struct {
 	ID           string
 	APIToken     string
 	IsRegistered bool
+	Quotas       ciam.Quotas
 }
 
 // Input defines the entrypoint interface.
@@ -53,20 +55,7 @@ type inquiry struct {
 	User      *User
 }
 
-const (
-	promptLengthMin = 3
-
-	// QUOTAS
-	// base user
-	quotaBaseUserPromptLengthMax = 100
-	quotaBaseUserRPM             = 2
-	quotaBaseUserRPD             = 10
-
-	// registered user
-	quotaRegisteredUserPromptLengthMax = 300
-	quotaRegisteredUserRPM             = 3
-	quotaRegisteredUserRPD             = 20
-)
+const promptLengthMin = 3
 
 func (v inquiry) GetPrompt() string {
 	return v.Prompt
@@ -81,24 +70,17 @@ func (v inquiry) GetUser() *User {
 }
 
 func (v inquiry) Validate() error {
+	max := int(v.GetUser().Quotas.PromptLengthMax)
+
 	prompt := strings.ReplaceAll(v.Prompt, "\n", "")
-	return validatePromptLength(prompt, quotaPromptLengthMax(v.GetUser()))
-}
 
-func quotaPromptLengthMax(user *User) int {
-	if user.IsRegistered {
-		return quotaRegisteredUserPromptLengthMax
-	}
-	return quotaBaseUserPromptLengthMax
-}
-
-func validatePromptLength(prompt string, max int) error {
 	if len(prompt) < promptLengthMin || len(prompt) > max {
 		return errors.New(
 			"prompt length must be between " + strconv.Itoa(promptLengthMin) + " and " +
 				strconv.Itoa(max) + " characters",
 		)
 	}
+
 	return nil
 }
 
@@ -118,36 +100,28 @@ func NewInput(prompt string, user *User) (Input, error) {
 }
 
 type QuotaRequestsConsumption struct {
-	Limit int   `json:"limit"`
-	Used  int   `json:"used"`
-	Reset int64 `json:"reset"`
+	Limit uint16 `json:"limit"`
+	Used  uint16 `json:"used"`
+	Reset int64  `json:"reset"`
 }
 
 func (v quotaIssuer) quotaRPM(user *User) QuotaRequestsConsumption {
-	o := QuotaRequestsConsumption{
-		Limit: quotaBaseUserRPM,
+	return QuotaRequestsConsumption{
+		Limit: user.Quotas.RequestsPerMinute,
 		Reset: v.minuteNext.Unix(),
 	}
-	if user.IsRegistered {
-		o.Limit = quotaRegisteredUserRPM
-	}
-	return o
 }
 
 func (v quotaIssuer) quotaRPD(user *User) QuotaRequestsConsumption {
-	o := QuotaRequestsConsumption{
-		Limit: quotaBaseUserRPD,
+	return QuotaRequestsConsumption{
+		Limit: user.Quotas.RequestsPerDay,
 		Reset: v.dayNext.Unix(),
 	}
-	if user.IsRegistered {
-		o.Limit = quotaRegisteredUserRPD
-	}
-	return o
 }
 
 func (v quotaIssuer) quotaUsage(user *User) QuotasUsage {
 	return QuotasUsage{
-		PromptLengthMax: quotaPromptLengthMax(user),
+		PromptLengthMax: user.Quotas.PromptLengthMax,
 		RateMinute:      v.quotaRPM(user),
 		RateDay:         v.quotaRPD(user),
 	}
@@ -204,7 +178,7 @@ func ValidateRequestsQuotaUsage(ctx context.Context, clientRepository Repository
 }
 
 type QuotasUsage struct {
-	PromptLengthMax int                      `json:"prompt_length_max"`
+	PromptLengthMax uint16                   `json:"prompt_length_max"`
 	RateMinute      QuotaRequestsConsumption `json:"rate_minute"`
 	RateDay         QuotaRequestsConsumption `json:"rate_day"`
 }
@@ -235,10 +209,10 @@ func GetQuotaUsage(ctx context.Context, clientRepository RepositoryPrediction, u
 	}
 
 	requestsDaily := sliceWithinWindow(requestsTimestamps, quotasController.dayNow, quotasController.dayNext)
-	quotas.RateDay.Used = len(requestsDaily)
+	quotas.RateDay.Used = uint16(len(requestsDaily))
 
 	requestsMinute := sliceWithinWindow(requestsTimestamps, quotasController.minuteNow, quotasController.minuteNext)
-	quotas.RateMinute.Used = len(requestsMinute)
+	quotas.RateMinute.Used = uint16(len(requestsMinute))
 
 	// by transitivity, the RPM/throttling quota is exceeded if the daily quota is exceeded
 	if quotas.RateDay.Used >= quotas.RateDay.Limit {
