@@ -1,76 +1,177 @@
-import {getCookie, setCookie} from 'typescript-cookie';
+import {getCookie, setCookie} from "typescript-cookie";
 
 const defaultNA = "NA";
 
 type jwt_header = {
-    alg: string
-    typ: string
+    alg: string;
+    typ: string;
 }
 
 type user_quotas = {
-    prompt_length_max: number
-    rpm: number
-    rpd: number
+    prompt_length_max: number;
+    rpm: number;
+    rpd: number;
 }
 
 type jwt_payload = {
-    email_verified: string
-    email: string
-    fingerprint: string
-    role: string
-    quotas: user_quotas
-    sub: string
-    iss: string
-    aud: string
-    iat: bigint
-    exp: bigint
+    email_verified: string;
+    email: string;
+    fingerprint: string;
+    role: string;
+    quotas: user_quotas;
+    sub: string;
+    iss: string;
+    aud: string;
+    iat: bigint;
+    exp: bigint;
 }
 
-type jwt = {
-    header: jwt_header
-    payload: jwt_payload
-    signature: string
+class JWT {
+    protected _default_aud: string = "https://diagramastext.dev";
+    protected _default_iss: string = "https://ciam.diagramastext.dev";
+
+    private readonly header: jwt_header;
+    private readonly payload: jwt_payload;
+    private readonly signature: string = "";
+
+    constructor(v: string) {
+        const el = v.split(".");
+
+        if (el.length < 2) {
+            throw new Error("invalid JWT")
+        }
+
+        this.header = JSON.parse(fromBase64(el[0]));
+        this.payload = JSON.parse(fromBase64(el[1]));
+
+        if (el.length < 3) {
+            this.signature = el[3];
+        }
+
+        this._validate()
+    }
+
+    isExpired(): boolean {
+        const nowSec = Date.now() / 1000;
+        return this.payload.exp < nowSec || this.payload.exp <= this.payload.iat;
+    }
+
+    serialize(): string {
+        let o = `${toBase64(JSON.stringify(this.header))}.${toBase64(JSON.stringify(this.payload))}`;
+        if (this.signature !== "") {
+            o += `.${this.signature}`
+        }
+        return o;
+    }
+
+    getQuotas(): user_quotas | undefined {
+        return this.payload.quotas;
+    }
+
+    getFingerprint(): string {
+        return this.payload.fingerprint;
+    }
+
+    getEmail(): string {
+        return this.payload.email;
+    }
+
+    getSub(): string {
+        return this.payload.sub;
+    }
+
+    private _validate() {
+        if (this.header.alg !== "none" && this.signature === "") {
+            throw new Error("invalid JWT: no signature found")
+        }
+        if (this.payload.aud !== this._default_aud) {
+            throw new Error("invalid JWT: faulty aud")
+        }
+        if (this.payload.iss !== this._default_iss) {
+            throw new Error("invalid JWT: faulty iss")
+        }
+    }
 }
 
-type tokens = {
-    identity: jwt
-    access: jwt
-    refresh: jwt
+class Tokens {
+    identity: JWT;
+    access: JWT | null;
+    refresh: JWT | null;
+
+    constructor(rawTokensStr: string) {
+        const tkn: rawTokens = JSON.parse(rawTokensStr);
+
+        try {
+            this.identity = new JWT(tkn.identity);
+        } catch (e) {
+            // @ts-ignore
+            throw new Error(`identity token: ${e.message}`)
+        }
+
+        try {
+            this.access = this._parseToken(tkn.access);
+        } catch (e) {
+            // @ts-ignore
+            throw new Error(`access token: ${e.message}`)
+        }
+
+        try {
+            this.refresh = this._parseToken(tkn.refresh);
+        } catch (e) {
+            // @ts-ignore
+            throw new Error(`refresh token: ${e.message}`)
+        }
+    }
+
+    private _parseToken(v: string): JWT | null {
+        if (v !== "" && v !== null && v !== undefined) {
+            return new JWT(v);
+        }
+        return null;
+    }
+}
+
+type rawTokens = {
+    identity: string;
+    access: string;
+    refresh: string;
 };
 
-type tokensCache = {
-    identity: string
-    access: string
-    refresh: string
-};
+export function fromBase64(v: string): string {
+    return Buffer.from(v, "base64").toString("binary");
+}
 
-
-function fromBase64(v: string): string {
-    return Buffer.from(v, "base64").toString('binary');
+function toBase64(v: string): string {
+    return Buffer.from(v, "base64").toString("binary");
 }
 
 export class User {
     _cookie_tokens_key = "tokens";
     _cookie_tokens_exp_days = 7;
 
-    private readonly _id: string
-    private readonly _fingerprint: string
-    private readonly _tokens: tokens | undefined
-    readonly quotas: user_quotas
+    private readonly _fingerprint: string;
+    protected _tokens: Tokens | undefined;
+    readonly quotas: user_quotas;
+
+    email: string = "";
 
     constructor() {
-        this.quotas = {
-            prompt_length_max: 100,
-            rpm: 1,
-            rpd: 1,
-        };
-        this._id = defaultNA;
+        const s = getCookie(this._cookie_tokens_key);
+        if (s !== undefined) {
+            this._tokens = new Tokens(s);
+            if (this._tokens.access?.isExpired()) {
+                this.refreshTokens()
+            }
+        }
 
-        this._tokens = this.get_tokens_cache();
-        const acc = this._tokens?.access;
-        if (acc) {
-            this._id = acc.payload.sub;
-            this.quotas = acc.payload.quotas;
+        this.quotas = this._tokens?.access?.getQuotas()!;
+
+        if (this.quotas === undefined) {
+            this.quotas = {
+                prompt_length_max: 100,
+                rpm: 1,
+                rpd: 1,
+            };
         }
 
         // TODO: add verification of the fingerprint
@@ -82,29 +183,39 @@ export class User {
         this._fingerprint = get_fingerprint(userAgent);
     }
 
-    is_registered() {
-        return this._id !== defaultNA;
+    isAuth(): boolean {
+        return this._tokens !== undefined;
     }
 
-    login() {
+    // Implements the logic to signin anonym user.
+    signInAnonym() {
         throw Error("method mot implemented")
     }
 
-    private get_tokens_cache(): tokens | undefined {
-        const s = getCookie(this._cookie_tokens_key);
-        if (s === undefined) {
-            return undefined;
-        }
-        const tkn: tokensCache = JSON.parse(s);
-        return {
-            access: JSON.parse(fromBase64(tkn.access)),
-            identity: JSON.parse(fromBase64(tkn.identity)),
-            refresh: JSON.parse(fromBase64(tkn.refresh)),
-        };
+    // Implements the logic to initialise user registration.
+    registerInit(email: string) {
+        throw Error("method mot implemented")
     }
 
-    private set_tokens_cache(ciamReposponseTokens: string) {
-        setCookie(this._cookie_tokens_key, ciamReposponseTokens, {
+    // Implements the logic to confirm user registration.
+    registerConfirm(secret_code: string) {
+        throw Error("method mot implemented");
+    }
+
+    private refreshTokens() {
+        throw Error("method mot implemented");
+    }
+
+    isRegistered(): boolean {
+        return this._tokens?.identity.getEmail() !== "";
+    }
+
+    getId(): string {
+        return this._tokens?.identity.getSub()!;
+    }
+
+    private setTokensCache(ciamResponseTokens: string) {
+        setCookie(this._cookie_tokens_key, ciamResponseTokens, {
             expires: this._cookie_tokens_exp_days,
             sameSite: "strict",
             secure: true,
