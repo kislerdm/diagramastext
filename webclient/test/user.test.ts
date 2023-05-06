@@ -1,6 +1,6 @@
-import { test, assert } from 'vitest'
+import {assert, test, it} from 'vitest'
 
-import {get_fingerprint} from './../src/user';
+import {fromBase64, get_fingerprint} from './../src/user';
 
 test('fingerprint: happy path', () => {
     // GIVEN
@@ -21,5 +21,21 @@ test('fingerprint: User-Agen unknown', () => {
     const got = get_fingerprint(userAgent);
 
     // THEN
-    assert.equal(want, got, "unexpected result.")
+    assert.equal(got, want, "unexpected result.")
+})
+
+test('fromBase64', () => {
+    it('shall yield a JSON string', () => {
+        //GIVEN
+        const s = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0";
+        const want = JSON.stringify({
+            "alg": "none",
+            "typ": "JWT",
+        })
+
+        //WHEN
+        const got = fromBase64(s);
+        //THEN
+        assert.equal(got, want)
+    })
 })
