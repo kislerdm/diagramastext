@@ -1,6 +1,6 @@
 import {assert, test, it} from 'vitest'
 
-import {fromBase64, get_fingerprint} from './../src/user';
+import {fromBase64, get_fingerprint} from '@/ciam';
 
 test('fingerprint: happy path', () => {
     // GIVEN

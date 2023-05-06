@@ -6,7 +6,7 @@ import Header from "./components/header";
 import {Loader, Popup} from "./components/popup";
 
 import {Config, IsResponseError, IsResponseSVG} from "./ports";
-import {User} from "./user";
+import {CIAMClient} from "./ciam";
 
 // @ts-ignore
 import placeholderOutputSVG from "./components/svg/output-placeholder.svg?raw";
@@ -31,7 +31,7 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
             InputLengthCounter: "3"
         };
 
-    const user = new User();
+    const user = new CIAMClient(cfg.urlAPI);
     const promptLengthLimit = new PromptLengthLimit(cfg.promptMinLength, user.quotas.prompt_length_max);
 
     mountPoint.innerHTML = `${Header}
