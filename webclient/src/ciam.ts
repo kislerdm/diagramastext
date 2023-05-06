@@ -145,9 +145,10 @@ function toBase64(v: string): string {
     return Buffer.from(v, "base64").toString("binary");
 }
 
-export class User {
+export class CIAMClient {
     _cookie_tokens_key = "tokens";
     _cookie_tokens_exp_days = 7;
+    private readonly _ciam_base_url: string;
 
     private readonly _fingerprint: string;
     protected _tokens: Tokens | undefined;
@@ -155,7 +156,9 @@ export class User {
 
     email: string = "";
 
-    constructor() {
+    constructor(ciam_base_url: string) {
+        this._ciam_base_url = ciam_base_url;
+
         const s = getCookie(this._cookie_tokens_key);
         if (s !== undefined) {
             this._tokens = new Tokens(s);
