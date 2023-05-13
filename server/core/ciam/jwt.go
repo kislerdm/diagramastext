@@ -21,8 +21,8 @@ type JWT interface {
 }
 
 type OptFn func(JWT) error
-type SigningFn func(signingString string) (signature string, alg string, err error)
-type SignatureVerificationFn func(signingString, signature string) error
+type SigningFn func(signingString string) (signature []byte, alg string, err error)
+type SignatureVerificationFn func(signingString string, signature []byte) error
 
 func WithCustomIat(iat time.Time) OptFn {
 	return func(jwt JWT) error {
@@ -31,18 +31,21 @@ func WithCustomIat(iat time.Time) OptFn {
 	}
 }
 
-func WithSignature(signFn SigningFn) OptFn {
-	return func(jwt JWT) (err error) {
-		if signFn == nil {
-			return errors.New("signing function must be provided")
-		}
-		signingString, err := jwt.(*token).signingString()
-		if err != nil {
-			return
-		}
-		jwt.(*token).signature, jwt.(*token).header.Alg, err = signFn(signingString)
-		return
+// Sign signs the token. If nil signing function provided, JWT signature will be removed, and the 'alg' set to 'none'.
+func Sign(jwt JWT, signFn SigningFn) (JWT, error) {
+	if signFn == nil {
+		jwt.(*token).signature = nil
+		jwt.(*token).header.Alg = algNone
+		return jwt, nil
 	}
+
+	signingString, err := jwt.(*token).signingString()
+	if err != nil {
+		return nil, err
+	}
+
+	jwt.(*token).signature, jwt.(*token).header.Alg, err = signFn(signingString)
+	return jwt, nil
 }
 
 func NewIDToken(userID, email, fingerprint string, emailVerified bool, durationSec int64, optFns ...OptFn) (
@@ -150,7 +153,7 @@ type JWTPayload struct {
 type token struct {
 	header    JWTHeader
 	payload   JWTPayload
-	signature string
+	signature []byte
 }
 
 func (t token) UserEmail() string {
@@ -185,7 +188,7 @@ func (t token) String() (string, error) {
 		return "", err
 	}
 
-	switch t.signature == "" {
+	switch t.signature == nil {
 	case true:
 		if t.header.Alg != algNone {
 			return "", errors.New("signature is missing")
@@ -195,7 +198,7 @@ func (t token) String() (string, error) {
 		if t.header.Alg == algNone || t.header.Alg == "" {
 			return "", errors.New("JWT header corrupt: alg value")
 		}
-		return signingString + "." + t.signature, nil
+		return signingString + "." + encodeSegment(t.signature), nil
 	}
 }
 
@@ -222,7 +225,7 @@ func (t token) signingString() (string, error) {
 }
 
 func (t token) verifySignature(verificationFn SignatureVerificationFn) error {
-	if (t.header.Alg != algNone && verificationFn == nil) || (t.header.Alg == algNone && t.signature != "") {
+	if (t.header.Alg != algNone && verificationFn == nil) || (t.header.Alg == algNone && t.signature != nil) {
 		return errors.New("corrupt JWT: alg does not match the signature")
 	}
 	signingString, err := t.signingString()
@@ -263,7 +266,10 @@ func ParseToken(s string) (JWT, error) {
 	}
 
 	if len(elements) == 3 {
-		o.signature = elements[2]
+		o.signature, err = decodeSegment(elements[2])
+		if err != nil {
+			return nil, errors.New("wrong JWT signature format")
+		}
 	}
 
 	return &o, nil

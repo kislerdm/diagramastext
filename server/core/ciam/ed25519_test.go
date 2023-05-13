@@ -93,7 +93,7 @@ func TestTracingSignAndVerify(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			const signingString = "foo"
+			const signingString = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoxLCJxdW90YXMiOnsicHJvbXB0X2xlbmd0aF9tYXgiOjMwMCwicnBtIjozLCJycGQiOjIwfSwic3ViIjoiNGZhNmVjYWItMTAyOS00MmFhLWJjZTctOTk4MDBkNmViNjMwIiwiaXNzIjoiaHR0cHM6Ly9jaWFtLmRpYWdyYW1hc3RleHQuZGV2IiwiYXVkIjoiaHR0cHM6Ly9kaWFncmFtYXN0ZXh0LmRldiIsImlhdCI6MCwiZXhwIjozNjAwfQ"
 
 			// WHEN
 			signature, alg, err := clientSign.Sign(context.TODO(), signingString)

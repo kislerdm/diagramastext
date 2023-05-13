@@ -3,6 +3,7 @@ package ciam
 import (
 	"context"
 	"errors"
+	"reflect"
 	"time"
 )
 
@@ -168,33 +169,33 @@ func (m *MockRepositoryCIAM) DeleteOneTimeSecret(_ context.Context, userID strin
 // TokenSigningClient defines the communication port to the token's signing entity.
 type TokenSigningClient interface {
 	// Verify verifies the token.
-	Verify(ctx context.Context, signingString, signature string) error
+	Verify(ctx context.Context, signingString string, signature []byte) error
 
 	// Sign signs the token.
-	Sign(ctx context.Context, signingString string) (signature string, alg string, err error)
+	Sign(ctx context.Context, signingString string) (signature []byte, alg string, err error)
 }
 
 type MockTokenSigningClient struct {
 	Alg       string
-	Signature string
+	Signature []byte
 	Err       error
 }
 
-func (m MockTokenSigningClient) Verify(_ context.Context, _, signature string) error {
+func (m MockTokenSigningClient) Verify(_ context.Context, _ string, signature []byte) error {
 	if m.Err != nil {
 		return m.Err
 	}
-	if signature != m.Signature {
+	if !reflect.DeepEqual(signature, m.Signature) {
 		return errors.New("invalid signature")
 	}
 	return nil
 }
 
 func (m MockTokenSigningClient) Sign(_ context.Context, _ string) (
-	signature string, alg string, err error,
+	signature []byte, alg string, err error,
 ) {
 	if m.Err != nil {
-		return "", "", m.Err
+		return nil, m.Alg, m.Err
 	}
 	return m.Signature, m.Alg, nil
 }

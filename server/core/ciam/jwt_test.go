@@ -11,7 +11,7 @@ func Test_token_String(t *testing.T) {
 	type fields struct {
 		header    JWTHeader
 		payload   JWTPayload
-		signature string
+		signature []byte
 	}
 	tests := []struct {
 		name    string
@@ -29,9 +29,9 @@ func Test_token_String(t *testing.T) {
 				payload: JWTPayload{
 					Sub: "bar",
 				},
-				signature: "qux",
+				signature: []byte("qux"),
 			},
-			want:    "eyJhbGciOiJmb28iLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJiYXIiLCJpc3MiOiIiLCJhdWQiOiIiLCJpYXQiOjAsImV4cCI6MH0.qux",
+			want:    "eyJhbGciOiJmb28iLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJiYXIiLCJpc3MiOiIiLCJhdWQiOiIiLCJpYXQiOjAsImV4cCI6MH0.cXV4",
 			wantErr: nil,
 		},
 		{
@@ -70,7 +70,7 @@ func Test_token_String(t *testing.T) {
 				payload: JWTPayload{
 					Sub: "foo",
 				},
-				signature: "bar",
+				signature: []byte("bar"),
 			},
 			wantErr: errors.New("JWT header corrupt: alg value"),
 		},
@@ -84,7 +84,7 @@ func Test_token_String(t *testing.T) {
 				payload: JWTPayload{
 					Sub: "foo",
 				},
-				signature: "bar",
+				signature: []byte("bar"),
 			},
 			wantErr: errors.New("JWT header corrupt: alg value"),
 		},
@@ -114,7 +114,7 @@ func Test_token_isExpired(t1 *testing.T) {
 	type fields struct {
 		header    JWTHeader
 		payload   JWTPayload
-		signature string
+		signature []byte
 	}
 	tests := []struct {
 		name   string
@@ -172,7 +172,7 @@ func Test_token_verifySignature(t *testing.T) {
 	type fields struct {
 		header    JWTHeader
 		payload   JWTPayload
-		signature string
+		signature []byte
 	}
 	type args struct {
 		verificationFn SignatureVerificationFn
@@ -190,7 +190,7 @@ func Test_token_verifySignature(t *testing.T) {
 					Alg: "foo",
 					Typ: typ,
 				},
-				signature: "bar",
+				signature: []byte("bar"),
 			},
 			args:    args{},
 			wantErr: errors.New("corrupt JWT: alg does not match the signature"),
@@ -202,7 +202,7 @@ func Test_token_verifySignature(t *testing.T) {
 					Alg: algNone,
 					Typ: typ,
 				},
-				signature: "bar",
+				signature: []byte("bar"),
 			},
 			args:    args{},
 			wantErr: errors.New("corrupt JWT: alg does not match the signature"),
@@ -214,10 +214,10 @@ func Test_token_verifySignature(t *testing.T) {
 					Alg: "foo",
 					Typ: typ,
 				},
-				signature: "bar",
+				signature: []byte("bar"),
 			},
 			args: args{
-				verificationFn: func(signingString, signature string) error {
+				verificationFn: func(signingString string, signature []byte) error {
 					return errors.New("foobar")
 				},
 			},
