@@ -141,8 +141,8 @@ export function fromBase64(v: string): string {
     return Buffer.from(v, "base64").toString("binary");
 }
 
-function toBase64(v: string): string {
-    return Buffer.from(v, "base64").toString("binary");
+export function toBase64(v: string): string {
+    return Buffer.from(v, "binary").toString("base64url");
 }
 
 export class CIAMClient {
