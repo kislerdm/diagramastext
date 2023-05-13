@@ -45,7 +45,7 @@ func validateToken(t *testing.T, tkn JWT, tokenTyp string, clientSign TokenSigni
 
 	if clientSign != nil {
 		if err := tkn.Validate(
-			func(signingString, signature string) error {
+			func(signingString string, signature []byte) error {
 				return clientSign.Verify(context.TODO(), signingString, signature)
 			},
 		); err != nil {
@@ -73,7 +73,7 @@ func testSigninAnonymFlowUserDidNotExist(t *testing.T) {
 	const fingerprint = "foo"
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	repoClient := &MockRepositoryCIAM{}
@@ -135,7 +135,7 @@ func testSigninAnonymFlowUserExisted(t *testing.T) {
 	const fingerprint = "foo"
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	u := &User{
@@ -191,7 +191,7 @@ func testSigninAnonymFlowUserDeactivated(t *testing.T) {
 	const fingerprint = "foo"
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	u := &User{
@@ -298,7 +298,7 @@ func testSigninUserFlowUserDidNotExist(t *testing.T) {
 	)
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	repoClient := &MockRepositoryCIAM{}
@@ -367,7 +367,7 @@ func testSigninUserFlowDeactivatedUserExisted(t *testing.T) {
 	)
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	u := &User{
@@ -434,7 +434,7 @@ func testSigninUserFlowActiveUserExisted(t *testing.T) {
 	)
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	u := &User{
@@ -504,7 +504,7 @@ func testSigninUserFlowUserExistedValidSecretExisted(t *testing.T) {
 	)
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	u := &User{
@@ -580,7 +580,7 @@ func testSigninUserFlowUserExistedExpiredSecretExisted(t *testing.T) {
 	)
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	u := &User{
@@ -656,7 +656,7 @@ func Test_client_IssueTokensAfterSecretConfirmationHappyPath(t *testing.T) {
 	)
 	tokenSignClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	u := &User{
@@ -667,17 +667,20 @@ func Test_client_IssueTokensAfterSecretConfirmationHappyPath(t *testing.T) {
 
 	iat := time.Now().UTC()
 
-	tID, err := NewIDToken(
-		u.ID, u.Email, u.Fingerprint, u.EmailVerified, 0,
-		WithCustomIat(iat), WithSignature(
-			func(signingString string) (signature string, alg string, err error) {
-				return tokenSignClient.Sign(context.TODO(), signingString)
-			},
-		),
+	tID, err := NewIDToken(u.ID, u.Email, u.Fingerprint, u.EmailVerified, 0, WithCustomIat(iat))
+	if err != nil {
+		panic(err)
+	}
+
+	tID, err = Sign(
+		tID, func(signingString string) (signature []byte, alg string, err error) {
+			return tokenSignClient.Sign(context.TODO(), signingString)
+		},
 	)
 	if err != nil {
 		panic(err)
 	}
+
 	tokenID, err := tID.String()
 	if err != nil {
 		panic(err)
@@ -772,17 +775,19 @@ func Test_client_ValidateToken(t *testing.T) {
 
 	signingClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	const userID = "4fa6ecab-1029-42aa-bce7-99800d6eb630"
 
-	accessToken, err := NewAccessToken(
-		userID, true, WithSignature(
-			func(signingString string) (signature string, alg string, err error) {
-				return signingClient.Sign(context.TODO(), signingString)
-			},
-		),
+	accessToken, err := NewAccessToken(userID, true)
+	if err != nil {
+		panic(err)
+	}
+	accessToken, err = Sign(
+		accessToken, func(signingString string) (signature []byte, alg string, err error) {
+			return signingClient.Sign(context.TODO(), signingString)
+		},
 	)
 	if err != nil {
 		panic(err)
@@ -868,7 +873,7 @@ func Test_client_RefreshTokens(t *testing.T) {
 
 	signingClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	t.Parallel()
@@ -899,12 +904,11 @@ func Test_client_RefreshTokens(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				refreshToken: mustNewTokenStr(
-					NewRefreshToken(
-						userID, WithSignature(
-							func(signingString string) (signature string, alg string, err error) {
-								return signingClient.Sign(context.TODO(), signingString)
-							},
-						),
+					Sign(
+						mustNewToken(NewRefreshToken(userID)),
+						func(signingString string) (signature []byte, alg string, err error) {
+							return signingClient.Sign(context.TODO(), signingString)
+						},
 					),
 				),
 			},
@@ -929,12 +933,11 @@ func Test_client_RefreshTokens(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				refreshToken: mustNewTokenStr(
-					NewRefreshToken(
-						userID, WithSignature(
-							func(signingString string) (signature string, alg string, err error) {
-								return signingClient.Sign(context.TODO(), signingString)
-							},
-						),
+					Sign(
+						mustNewToken(NewRefreshToken(userID)),
+						func(signingString string) (signature []byte, alg string, err error) {
+							return signingClient.Sign(context.TODO(), signingString)
+						},
 					),
 				),
 			},
@@ -949,12 +952,11 @@ func Test_client_RefreshTokens(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				refreshToken: mustNewTokenStr(
-					NewRefreshToken(
-						userID, WithSignature(
-							func(signingString string) (signature string, alg string, err error) {
-								return signingClient.Sign(context.TODO(), signingString)
-							},
-						),
+					Sign(
+						mustNewToken(NewRefreshToken(userID)),
+						func(signingString string) (signature []byte, alg string, err error) {
+							return signingClient.Sign(context.TODO(), signingString)
+						},
 					),
 				),
 			},
@@ -979,12 +981,11 @@ func Test_client_RefreshTokens(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				refreshToken: mustNewTokenStr(
-					NewRefreshToken(
-						userID, WithSignature(
-							func(signingString string) (signature string, alg string, err error) {
-								return signingClient.Sign(context.TODO(), signingString)
-							},
-						),
+					Sign(
+						mustNewToken(NewRefreshToken(userID)),
+						func(signingString string) (signature []byte, alg string, err error) {
+							return signingClient.Sign(context.TODO(), signingString)
+						},
 					),
 				),
 			},
@@ -1001,12 +1002,11 @@ func Test_client_RefreshTokens(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				refreshToken: mustNewTokenStr(
-					NewRefreshToken(
-						userID, WithSignature(
-							func(signingString string) (signature string, alg string, err error) {
-								return signingClient.Sign(context.TODO(), signingString)
-							},
-						),
+					Sign(
+						mustNewToken(NewRefreshToken(userID)),
+						func(signingString string) (signature []byte, alg string, err error) {
+							return signingClient.Sign(context.TODO(), signingString)
+						},
 					),
 				),
 			},
@@ -1023,12 +1023,11 @@ func Test_client_RefreshTokens(t *testing.T) {
 			args: args{
 				ctx: context.TODO(),
 				refreshToken: mustNewTokenStr(
-					NewRefreshToken(
-						userID, WithSignature(
-							func(_ string) (signature string, alg string, err error) {
-								return "foo", "bar", nil
-							},
-						),
+					Sign(
+						mustNewToken(NewRefreshToken(userID)),
+						func(signingString string) (signature []byte, alg string, err error) {
+							return signingClient.Sign(context.TODO(), signingString)
+						},
 					),
 				),
 			},
@@ -1092,7 +1091,7 @@ func TestTokens_Serialize(t *testing.T) {
 
 	signingClient := MockTokenSigningClient{
 		Alg:       "EdDSA",
-		Signature: "qux",
+		Signature: []byte("qux"),
 	}
 
 	const (
@@ -1112,38 +1111,36 @@ func TestTokens_Serialize(t *testing.T) {
 			name: "happy path",
 			fields: fields{
 				id: mustNewToken(
-					NewIDToken(
-						userID, email, fingerprint, true, 0,
-						WithCustomIat(iat),
-						WithSignature(
-							func(signingString string) (signature string, alg string, err error) {
-								return signingClient.Sign(context.TODO(), signingString)
-							},
+					Sign(
+						mustNewToken(
+							NewIDToken(
+								userID, email, fingerprint, true, 0,
+								WithCustomIat(iat),
+							),
 						),
+						func(signingString string) (signature []byte, alg string, err error) {
+							return signingClient.Sign(context.TODO(), signingString)
+						},
 					),
 				),
 				refresh: mustNewToken(
-					NewRefreshToken(
-						userID, WithCustomIat(iat),
-						WithSignature(
-							func(signingString string) (signature string, alg string, err error) {
-								return signingClient.Sign(context.TODO(), signingString)
-							},
-						),
+					Sign(
+						mustNewToken(NewRefreshToken(userID, WithCustomIat(iat))),
+						func(signingString string) (signature []byte, alg string, err error) {
+							return signingClient.Sign(context.TODO(), signingString)
+						},
 					),
 				),
 				access: mustNewToken(
-					NewAccessToken(
-						userID, true, WithCustomIat(iat),
-						WithSignature(
-							func(signingString string) (signature string, alg string, err error) {
-								return signingClient.Sign(context.TODO(), signingString)
-							},
-						),
+					Sign(
+						mustNewToken(NewAccessToken(userID, true, WithCustomIat(iat))),
+						func(signingString string) (signature []byte, alg string, err error) {
+							return signingClient.Sign(context.TODO(), signingString)
+						},
 					),
 				),
 			},
-			want:    []byte(`{"id":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZW1haWwiOiJiYXJAYmF6LnF1eHgiLCJmaW5nZXJwcmludCI6ImZvbyIsInN1YiI6IjRmYTZlY2FiLTEwMjktNDJhYS1iY2U3LTk5ODAwZDZlYjYzMCIsImlzcyI6Imh0dHBzOi8vY2lhbS5kaWFncmFtYXN0ZXh0LmRldiIsImF1ZCI6Imh0dHBzOi8vZGlhZ3JhbWFzdGV4dC5kZXYiLCJpYXQiOjAsImV4cCI6MzYwMH0.qux","refresh":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0ZmE2ZWNhYi0xMDI5LTQyYWEtYmNlNy05OTgwMGQ2ZWI2MzAiLCJpc3MiOiJodHRwczovL2NpYW0uZGlhZ3JhbWFzdGV4dC5kZXYiLCJhdWQiOiJodHRwczovL2RpYWdyYW1hc3RleHQuZGV2IiwiaWF0IjowLCJleHAiOjg2NDAwMDB9.qux","access":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoxLCJxdW90YXMiOnsicHJvbXB0X2xlbmd0aF9tYXgiOjMwMCwicnBtIjozLCJycGQiOjIwfSwic3ViIjoiNGZhNmVjYWItMTAyOS00MmFhLWJjZTctOTk4MDBkNmViNjMwIiwiaXNzIjoiaHR0cHM6Ly9jaWFtLmRpYWdyYW1hc3RleHQuZGV2IiwiYXVkIjoiaHR0cHM6Ly9kaWFncmFtYXN0ZXh0LmRldiIsImlhdCI6MCwiZXhwIjozNjAwfQ.qux"}`),
+			want:    []byte(`{"id":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZW1haWwiOiJiYXJAYmF6LnF1eHgiLCJmaW5nZXJwcmludCI6ImZvbyIsInN1YiI6IjRmYTZlY2FiLTEwMjktNDJhYS1iY2U3LTk5ODAwZDZlYjYzMCIsImlzcyI6Imh0dHBzOi8vY2lhbS5kaWFncmFtYXN0ZXh0LmRldiIsImF1ZCI6Imh0dHBzOi8vZGlhZ3JhbWFzdGV4dC5kZXYiLCJpYXQiOjAsImV4cCI6MzYwMH0.cXV4","refresh":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0ZmE2ZWNhYi0xMDI5LTQyYWEtYmNlNy05OTgwMGQ2ZWI2MzAiLCJpc3MiOiJodHRwczovL2NpYW0uZGlhZ3JhbWFzdGV4dC5kZXYiLCJhdWQiOiJodHRwczovL2RpYWdyYW1hc3RleHQuZGV2IiwiaWF0IjowLCJleHAiOjg2NDAwMDB9.cXV4","access":"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoxLCJxdW90YXMiOnsicHJvbXB0X2xlbmd0aF9tYXgiOjMwMCwicnBtIjozLCJycGQiOjIwfSwic3ViIjoiNGZhNmVjYWItMTAyOS00MmFhLWJjZTctOTk4MDBkNmViNjMwIiwiaXNzIjoiaHR0cHM6Ly9jaWFtLmRpYWdyYW1hc3RleHQuZGV2IiwiYXVkIjoiaHR0cHM6Ly9kaWFncmFtYXN0ZXh0LmRldiIsImlhdCI6MCwiZXhwIjozNjAwfQ.cXV4"}`),
 			wantErr: false,
 		},
 	}

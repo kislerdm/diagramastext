@@ -1575,3 +1575,73 @@ func Test_httpHandler_ciamHandlerSigninAnonym(t *testing.T) {
 		)
 	}
 }
+
+func Test_extractLeadingPath(t *testing.T) {
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "empty string",
+			args: args{
+				path: "",
+			},
+			want: "",
+		},
+		{
+			name: "leading slash",
+			args: args{
+				path: "/",
+			},
+			want: "/",
+		},
+		{
+			name: "path starting with slash",
+			args: args{
+				path: "/foo/bar/baz",
+			},
+			want: "/foo",
+		},
+		{
+			name: "path starting without slash",
+			args: args{
+				path: "foo/bar/baz",
+			},
+			want: "foo",
+		},
+		{
+			name: "path with trailing slashes",
+			args: args{
+				path: "/foo///bar/baz",
+			},
+			want: "/foo",
+		},
+		{
+			name: "path with trailing slashes in the beginning",
+			args: args{
+				path: "//foo///bar/baz",
+			},
+			want: "/",
+		},
+		{
+			name: "path as a single 'word'",
+			args: args{
+				path: "foobarbaz",
+			},
+			want: "foobarbaz",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := extractLeadingPath(tt.args.path); got != tt.want {
+					t.Errorf("extractLeadingPath() = %v, want %v", got, tt.want)
+				}
+			},
+		)
+	}
+}

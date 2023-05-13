@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/ed25519"
+	"crypto/rand"
 	"errors"
 )
 
@@ -33,20 +34,20 @@ func (h hasherEd25519) HashFunc() crypto.Hash {
 	return 0
 }
 
-func (e clientEd25519) Sign(_ context.Context, signingString string) (signature string, alg string, err error) {
-	signatureBytes, err := e.privateKey.Sign(nil, []byte(signingString), hasherEd25519{})
+func (e clientEd25519) Sign(_ context.Context, signingString string) (signature []byte, alg string, err error) {
+	signatureBytes, err := e.privateKey.Sign(rand.Reader, []byte(signingString), hasherEd25519{})
 
 	// The error is always nil because the signingString is ASSUMED to be not hashed - hasherEd25519 definition
 	// FIXME: would validation of hashing be required?
 	if err != nil {
-		return "", "", err
+		return nil, "EdDSA", err
 	}
 
-	return string(signatureBytes), e.alg, nil
+	return signatureBytes, e.alg, nil
 }
 
-func (e clientEd25519) Verify(_ context.Context, signingString, signature string) error {
-	if !ed25519.Verify(e.publicKey, []byte(signingString), []byte(signature)) {
+func (e clientEd25519) Verify(_ context.Context, signingString string, signature []byte) error {
+	if !ed25519.Verify(e.publicKey, []byte(signingString), signature) {
 		return errors.New("failed signature verification")
 	}
 	return nil

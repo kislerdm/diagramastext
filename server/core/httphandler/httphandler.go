@@ -85,7 +85,7 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var user diagram.User
 
-	switch r.URL.Path {
+	switch extractLeadingPath(r.URL.Path) {
 	case pathStatus:
 		switch r.Method {
 		case http.MethodGet:
@@ -132,6 +132,17 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w, []byte(`{"error":"resource `+r.URL.Path+` not found"}`),
 		newHandlerNotExistsError(errors.New(r.URL.Path+" not found")),
 	)
+}
+
+func extractLeadingPath(p string) string {
+	var o strings.Builder
+	for i, s := range p[:] {
+		if i > 0 && s == '/' {
+			break
+		}
+		o.WriteRune(s)
+	}
+	return o.String()
 }
 
 func (h httpHandler) authorizationWebclient(r *http.Request, user *diagram.User) error {

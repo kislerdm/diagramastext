@@ -129,13 +129,19 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 		userID     string
 		err        error
 		newIDToken = func(userID, email, fingerprint string, iat time.Time) (JWT, error) {
-			return NewIDToken(
-				userID, email, fingerprint, false, 0, WithCustomIat(iat), WithSignature(
-					func(signingString string) (signature string, alg string, err error) {
-						return c.clientKMS.Sign(ctx, signature)
-					},
-				),
+			t, err := NewIDToken(userID, email, fingerprint, false, 0, WithCustomIat(iat))
+			if err != nil {
+				return nil, err
+			}
+			t, err = Sign(
+				t, func(signingString string) (signature []byte, alg string, err error) {
+					return c.clientKMS.Sign(ctx, signingString)
+				},
 			)
+			if err != nil {
+				return nil, err
+			}
+			return t, nil
 		}
 	)
 
@@ -181,7 +187,7 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 		return Tokens{}, err
 	}
 	if err := t.Validate(
-		func(signingString, signature string) error {
+		func(signingString string, signature []byte) error {
 			return c.clientKMS.Verify(ctx, signingString, signature)
 		},
 	); err != nil {
@@ -213,26 +219,42 @@ func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identity
 func (c client) issueTokens(ctx context.Context, userID, email, fingerprint string, emailVerified bool) (
 	Tokens, error,
 ) {
+	signFn := func(signingString string) (signature []byte, alg string, err error) {
+		return c.clientKMS.Sign(ctx, signingString)
+	}
+
 	iat := time.Now().UTC()
-	opts := []OptFn{
-		WithCustomIat(iat), WithSignature(
-			func(signingString string) (signature string, alg string, err error) {
-				return c.clientKMS.Sign(ctx, signature)
-			},
-		),
-	}
-	idToken, err := NewIDToken(userID, email, fingerprint, emailVerified, 0, opts...)
+
+	idToken, err := NewIDToken(userID, email, fingerprint, emailVerified, 0, WithCustomIat(iat))
 	if err != nil {
 		return Tokens{}, err
 	}
-	accessToken, err := NewAccessToken(userID, emailVerified, opts...)
+
+	idToken, err = Sign(idToken, signFn)
 	if err != nil {
 		return Tokens{}, err
 	}
-	refreshToken, err := NewRefreshToken(userID, opts...)
+
+	accessToken, err := NewAccessToken(userID, emailVerified, WithCustomIat(iat))
 	if err != nil {
 		return Tokens{}, err
 	}
+
+	accessToken, err = Sign(accessToken, signFn)
+	if err != nil {
+		return Tokens{}, err
+	}
+
+	refreshToken, err := NewRefreshToken(userID, WithCustomIat(iat))
+	if err != nil {
+		return Tokens{}, err
+	}
+
+	refreshToken, err = Sign(refreshToken, signFn)
+	if err != nil {
+		return Tokens{}, err
+	}
+
 	return Tokens{
 		id:      idToken,
 		refresh: refreshToken,
@@ -246,7 +268,7 @@ func (c client) ParseAndValidateToken(ctx context.Context, token string) (JWT, e
 		return nil, err
 	}
 	if err := t.Validate(
-		func(signingString, signature string) error {
+		func(signingString string, signature []byte) error {
 			return c.clientKMS.Verify(ctx, signingString, signature)
 		},
 	); err != nil {
@@ -261,7 +283,7 @@ func (c client) RefreshTokens(ctx context.Context, refreshToken string) (Tokens,
 		return Tokens{}, err
 	}
 	if err := t.Validate(
-		func(signingString, signature string) error {
+		func(signingString string, signature []byte) error {
 			return c.clientKMS.Verify(ctx, signingString, signature)
 		},
 	); err != nil {
