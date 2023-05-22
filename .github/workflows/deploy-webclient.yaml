@@ -59,7 +59,7 @@ jobs:
           docker run -e SERVER=$VITE_URL_API -v ${PWD}/api-reference:/app -t hairyhenderson/gomplate:stable -f /app/api-spec.yaml -o /app/api-spec.yaml
           cp -r api-reference dist/
       - name: Sync webclient
-        uses: cpina/github-action-push-to-another-repository@v1.5.1
+        uses: cpina/github-action-push-to-another-repository@v1.7.2
         env:
           SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
         with:
