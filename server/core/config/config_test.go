@@ -136,6 +136,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 				"CIAM_SMTP_HOST":         "yy",
 				"CIAM_SMTP_PORT":         "44",
 				"CIAM_SMTP_SENDER_EMAIL": "dfdf",
+				"CIAM_KEY":               "projects/my-project/locations/us-east1/keyRings/my-key-ring/cryptoKeys/my-key",
 			},
 			want: &Config{
 				RepositoryPredictionConfig: repositoryPredictionConfig{
@@ -159,6 +160,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 					SmtpSenderEmail:    "support@bar.baz",
 					PrivateKey:         keyPriv,
 					PublicKey:          keyPub,
+					KeyID:              "projects/my-project/locations/us-east1/keyRings/my-key-ring/cryptoKeys/my-key",
 				},
 				ModelInferenceConfig: modelInferenceConfig{
 					Token:     "foobar",
@@ -189,6 +191,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 				"CIAM_SMTP_HOST":         "yy",
 				"CIAM_SMTP_PORT":         "44",
 				"CIAM_SMTP_SENDER_EMAIL": "dfdf",
+				"CIAM_KEY":               "projects/my-project/locations/us-east1/keyRings/my-key-ring/cryptoKeys/my-key",
 			},
 			want: &Config{
 				RepositoryPredictionConfig: repositoryPredictionConfig{
@@ -214,6 +217,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 					SmtpHost:           "yy",
 					SmtpPort:           "44",
 					SmtpSenderEmail:    "dfdf",
+					KeyID:              "projects/my-project/locations/us-east1/keyRings/my-key-ring/cryptoKeys/my-key",
 				},
 			},
 		},

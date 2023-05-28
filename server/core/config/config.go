@@ -59,8 +59,10 @@ type modelInferenceConfig struct {
 }
 
 type ciamCfg struct {
-	PrivateKey         []byte
-	PublicKey          []byte
+	PrivateKey []byte
+	PublicKey  []byte
+	// KMS key ID
+	KeyID              string
 	TableOneTimeSecret string
 	SmtpUser           string
 	SmtpPassword       string
@@ -183,6 +185,10 @@ func loadEnvVarConfig(cfg *Config) {
 
 	if v := os.Getenv("CIAM_SMTP_SENDER_EMAIL"); v != "" {
 		cfg.CIAM.SmtpSenderEmail = v
+	}
+
+	if v := os.Getenv("CIAM_KEY"); v != "" {
+		cfg.CIAM.KeyID = v
 	}
 }
 
