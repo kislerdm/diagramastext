@@ -12,7 +12,7 @@ localenv: ## Provisions local development environment.
 	@ if [ "${OPENAI_API_KEY}" == "" ]; then echo "set OPENAI_API_KEY environment variable"; exit 137; fi
 	@ echo "access webclient on http://localhost:${PORT_CLIENT}"
 	@ echo "access database webclient on http://localhost:${PORT_DBCLIENT}"
-	@ VERSION=${GIT_SHA} PORT_SERVER=${PORT_SERVER} PORT_CLIENT=${PORT_CLIENT} docker compose up --force-recreate --build 1> /dev/null
+	@ VERSION=${GIT_SHA} PORT_SERVER=${PORT_SERVER} PORT_CLIENT=${PORT_CLIENT} docker compose up --force-recreate --build
 
 localenv-teardown: ## Cleans the local development environment.
 	@ docker compose down
