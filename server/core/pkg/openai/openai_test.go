@@ -125,8 +125,9 @@ func Test_clientOpenAI_decodeResponseGPT35Turbo(t *testing.T) {
 
 	t.Run(
 		"happy path", func(t *testing.T) {
+			const input = `{"id":"chatcmpl-731P1AqUCWr2iVKnmlMIMCQoufu40","object":"chat.completion","created":1680954731,"model":"gpt-3.5-turbo-0301","usage":{"prompt_tokens":781,"completion_tokens":66,"total_tokens":847},"choices":[{"message":{"role":"assistant","content":"C4 diagram with a Go CLI interacting with a Rust backend:\n\n{\"nodes\":[{\"id\":\"0\",\"label\":\"Go CLI\",\"technology\":\"Go\"},{\"id\":\"1\",\"label\":\"Rust Backend\",\"technology\":\"Rust\"}],\"links\":[{\"from\":\"0\",\"to\":\"1\",\"label\":\"interacts with\",\"technology\":\"HTTP\"}]}"},"finish_reason":"stop","index":0}]}`
 			// GIVEN
-			responseBytes := []byte(`{"id":"chatcmpl-731P1AqUCWr2iVKnmlMIMCQoufu40","object":"chat.completion","created":1680954731,"model":"gpt-3.5-turbo-0301","usage":{"prompt_tokens":781,"completion_tokens":66,"total_tokens":847},"choices":[{"message":{"role":"assistant","content":"C4 diagram with a Go CLI interacting with a Rust backend:\n\n{\"nodes\":[{\"id\":\"0\",\"label\":\"Go CLI\",\"technology\":\"Go\"},{\"id\":\"1\",\"label\":\"Rust Backend\",\"technology\":\"Rust\"}],\"links\":[{\"from\":\"0\",\"to\":\"1\",\"label\":\"interacts with\",\"technology\":\"HTTP\"}]}"},"finish_reason":"stop","index":0}]}`)
+			responseBytes := []byte(input)
 			// WHEN
 			gotRaw, got, usageTokensPrompt, usageTokensCompletions, err := decodeResponse(responseBytes, model)
 			if err != nil {
@@ -141,7 +142,7 @@ func Test_clientOpenAI_decodeResponseGPT35Turbo(t *testing.T) {
 				t.Fatal("unexpected response")
 			}
 
-			if gotRaw != `"C4 diagram with a Go CLI interacting with a Rust backend:\n\n{\"nodes\":[{\"id\":\"0\",\"label\":\"Go CLI\",\"technology\":\"Go\"},{\"id\":\"1\",\"label\":\"Rust Backend\",\"technology\":\"Rust\"}],\"links\":[{\"from\":\"0\",\"to\":\"1\",\"label\":\"interacts with\",\"technology\":\"HTTP\"}]}"` {
+			if gotRaw != input {
 				t.Fatal("unexpected raw response")
 			}
 
@@ -373,21 +374,43 @@ func Test_clientOpenAI_Do(t *testing.T) {
 		model, userPrompt, systemContent string
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []byte
-		wantRaw string
-		wantErr bool
+		name                 string
+		fields               fields
+		args                 args
+		want                 []byte
+		wantRaw              string
+		wantErr              bool
+		wantPromptTokens     uint16
+		wantCompletionTokens uint16
 	}{
 		{
-			name: "happy path: gpt-3.5-turbo",
+			name: "happy path: gpt-3.5-turbo - v2",
 			fields: fields{
 				httpClient: mockHTTPClient{
 					V: &http.Response{
 						Body: io.NopCloser(
 							strings.NewReader(
-								`{"id":"0","choices":[{"message":{"content":"{\"nodes\":[{\"id\":\"0\"}]}"},"finish_reason":"stop"}]}`,
+								`{
+  "id": "chatcmpl-7dMb574CLDw6RsW4NT7efSw3I6isw",
+  "object": "chat.completion",
+  "created": 1689616011,
+  "model": "gpt-3.5-turbo-0613",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"nodes\":[{\"id\":\"0\"}]}"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 820,
+    "completion_tokens": 61,
+    "total_tokens": 881
+  }
+}`,
 							),
 						),
 						StatusCode: http.StatusOK,
@@ -402,8 +425,30 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				systemContent: "foo",
 				userPrompt:    "bar",
 			},
-			wantRaw: `"{\"nodes\":[{\"id\":\"0\"}]}"`,
-			want:    []byte(`{"nodes":[{"id":"0"}]}`),
+			wantRaw: `{
+  "id": "chatcmpl-7dMb574CLDw6RsW4NT7efSw3I6isw",
+  "object": "chat.completion",
+  "created": 1689616011,
+  "model": "gpt-3.5-turbo-0613",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"nodes\":[{\"id\":\"0\"}]}"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 820,
+    "completion_tokens": 61,
+    "total_tokens": 881
+  }
+}`,
+			want:                 []byte(`{"nodes":[{"id":"0"}]}`),
+			wantCompletionTokens: 61,
+			wantPromptTokens:     820,
 		},
 		{
 			name: "happy path: code-davinci-002",
@@ -437,7 +482,22 @@ func Test_clientOpenAI_Do(t *testing.T) {
 					V: &http.Response{
 						Body: io.NopCloser(
 							strings.NewReader(
-								`{"id":"0","choices":[{"message":{"content":"{\"nodes\":[{\"id\":\"0\"}]}"},"finish_reason":"stop"}]}`,
+								`{
+  "id": "chatcmpl-7dMb574CLDw6RsW4NT7efSw3I6isw",
+  "object": "chat.completion",
+  "created": 1689616011,
+  "model": "gpt-3.5-turbo-0613",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"nodes\":[{\"id\":\"0\"}]}"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}`,
 							),
 						),
 						StatusCode: http.StatusOK,
@@ -452,8 +512,23 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				systemContent: "foo",
 				userPrompt:    "bar",
 			},
-			wantRaw: `"{\"nodes\":[{\"id\":\"0\"}]}"`,
-			want:    []byte(`{"nodes":[{"id":"0"}]}`),
+			wantRaw: `{
+  "id": "chatcmpl-7dMb574CLDw6RsW4NT7efSw3I6isw",
+  "object": "chat.completion",
+  "created": 1689616011,
+  "model": "gpt-3.5-turbo-0613",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"nodes\":[{\"id\":\"0\"}]}"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}`,
+			want: []byte(`{"nodes":[{"id":"0"}]}`),
 		},
 		{
 			name: "happy path: gpt-3.5-turbo, chat assistance's explanation included",
@@ -481,8 +556,14 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				systemContent: "foo",
 				userPrompt:    "bar",
 			},
-			wantRaw: "\"Here's the C4 diagram for a Python web server reading from an external Postgres database:\n\n```\n{\n  \\\"title\\\": \\\"Python Web Server Reading from External Postgres Database\\\",\\n  \\\"nodes\\\": [\\n    {\\\"id\\\": \\\"0\\\", \\\"label\\\": \\\"Web Server\\\", \\\"technology\\\": \\\"Python\\\"},\\n    {\\\"id\\\": \\\"1\\\", \\\"label\\\": \\\"Postgres\\\", \\\"technology\\\": \\\"Postgres\\\", \\\"external\\\": true, \\\"is_database\\\": true}\\n  ],\\n  \\\"links\\\": [\\n    {\\\"from\\\": \\\"0\\\", \\\"to\\\": \\\"1\\\", \\\"label\\\": \\\"reads from Postgres\\\", \\\"technology\\\": \\\"TCP\\\"}\\n  ],\\n  \\\"footer\\\": \\\"C4 Model\\\"\n}\n```\n\nThe diagram shows two nodes: a Python web server and an external Postgres database. The web server reads data from the Postgres database over TCP.\"",
-			want:    []byte(`{"title":"Python Web Server Reading from External Postgres Database","nodes":[{"id":"0","label":"Web Server","technology":"Python"},{"id":"1","label":"Postgres","technology":"Postgres","external":true,"is_database":true}],"links":[{"from":"0","to":"1","label":"reads from Postgres","technology":"TCP"}],"footer":"C4 Model"}`),
+			wantRaw: `{"id":"chatcmpl-71dU5szgGdOOtLiTDqB5yr0gum3Kz","object":"chat.completion","created":1680624461,"model":"gpt-3.5-turbo-0301","usage":{"prompt_tokens":781,"completion_tokens":173,"total_tokens":954},` +
+				`"choices":[{"message":{"role":"assistant","content":"Here's the C4 diagram for a Python web server reading from an external Postgres database:` +
+				"\n\n```\n{\n  " +
+				`\"title\": \"Python Web Server Reading from External Postgres Database\",\n  \"nodes\": [\n    {\"id\": \"0\", \"label\": \"Web Server\", \"technology\": \"Python\"},\n    {\"id\": \"1\", \"label\": \"Postgres\", \"technology\": \"Postgres\", \"external\": true, \"is_database\": true}\n  ],\n  \"links\": [\n    {\"from\": \"0\", \"to\": \"1\", \"label\": \"reads from Postgres\", \"technology\": \"TCP\"}\n  ],\n  \"footer\": \"C4 Model\"` +
+				"\n}\n```\n\nThe diagram shows two nodes: a Python web server and an external Postgres database. The web server reads data from the Postgres database over TCP." + `"},"finish_reason":"stop","index":0}]}`,
+			want:                 []byte(`{"title":"Python Web Server Reading from External Postgres Database","nodes":[{"id":"0","label":"Web Server","technology":"Python"},{"id":"1","label":"Postgres","technology":"Postgres","external":true,"is_database":true}],"links":[{"from":"0","to":"1","label":"reads from Postgres","technology":"TCP"}],"footer":"C4 Model"}`),
+			wantPromptTokens:     781,
+			wantCompletionTokens: 173,
 		},
 		{
 			name: "unhappy path: invalid prompt",
@@ -534,7 +615,7 @@ func Test_clientOpenAI_Do(t *testing.T) {
 					token:      tt.fields.token,
 					maxTokens:  tt.fields.maxTokens,
 				}
-				gotRaw, got, _, _, err := c.Do(
+				gotRaw, got, gotPromptTokens, gotCompletionTokens, err := c.Do(
 					tt.args.ctx, tt.args.userPrompt, tt.args.systemContent, tt.args.model,
 				)
 				if (err != nil) != tt.wantErr {
@@ -546,6 +627,12 @@ func Test_clientOpenAI_Do(t *testing.T) {
 				}
 				if !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("Do() got = %v, want %v", got, tt.want)
+				}
+				if gotCompletionTokens != tt.wantCompletionTokens {
+					t.Errorf("Do() gotCompletionTokens = %d, want %d", gotCompletionTokens, tt.wantCompletionTokens)
+				}
+				if gotPromptTokens != tt.wantPromptTokens {
+					t.Errorf("Do() gotPromptTokens = %d, want %d", gotPromptTokens, tt.wantPromptTokens)
 				}
 			},
 		)

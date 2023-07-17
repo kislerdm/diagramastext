@@ -41,6 +41,6 @@ replace (
 	github.com/kislerdm/diagramastext/server/core v0.0.5 => ../../
 	github.com/kislerdm/diagramastext/server/core/pkg/gcpsecretsmanager v0.0.1 => ../../pkg/gcpsecretsmanager
 	github.com/kislerdm/diagramastext/server/core/pkg/httpclient v0.0.1 => ../../pkg/httpclient
-	github.com/kislerdm/diagramastext/server/core/pkg/openai v0.0.3 => ../../pkg/openai
+	github.com/kislerdm/diagramastext/server/core/pkg/openai v0.0.4 => ../../pkg/openai
 	github.com/kislerdm/diagramastext/server/core/pkg/postgres v0.0.2 => ../../pkg/postgres
 )

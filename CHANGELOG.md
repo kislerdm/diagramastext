@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.7] - 2023-07-18
+
+### Fixed
+
+- Deserialization of the OpenAI response
+
 ## [0.0.6] - 2023-04-13
 
 ### Added
