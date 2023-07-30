@@ -47,6 +47,11 @@ type ciamConfigStore struct {
 	TableOneTimeSecret string `json:"table_one_time_secret"`
 }
 
+type cognitoConfig struct {
+	ClientID      string `json:"client_id"`
+	CognitoRegion string `json:"cognito_region"`
+}
+
 type secret struct {
 	repositoryPredictionConfig
 	ciamConfigStore
@@ -72,6 +77,7 @@ type ciamCfg struct {
 type Config struct {
 	RepositoryPredictionConfig repositoryPredictionConfig
 	CIAM                       ciamCfg
+	Cognito                    cognitoConfig
 	ModelInferenceConfig       modelInferenceConfig
 }
 

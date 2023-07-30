@@ -36,6 +36,12 @@ func init() {
 
 	cfg := config.LoadDefaultConfig(context.Background(), secretsmanagerClient)
 
+	// TODO:- MC replace the current ciam with this
+	//cognitoClient, err := awscognito.NewCognitoClient(context.Background(), cfg.Cognito.CognitoRegion, cfg.Cognito.ClientID)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
 	modelInferenceClient, err := openai.NewOpenAIClient(
 		openai.Config{
 			Token:     cfg.ModelInferenceConfig.Token,
