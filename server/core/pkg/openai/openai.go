@@ -233,10 +233,22 @@ func decodeResponse(respBytes []byte, model string) (
 	}
 }
 
+func decodeChatCompletionsResultV2(respBytes []byte) (string, []byte, uint16, uint16, error) {
+	var resp openAIResponseChat
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		return "", nil, 0, 0, err
+	}
+	if len(resp.Choices) == 0 {
+		return "", nil, 0, 0, errors.New("unsuccessful prediction")
+	}
+	return string(respBytes), []byte(resp.Choices[0].Message.Content), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
+}
+
 func decodeChatCompletionsResult(respBytes []byte) (string, []byte, uint16, uint16, error) {
 	var resp openAIResponseChat
 	if err := json.Unmarshal(cleanRawBytesChatResponse(respBytes), &resp); err != nil {
-		return "", nil, 0, 0, err
+		// TODO: evaluate the response's data structure to potentially remove decodeChatCompletionsResult
+		return decodeChatCompletionsResultV2(respBytes)
 	}
 
 	if len(resp.Choices) == 0 {
@@ -245,15 +257,7 @@ func decodeChatCompletionsResult(respBytes []byte) (string, []byte, uint16, uint
 
 	s := cleanRawResponse(cleanRawChatResponse(resp.Choices[0].Message.Content))
 
-	return readRawResponseChat(respBytes), []byte(s), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
-}
-
-func readRawResponseChat(respBytes []byte) string {
-	v := bytes.Split(respBytes, []byte(`"content":`))
-	if len(v) < 2 {
-		return string(respBytes)
-	}
-	return string(bytes.Split(v[1], []byte(`},"finish_reason"`))[0])
+	return string(respBytes), []byte(s), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
 }
 
 // chatDescriptionSeparator separates the code snippet from the chat's natural language description
