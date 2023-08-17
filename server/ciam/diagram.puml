@@ -1,0 +1,25 @@
+@startuml
+!include <C4/C4_Container>
+
+title Container diagram of the user authentication system
+footer "<contact@diagramastext.dev> - %date('yyyy-MM-dd')"
+
+Person(user, "User")
+Container(client, Webclient, "Browser, JS")
+
+System(cognito, "AWS Cognito", "Manages user account and their access to the diagramastext server")
+Container(lambda_define_challage, Custom trigger:\ndefines auth challenge, "AWS Lambda, Go")
+Container(lambda_create_challage, Custom trigger:\ncreates auth challenge, "AWS Lambda, Go")
+Container(lambda_verifies_challage, Custom trigger:\nverifies auth challenge, "AWS Lambda, Go")
+System_Ext(smtp, "Email server")
+
+Rel_R(user, client, "Uses")
+Rel_D(client, cognito, "Gets and validates JWT", "async, HTTPS")
+Rel_D(cognito, lambda_define_challage, "Determines which custom challenge needs to be created", "sync, HTTPS")
+Rel_D(cognito, lambda_verifies_challage, "Verifies the code that the user entered", "sync, HTTPS")
+Rel_L(cognito, lambda_create_challage, "Generates a secret login code and mails it to the user by using privateemail.com", "sync, HTTPS")
+Rel_U(lambda_create_challage, smtp, "Sends email with a secret login code", "sync, SMTP")
+Rel_L(user, smtp, "Reads email", "sync")
+
+SHOW_LEGEND()
+@enduml
