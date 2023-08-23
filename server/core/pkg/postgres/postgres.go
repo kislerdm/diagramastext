@@ -296,7 +296,7 @@ func (c Client) CreateUser(ctx context.Context, id, email, fingerprint string, i
 }
 
 func (c Client) ReadUser(ctx context.Context, id string) (
-	found, isActive, emailVerified bool, email, fingerprint string, err error,
+	found, isActive bool, role uint8, email, fingerprint string, err error,
 ) {
 	if id == "" {
 		err = errors.New("id is required")
@@ -306,7 +306,7 @@ func (c Client) ReadUser(ctx context.Context, id string) (
 		ctx, `SELECT 
 	is_active
 	,email
-    ,email_verified
+    ,role
 	,web_fingerprint
 FROM `+c.tableUsers+` WHERE user_id = $1`, id,
 	)
@@ -314,15 +314,17 @@ FROM `+c.tableUsers+` WHERE user_id = $1`, id,
 		return
 	}
 	if rows.Next() {
-		if err := rows.Scan(&isActive, &email, &emailVerified, &fingerprint); err != nil {
-			return false, false, false, "", "", err
+		var r int
+		if err := rows.Scan(&isActive, &email, &r, &fingerprint); err != nil {
+			return false, false, 0, "", "", err
 		}
 		rows.Close()
 
+		role = uint8(r)
 		found = true
 		return
 	}
-	return false, false, false, "", "", nil
+	return false, false, 0, "", "", nil
 }
 
 func (c Client) LookupUserByEmail(ctx context.Context, email string) (id string, isActive bool, err error) {
