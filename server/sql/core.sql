@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS users
 (
     user_id         UUID      NOT NULL PRIMARY KEY,
     email           TEXT,
-    email_verified  BOOLEAN   NOT NULL DEFAULT FALSE,
+    role            SMALLINT  NOT NULL,
     web_fingerprint TEXT,
     is_active       BOOLEAN   NOT NULL DEFAULT FALSE,
     is_premium      BOOLEAN   NOT NULL DEFAULT FALSE,
@@ -32,12 +32,12 @@ CREATE TABLE IF NOT EXISTS users
     update_at       TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO users (user_id, is_active)
-VALUES ('00000000-0000-0000-0000-000000000000', TRUE);
+INSERT INTO users (user_id, role)
+VALUES ('00000000-0000-0000-0000-000000000000', 0);
 
-INSERT INTO users (user_id, is_active, email, email_verified, is_premium)
-VALUES ('47a87ca5-e00f-4075-af68-1ef2caba30ce', TRUE, 'tech@diagramastext.dev', TRUE, FALSE),
-       ('49d52e3f-ebeb-42af-925d-e69114ed8c5f', TRUE, 'tech.premium@diagramastext.dev', TRUE, TRUE)
+INSERT INTO users (user_id, is_active, email, role, is_premium)
+VALUES ('47a87ca5-e00f-4075-af68-1ef2caba30ce', TRUE, 'tech@diagramastext.dev', 1, FALSE),
+       ('49d52e3f-ebeb-42af-925d-e69114ed8c5f', TRUE, 'tech.premium@diagramastext.dev', 1, TRUE)
 ;
 
 CREATE TABLE IF NOT EXISTS api_tokens
