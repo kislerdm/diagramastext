@@ -1002,6 +1002,7 @@ func TestClient_CreateUser(t *testing.T) {
 		email       string
 		fingerprint string
 		isActive    bool
+		role        *uint8
 	}
 	tests := []struct {
 		name   string
@@ -1021,8 +1022,9 @@ func TestClient_CreateUser(t *testing.T) {
 				tableTokens:               "quxx",
 			},
 			args: args{
-				ctx: context.TODO(),
-				id:  "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+				ctx:  context.TODO(),
+				id:   "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+				role: pointerUint(0),
 			},
 			wantErr: false,
 		},
@@ -1042,6 +1044,22 @@ func TestClient_CreateUser(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "shall fail: user role is missing",
+			fields: fields{
+				c:                         &mockDbClient{},
+				tableWritePrompt:          "foo",
+				tableWriteModelPrediction: "bar",
+				tableWriteSuccessFlag:     "baz",
+				tableUsers:                "qux",
+				tableTokens:               "quxx",
+			},
+			args: args{
+				ctx: context.TODO(),
+				id:  "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -1055,13 +1073,17 @@ func TestClient_CreateUser(t *testing.T) {
 					tableTokens:               tt.fields.tableTokens,
 				}
 				if err := c.CreateUser(
-					tt.args.ctx, tt.args.id, tt.args.email, tt.args.fingerprint, tt.args.isActive,
+					tt.args.ctx, tt.args.id, tt.args.email, tt.args.fingerprint, tt.args.isActive, tt.args.role,
 				); (err != nil) != tt.wantErr {
 					t.Errorf("CreateUser() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			},
 		)
 	}
+}
+
+func pointerUint(i uint8) *uint8 {
+	return &i
 }
 
 func TestClient_ReadUser(t *testing.T) {
@@ -1410,7 +1432,7 @@ func TestClient_LookupUserByFingerprint(t *testing.T) {
 	}
 }
 
-func TestClient_UpdateUserSetEmailVerified(t *testing.T) {
+func TestClient_UpdateUserSetActive(t *testing.T) {
 	type fields struct {
 		c                         dbClient
 		tableWritePrompt          string
@@ -1479,8 +1501,8 @@ func TestClient_UpdateUserSetEmailVerified(t *testing.T) {
 					tableUsers:                tt.fields.tableUsers,
 					tableTokens:               tt.fields.tableTokens,
 				}
-				if err := c.UpdateUserSetEmailVerified(tt.args.ctx, tt.args.id); (err != nil) != tt.wantErr {
-					t.Errorf("UpdateUserSetEmailVerified() error = %v, wantErr %v", err, tt.wantErr)
+				if err := c.UpdateUserSetActive(tt.args.ctx, tt.args.id); (err != nil) != tt.wantErr {
+					t.Errorf("UpdateUserSetActive() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			},
 		)

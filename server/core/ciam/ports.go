@@ -8,7 +8,7 @@ import (
 
 // RepositoryCIAM defines the communication port to persistence layer hosting users' data.
 type RepositoryCIAM interface {
-	CreateUser(ctx context.Context, id, email, fingerprint string, isActive bool, role uint8) error
+	CreateUser(ctx context.Context, id, email, fingerprint string, isActive bool, role *uint8) error
 	ReadUser(ctx context.Context, id string) (
 		found, isActive bool, role uint8, email, fingerprint string, err error,
 	)
@@ -45,7 +45,7 @@ type MockRepositoryCIAM struct {
 }
 
 func (m *MockRepositoryCIAM) CreateUser(
-	_ context.Context, id, email, fingerprint string, isActive bool, role uint8,
+	_ context.Context, id, email, fingerprint string, isActive bool, role *uint8,
 ) error {
 	if m.Err != nil {
 		return m.Err
@@ -56,7 +56,7 @@ func (m *MockRepositoryCIAM) CreateUser(
 			Email:       email,
 			Fingerprint: fingerprint,
 			IsActive:    isActive,
-			RoleID:      role,
+			RoleID:      *role,
 		},
 	)
 	return nil

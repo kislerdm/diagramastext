@@ -284,13 +284,17 @@ func (c Client) WriteSuccessFlag(ctx context.Context, requestID, userID, token s
 	return err
 }
 
-func (c Client) CreateUser(ctx context.Context, id, email, fingerprint string, isActive bool) error {
+func (c Client) CreateUser(ctx context.Context, id, email, fingerprint string, isActive bool, role *uint8) error {
 	if id == "" {
 		return errors.New("id is required")
 	}
+	if role == nil {
+		return errors.New("role is required")
+	}
 	_, err := c.c.Exec(
-		ctx, "INSERT INTO "+c.tableUsers+" (user_id,email,web_fingerprint,is_active) VALUES ($1,$2,$3,$4)",
-		id, email, fingerprint, isActive,
+		ctx,
+		"INSERT INTO "+c.tableUsers+" (user_id,email,web_fingerprint,is_active,role) VALUES ($1,$2,$3,$4,$5)",
+		id, email, fingerprint, isActive, int(*role),
 	)
 	return err
 }
@@ -375,14 +379,11 @@ func (c Client) LookupUserByFingerprint(ctx context.Context, fingerprint string)
 	return
 }
 
-func (c Client) UpdateUserSetEmailVerified(ctx context.Context, id string) error {
+func (c Client) UpdateUserSetActive(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("id is required")
 	}
-	_, err := c.c.Exec(
-		ctx, "UPDATE "+c.tableUsers+
-			" SET email_verified = TRUE, is_active = TRUE WHERE user_id = %1", id,
-	)
+	_, err := c.c.Exec(ctx, "UPDATE "+c.tableUsers+" SET is_active = TRUE WHERE user_id = %1", id)
 	return err
 }
 
