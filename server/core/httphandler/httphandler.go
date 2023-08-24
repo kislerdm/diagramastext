@@ -156,7 +156,7 @@ func (h httpHandler) authorizationWebclient(r *http.Request, user *diagram.User)
 		}
 	}
 
-	t, err := h.ciam.ParseAndValidateToken(r.Context(), authToken)
+	t, err := h.ciam.ParseAccessToken(r.Context(), authToken)
 	if err != nil {
 		return httpHandlerError{
 			Msg:      "invalid access token",
@@ -165,10 +165,8 @@ func (h httpHandler) authorizationWebclient(r *http.Request, user *diagram.User)
 		}
 	}
 
-	user.ID = t.UserID()
-	user.IsRegistered = t.UserRole().IsRegisteredUser()
-	user.Quotas = t.UserQuotas()
-
+	user.ID = t.ID
+	user.Role = t.Role
 	return nil
 }
 
@@ -198,9 +196,8 @@ func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error
 	}
 
 	user.ID = userID
-	user.IsRegistered = true
 	user.APIToken = authToken
-	user.Quotas = ciam.QuotasRegisteredUser
+	user.Role = diagram.RoleRegisteredUser
 
 	return h.checkQuota(r, user)
 }
@@ -386,22 +383,7 @@ func (h httpHandler) ciamHandlerSigninAnonym(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	tokens, err := h.ciam.SigninAnonym(r.Context(), req.Fingerprint)
-	if err != nil {
-		h.response(
-			w, []byte(`{"error":"internal error"}`),
-			httpHandlerError{
-				Msg:      err.Error(),
-				Type:     errorCIAMSigninAnonym,
-				HTTPCode: http.StatusInternalServerError,
-			},
-		)
-		return
-	}
-
-	o, err := tokens.Serialize()
-	// TODO(?): remove error handling at this level
-	// motivation: if CIAM generated tokens, their integrity is guaranteed
+	o, err := h.ciam.SigninAnonym(r.Context(), req.Fingerprint)
 	if err != nil {
 		h.response(
 			w, []byte(`{"error":"internal error"}`),

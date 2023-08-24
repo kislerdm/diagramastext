@@ -131,7 +131,7 @@ const (
 )
 
 func defineModel(user *diagram.User) string {
-	if user != nil && user.IsRegistered {
+	if user != nil && user.Role.IsRegisteredUser() {
 		// FIXME: change for fine-tuned model after it's trained
 		return registeredModel
 	}

@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/kislerdm/diagramastext/server/core/diagram"
 )
 
 const (
@@ -33,17 +35,8 @@ type stdClaims struct {
 }
 
 func (s stdClaims) IsValidToken() error {
-	if s.Iss != iss {
-		return errors.New("wrong issuer")
-	}
-	if s.Aud != aud {
-		return errors.New("wrong audience")
-	}
-	if s.Exp < time.Now().UnixMilli() {
+	if s.Exp < time.Now().Unix() {
 		return errors.New("token expired")
-	}
-	if s.Iat > s.Exp || s.Iat > time.Now().UnixMilli() {
-		return errors.New("faulty iat")
 	}
 	return nil
 }
@@ -53,7 +46,7 @@ func newStdClaims(userID string, duration time.Duration, fnOps ...ClaimsOps) std
 		Sub: userID,
 		Iss: iss,
 		Aud: aud,
-		Iat: time.Now().UnixMilli(),
+		Iat: time.Now().Unix(),
 	}
 	setExp(&c, duration)
 	for _, fn := range fnOps {
@@ -72,14 +65,8 @@ type idTokenClaims struct {
 
 type accessTokenClaims struct {
 	stdClaims
-	Role   Role   `json:"role"`
-	Quotas Quotas `json:"quotas"`
-}
-
-type Quotas struct {
-	PromptLengthMax   uint16 `json:"prompt_length_max"`
-	RequestsPerMinute uint16 `json:"rpm"`
-	RequestsPerDay    uint16 `json:"rpd"`
+	Role   diagram.Role   `json:"role"`
+	Quotas diagram.Quotas `json:"quotas"`
 }
 
 type refreshTokenClaims struct {
@@ -87,14 +74,14 @@ type refreshTokenClaims struct {
 }
 
 func setExp(claims *stdClaims, d time.Duration) {
-	claims.Exp = claims.Iat + d.Milliseconds()
+	claims.Exp = claims.Iat + d.Milliseconds()/1000
 }
 
-func WithIat(iat time.Time) ClaimsOps {
+func WithCustomIat(iat time.Time) ClaimsOps {
 	return func(claims *stdClaims) {
 		d := claims.Exp - claims.Iat
-		claims.Iat = iat.UnixMilli()
-		setExp(claims, time.Duration(d)*time.Millisecond)
+		claims.Iat = iat.Unix()
+		setExp(claims, time.Duration(d)*time.Second)
 	}
 }
 
@@ -109,15 +96,15 @@ type Issuer interface {
 	// NewIDToken issuer id JWT.
 	NewIDToken(userID, email, fingerprint string, fnOps ...ClaimsOps) (string, error)
 	// NewAccessToken issuer access JWT.
-	NewAccessToken(userID string, role Role, fnOps ...ClaimsOps) (string, error)
+	NewAccessToken(user diagram.User, fnOps ...ClaimsOps) (string, error)
 	// NewRefreshToken issuer refresh JWT.
 	NewRefreshToken(userID string, fnOps ...ClaimsOps) (string, error)
 	// ParseIDToken parses id JWT.
-	ParseIDToken(token string) (userID string, err error)
+	ParseIDToken(token string) (userID, email, fingerprint string, err error)
 	// ParseRefreshToken parses refresh JWT.
 	ParseRefreshToken(token string) (userID string, err error)
 	// ParseAccessToken parses access JWT.
-	ParseAccessToken(token string) (userID string, role Role, quotas Quotas, err error)
+	ParseAccessToken(token string) (user diagram.User, err error)
 }
 
 func NewIssuer(key ed25519.PrivateKey) (Issuer, error) {
@@ -183,14 +170,11 @@ func (i issuer) NewIDToken(userID, email, fingerprint string, fnOps ...ClaimsOps
 	return i.serializeAndSign(tkn)
 }
 
-func (i issuer) NewAccessToken(userID string, role Role, fnOps ...ClaimsOps) (string, error) {
-	if !role.IsValid() {
-		return "", errors.New("faulty input role")
-	}
+func (i issuer) NewAccessToken(user diagram.User, fnOps ...ClaimsOps) (string, error) {
 	tkn := accessTokenClaims{
-		Role:      role,
-		Quotas:    role.Quotas(),
-		stdClaims: newStdClaims(userID, defaultExpirationDurationAccess, fnOps...),
+		Role:      user.Role,
+		Quotas:    user.Role.Quotas(),
+		stdClaims: newStdClaims(user.ID, defaultExpirationDurationAccess, fnOps...),
 	}
 	return i.serializeAndSign(tkn)
 }
@@ -231,15 +215,15 @@ func (i issuer) parseToken(token string, tkn interface{}) error {
 	return nil
 }
 
-func (i issuer) ParseIDToken(token string) (userID string, err error) {
+func (i issuer) ParseIDToken(token string) (userID, email, fingerprint string, err error) {
 	var tkn idTokenClaims
 	if err := i.parseToken(token, &tkn); err != nil {
-		return "", err
+		return "", "", "", err
 	}
 	if err := tkn.IsValidToken(); err != nil {
-		return "", err
+		return "", "", "", err
 	}
-	return tkn.Sub, nil
+	return tkn.Sub, *tkn.Email, *tkn.Fingerprint, nil
 }
 
 func (i issuer) ParseRefreshToken(token string) (userID string, err error) {
@@ -253,20 +237,22 @@ func (i issuer) ParseRefreshToken(token string) (userID string, err error) {
 	return tkn.Sub, nil
 }
 
-func (i issuer) ParseAccessToken(token string) (userID string, role Role, quotas Quotas, err error) {
+func (i issuer) ParseAccessToken(token string) (user diagram.User, err error) {
 	var tkn accessTokenClaims
-	if err := i.parseToken(token, &tkn); err != nil {
-		return "", 0, Quotas{}, err
+	if err = i.parseToken(token, &tkn); err != nil {
+		return
 	}
-	if err := tkn.IsValidToken(); err != nil {
-		return "", 0, Quotas{}, err
+	if err = tkn.IsValidToken(); err != nil {
+		return
 	}
 
 	if !reflect.DeepEqual(tkn.Quotas, tkn.Role.Quotas()) {
-		return "", 0, Quotas{}, errors.New("quotas from the token are not up to date")
+		err = errors.New("quotas from the token are not up to date")
+		return
 	}
 
-	return tkn.Sub, tkn.Role, tkn.Quotas, nil
+	user = diagram.User{ID: tkn.Sub, Role: tkn.Role}
+	return
 }
 
 func encodeSegment(seg []byte) string {

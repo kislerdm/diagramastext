@@ -23,8 +23,6 @@ func Test_loadDefaultConfig(t *testing.T) {
 		clientSecretsManager diagram.RepositorySecretsVault
 	}
 
-	keyPriv, keyPub := generateDevCertificateKeysPair()
-
 	tests := []struct {
 		name    string
 		args    args
@@ -45,8 +43,6 @@ func Test_loadDefaultConfig(t *testing.T) {
 								DBPassword: "postgres",
 							},
 							ciamConfigStore: ciamConfigStore{
-								PrivateKey:      keyPriv,
-								PublicKey:       keyPub,
 								SmtpUser:        "foo@bar.baz",
 								SmtpPassword:    "qux",
 								SmtpHost:        "smtphost",
@@ -84,8 +80,6 @@ func Test_loadDefaultConfig(t *testing.T) {
 					SmtpHost:           "smtphost",
 					SmtpPort:           "573",
 					SmtpSenderEmail:    "support@bar.baz",
-					PrivateKey:         keyPriv,
-					PublicKey:          keyPub,
 				},
 			},
 		},
@@ -103,8 +97,6 @@ func Test_loadDefaultConfig(t *testing.T) {
 								DBPassword: "postgres",
 							},
 							ciamConfigStore: ciamConfigStore{
-								PrivateKey:      keyPriv,
-								PublicKey:       keyPub,
 								SmtpUser:        "foo@bar.baz",
 								SmtpPassword:    "qux",
 								SmtpHost:        "smtphost",
@@ -158,8 +150,6 @@ func Test_loadDefaultConfig(t *testing.T) {
 					SmtpHost:           "smtphost",
 					SmtpPort:           "573",
 					SmtpSenderEmail:    "support@bar.baz",
-					PrivateKey:         keyPriv,
-					PublicKey:          keyPub,
 					KeyID:              "projects/my-project/locations/us-east1/keyRings/my-key-ring/cryptoKeys/my-key",
 				},
 				ModelInferenceConfig: modelInferenceConfig{
@@ -248,7 +238,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 			got := LoadDefaultConfig(context.TODO(), nil)
 
 			// THEN
-			if got.CIAM.PublicKey == nil || got.CIAM.PrivateKey == nil {
+			if got.CIAM.PrivateKey == nil {
 				t.Error("CIAM signing keys are not defined for dev environment")
 			}
 		},
@@ -262,7 +252,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 			got := LoadDefaultConfig(context.TODO(), nil)
 
 			// THEN
-			if got.CIAM.PublicKey == nil || got.CIAM.PrivateKey == nil {
+			if got.CIAM.PrivateKey == nil {
 				t.Error("CIAM signing keys are not defined for dev environment")
 			}
 		},

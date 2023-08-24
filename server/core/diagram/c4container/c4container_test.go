@@ -293,7 +293,7 @@ func Test_defineModel(t *testing.T) {
 	t.Run(
 		"registered user", func(t *testing.T) {
 			// GIVEN
-			user := &diagram.User{ID: "foobar", IsRegistered: true}
+			user := &diagram.User{ID: "foobar", Role: diagram.RoleRegisteredUser}
 
 			// WHEN
 			got := defineModel(user)

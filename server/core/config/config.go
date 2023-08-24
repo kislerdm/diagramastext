@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
@@ -38,7 +39,6 @@ type repositoryPredictionConfig struct {
 
 type ciamConfigStore struct {
 	PrivateKey         []byte `json:"private_key"`
-	PublicKey          []byte `json:"public_key"`
 	SmtpUser           string `json:"smtp_user"`
 	SmtpPassword       string `json:"smtp_password"`
 	SmtpHost           string `json:"smtp_host"`
@@ -59,8 +59,7 @@ type modelInferenceConfig struct {
 }
 
 type ciamCfg struct {
-	PrivateKey []byte
-	PublicKey  []byte
+	PrivateKey ed25519.PrivateKey
 	// KMS key ID
 	KeyID              string
 	TableOneTimeSecret string
@@ -114,9 +113,9 @@ func loadFromSecretsManager(
 		cfg.RepositoryPredictionConfig.DBUser = s.DBUser
 		cfg.RepositoryPredictionConfig.DBPassword = s.DBPassword
 
-		if s.PrivateKey != nil && s.PublicKey != nil {
-			cfg.CIAM.PrivateKey = s.PrivateKey
-			cfg.CIAM.PublicKey = s.PublicKey
+		if s.PrivateKey != nil {
+			// TODO: read private key from the secret
+			// cfg.CIAM.PrivateKey, _ = s.PrivateKey
 		}
 
 		cfg.CIAM.SmtpUser = s.SmtpUser
@@ -164,7 +163,7 @@ func loadEnvVarConfig(cfg *Config) {
 	}
 
 	if v := os.Getenv("ENV"); strings.HasPrefix(strings.ToLower(v), "dev") {
-		cfg.CIAM.PrivateKey, cfg.CIAM.PublicKey = generateDevCertificateKeysPair()
+		cfg.CIAM.PrivateKey = ciam.GenerateCertificate()
 	}
 
 	if v := os.Getenv("CIAM_SMTP_USER"); v != "" {
@@ -190,12 +189,4 @@ func loadEnvVarConfig(cfg *Config) {
 	if v := os.Getenv("CIAM_KEY"); v != "" {
 		cfg.CIAM.KeyID = v
 	}
-}
-
-func generateDevCertificateKeysPair() (keyPriv []byte, keyPub []byte) {
-	pub, priv, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		panic(err)
-	}
-	return priv, pub
 }

@@ -23,7 +23,6 @@ import (
 var (
 	postgresClient *postgres.Client
 	handler        http.Handler
-	ciamKMSClient  ciam.TokenSigningClient
 	ciamSMTPClient ciam.SMTPClient
 )
 
@@ -82,16 +81,14 @@ func init() {
 		}
 	}
 
-	ciamKMSClient, err = ciam.NewTokenSigningClientEd25519(cfg.CIAM.PrivateKey, cfg.CIAM.PublicKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	ciamSMTPClient = ciam.NewSMTClient(
 		cfg.CIAM.SmtpUser, cfg.CIAM.SmtpPassword, cfg.CIAM.SmtpHost, cfg.CIAM.SmtpPort, cfg.CIAM.SmtpSenderEmail,
 	)
 
-	ciamClient := ciam.NewClient(postgresClient, ciamKMSClient, ciamSMTPClient)
+	ciamClient, err := ciam.NewClient(postgresClient, ciamSMTPClient, cfg.CIAM.PrivateKey)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	handler, err = httphandler.NewHTTPHandler(
 		modelInferenceClient,

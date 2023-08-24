@@ -78,8 +78,9 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) ([]byte, e
 
 	if userID == "" {
 		userID = utils.NewUUID()
+		role := uint8(diagram.RoleAnonymUser)
 		if err := c.clientRepository.CreateUser(
-			ctx, userID, "", fingerprint, true, uint8(diagram.RoleAnonymUser),
+			ctx, userID, "", fingerprint, true, &role,
 		); err != nil {
 			return nil, err
 		}
@@ -112,8 +113,9 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) ([]by
 	switch userID == "" {
 	case true:
 		userID = utils.NewUUID()
+		role := uint8(diagram.RoleRegisteredUser)
 		if err := c.clientRepository.CreateUser(
-			ctx, userID, email, fingerprint, false, uint8(diagram.RoleRegisteredUser),
+			ctx, userID, email, fingerprint, false, &role,
 		); err != nil {
 			return nil, err
 		}

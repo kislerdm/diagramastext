@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
@@ -20,62 +21,66 @@ func TestCircular(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userIDWant := utils.NewUUID()
+	userWant := diagram.User{
+		ID:   utils.NewUUID(),
+		Role: diagram.RoleRegisteredUser,
+	}
 	const (
-		email = "foo@bar.baz"
+		email       = "foo@bar.baz"
+		fingerprint = "qux"
 	)
 
 	t.Parallel()
 	t.Run(
 		"shall parse generated id token", func(t *testing.T) {
-			tknStr, err := issuer.NewIDToken(userIDWant, email, "")
+			tknStr, err := issuer.NewIDToken(userWant.ID, email, fingerprint)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
 
-			userIDGot, err := issuer.ParseIDToken(tknStr)
+			userIDGot, emailGot, fingerprintGot, err := issuer.ParseIDToken(tknStr)
 			if err != nil {
 				t.Fatalf("failed to parse generated token: %v", err)
 			}
 
-			if userIDWant != userIDGot {
-				t.Errorf("wront userID extracted from the token. want: %s, got: %s", userIDWant, userIDGot)
+			if userWant.ID != userIDGot {
+				t.Errorf("wront userID extracted from the token. want: %s, got: %s", userWant.ID, userIDGot)
+			}
+
+			if emailGot != email {
+				t.Errorf("wront email extracted from the token. want: %s, got: %s", email, emailGot)
+			}
+
+			if fingerprintGot != fingerprint {
+				t.Errorf(
+					"wront fingerprint extracted from the token. want: %s, got: %s",
+					fingerprint, fingerprintGot,
+				)
 			}
 		},
 	)
 
 	t.Run(
 		"shall parse generated access token", func(t *testing.T) {
-			const roleWant = roleRegisteredUser
-			quotasWant := QuotasRegisteredUser
-
-			tknStr, err := issuer.NewAccessToken(userIDWant, roleWant)
+			tknStr, err := issuer.NewAccessToken(userWant)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
 
-			userIDGot, roleGot, quotasGot, err := issuer.ParseAccessToken(tknStr)
+			got, err := issuer.ParseAccessToken(tknStr)
 			if err != nil {
 				t.Fatalf("failed to parse generated token: %v", err)
 			}
 
-			if userIDWant != userIDGot {
-				t.Errorf("wront userIDWant extracted from the token. want: %s, got: %s", userIDWant, userIDGot)
-			}
-
-			if roleGot != roleWant {
-				t.Errorf("wront role extracted from the token. want: %v, got: %v", roleWant, roleGot)
-			}
-
-			if !reflect.DeepEqual(quotasGot, quotasWant) {
-				t.Errorf("wront quotas extracted from the token. want: %v, got: %v", quotasWant, quotasGot)
+			if !reflect.DeepEqual(userWant, got) {
+				t.Errorf("wront user data extracted from the token. want: %v, got: %v", userWant, got)
 			}
 		},
 	)
 
 	t.Run(
 		"shall parse generated refresh token", func(t *testing.T) {
-			tknStr, err := issuer.NewRefreshToken(userIDWant)
+			tknStr, err := issuer.NewRefreshToken(userWant.ID)
 			if err != nil {
 				t.Fatalf("failed to generate token: %v", err)
 			}
@@ -85,8 +90,8 @@ func TestCircular(t *testing.T) {
 				t.Fatalf("failed to parse generated token: %v", err)
 			}
 
-			if userIDWant != userIDGot {
-				t.Errorf("wront userIDWant extracted from the token. want: %s, got: %s", userIDWant, userIDGot)
+			if userWant.ID != userIDGot {
+				t.Errorf("wront userIDWant extracted from the token. want: %s, got: %s", userWant.ID, userIDGot)
 			}
 		},
 	)
