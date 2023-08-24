@@ -3,23 +3,21 @@ package ciam
 import (
 	"context"
 	"errors"
-	"reflect"
 	"time"
 )
 
 // RepositoryCIAM defines the communication port to persistence layer hosting users' data.
 type RepositoryCIAM interface {
-	CreateUser(ctx context.Context, id, email, fingerprint string, isActive bool) error
+	CreateUser(ctx context.Context, id, email, fingerprint string, isActive bool, role uint8) error
 	ReadUser(ctx context.Context, id string) (
-		found, isActive, emailVerified bool, email, fingerprint string, err error,
+		found, isActive bool, role uint8, email, fingerprint string, err error,
 	)
 
 	LookupUserByEmail(ctx context.Context, email string) (id string, isActive bool, err error)
 	LookupUserByFingerprint(ctx context.Context, fingerprint string) (id string, isActive bool, err error)
 
-	// UpdateUserSetEmailVerified sets user's email verification status.
-	// Note: the user will be also set as active.
-	UpdateUserSetEmailVerified(ctx context.Context, id string) error
+	// UpdateUserSetActive user active.
+	UpdateUserSetActive(ctx context.Context, userID string) error
 
 	// WriteOneTimeSecret creates a new, or updates existing one-time secret.
 	WriteOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error
@@ -28,8 +26,9 @@ type RepositoryCIAM interface {
 }
 
 type User struct {
-	ID, Email, Fingerprint  string
-	IsActive, EmailVerified bool
+	ID, Email, Fingerprint string
+	IsActive               bool
+	RoleID                 uint8
 }
 
 type Secret struct {
@@ -43,6 +42,35 @@ type MockRepositoryCIAM struct {
 	UserFingerprint map[string]*User
 	Secret          map[string]Secret
 	Err             error
+}
+
+func (m *MockRepositoryCIAM) CreateUser(
+	_ context.Context, id, email, fingerprint string, isActive bool, role uint8,
+) error {
+	if m.Err != nil {
+		return m.Err
+	}
+	m.setUser(
+		&User{
+			ID:          id,
+			Email:       email,
+			Fingerprint: fingerprint,
+			IsActive:    isActive,
+			RoleID:      role,
+		},
+	)
+	return nil
+}
+
+func (m *MockRepositoryCIAM) UpdateUserSetActive(_ context.Context, userID string) error {
+	if m.Err != nil {
+		return m.Err
+	}
+	if _, ok := m.UserID[userID]; !ok {
+		return errors.New("user not found")
+	}
+	m.UserID[userID].IsActive = true
+	return nil
 }
 
 func (m *MockRepositoryCIAM) setUser(u *User) {
@@ -62,32 +90,16 @@ func (m *MockRepositoryCIAM) setUser(u *User) {
 	m.UserID[u.ID] = u
 }
 
-func (m *MockRepositoryCIAM) CreateUser(_ context.Context, id, email, fingerprint string, isActive bool) error {
-	if m.Err != nil {
-		return m.Err
-	}
-	m.setUser(
-		&User{
-			ID:            id,
-			Email:         email,
-			Fingerprint:   fingerprint,
-			IsActive:      isActive,
-			EmailVerified: false,
-		},
-	)
-	return nil
-}
-
 func (m *MockRepositoryCIAM) ReadUser(_ context.Context, id string) (
-	found, isActive, emailVerified bool, email, fingerprint string, err error,
+	found, isActive bool, role uint8, email, fingerprint string, err error,
 ) {
 	if m.Err != nil {
-		return false, false, false, "", "", m.Err
+		return false, false, 0, "", "", m.Err
 	}
 	if u, ok := m.UserID[id]; ok {
-		return true, u.IsActive, u.EmailVerified, u.Email, u.Fingerprint, nil
+		return true, u.IsActive, u.RoleID, u.Email, u.Fingerprint, nil
 	}
-	return false, false, false, "", "", nil
+	return false, false, 0, "", "", nil
 }
 
 func (m *MockRepositoryCIAM) LookupUserByEmail(_ context.Context, email string) (id string, isActive bool, err error) {
@@ -122,11 +134,10 @@ func (m *MockRepositoryCIAM) UpdateUserSetEmailVerified(ctx context.Context, id 
 	}
 	m.setUser(
 		&User{
-			ID:            id,
-			Email:         email,
-			Fingerprint:   fingerprint,
-			IsActive:      true,
-			EmailVerified: true,
+			ID:          id,
+			Email:       email,
+			Fingerprint: fingerprint,
+			IsActive:    true,
 		},
 	)
 	return nil
@@ -164,38 +175,4 @@ func (m *MockRepositoryCIAM) DeleteOneTimeSecret(_ context.Context, userID strin
 	}
 	delete(m.Secret, userID)
 	return nil
-}
-
-// TokenSigningClient defines the communication port to the token's signing entity.
-type TokenSigningClient interface {
-	// Verify verifies the token.
-	Verify(ctx context.Context, signingString string, signature []byte) error
-
-	// Sign signs the token.
-	Sign(ctx context.Context, signingString string) (signature []byte, alg string, err error)
-}
-
-type MockTokenSigningClient struct {
-	Alg       string
-	Signature []byte
-	Err       error
-}
-
-func (m MockTokenSigningClient) Verify(_ context.Context, _ string, signature []byte) error {
-	if m.Err != nil {
-		return m.Err
-	}
-	if !reflect.DeepEqual(signature, m.Signature) {
-		return errors.New("invalid signature")
-	}
-	return nil
-}
-
-func (m MockTokenSigningClient) Sign(_ context.Context, _ string) (
-	signature []byte, alg string, err error,
-) {
-	if m.Err != nil {
-		return nil, m.Alg, m.Err
-	}
-	return m.Signature, m.Alg, nil
 }

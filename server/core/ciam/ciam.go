@@ -3,91 +3,63 @@ package ciam
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"math/rand"
 	"time"
 
+	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
 // Client defines the CIAM client.
 type Client interface {
 	// SigninAnonym executes anonym's authentication flow.
-	SigninAnonym(ctx context.Context, fingerprint string) (Tokens, error)
+	SigninAnonym(ctx context.Context, fingerprint string) (tokens []byte, err error)
 
 	// SigninUser executes user's authentication flow.
-	SigninUser(ctx context.Context, email, fingerprint string) (identityToken JWT, err error)
+	SigninUser(ctx context.Context, email, fingerprint string) (identityToken []byte, err error)
 
 	// IssueTokensAfterSecretConfirmation validates user's confirmation.
 	// The method requires successful invocation of SigninUser and a feedback from the user.
-	IssueTokensAfterSecretConfirmation(ctx context.Context, identityToken, secret string) (Tokens, error)
+	IssueTokensAfterSecretConfirmation(ctx context.Context, identityToken, secret string) (tokens []byte, err error)
 
 	// RefreshTokens refreshes access token given the refresh token.
-	RefreshTokens(ctx context.Context, refreshToken string) (Tokens, error)
+	RefreshTokens(ctx context.Context, refreshToken string) ([]byte, error)
 
-	// ParseAndValidateToken validates JWT.
-	ParseAndValidateToken(ctx context.Context, token string) (JWT, error)
-}
-
-type Tokens struct {
-	id      JWT
-	refresh JWT
-	access  JWT
-}
-
-func (t Tokens) Serialize() ([]byte, error) {
-	var (
-		temp struct {
-			ID      *string `json:"id,omitempty"`
-			Refresh *string `json:"refresh,omitempty"`
-			Access  *string `json:"access,omitempty"`
-		}
-		err error
-	)
-	sID, err := t.id.String()
-	if err != nil {
-		return nil, err
-	}
-	temp.ID = &sID
-
-	sRefresh, err := t.refresh.String()
-	if err != nil {
-		return nil, err
-	}
-	temp.Refresh = &sRefresh
-
-	sAccess, err := t.access.String()
-	if err != nil {
-		return nil, err
-	}
-	temp.Access = &sAccess
-
-	return json.Marshal(temp)
+	// ParseAccessToken parses token string and validates JWT.
+	ParseAccessToken(ctx context.Context, token string) (diagram.User, error)
 }
 
 // NewClient initializes the CIAM client.
-func NewClient(clientRepository RepositoryCIAM, clientKMS TokenSigningClient, clientEmail SMTPClient) Client {
-	return &client{
-		clientRepository: clientRepository,
-		clientKMS:        clientKMS,
-		clientEmail:      clientEmail,
+func NewClient(
+	clientRepository RepositoryCIAM, clientEmail SMTPClient, privateKey ed25519.PrivateKey,
+) (Client, error) {
+	issuer, err := NewIssuer(privateKey)
+	if err != nil {
+		return nil, err
 	}
+	return client{
+		clientRepository: clientRepository,
+		clientEmail:      clientEmail,
+		tokenIssuer:      issuer,
+	}, nil
 }
 
 type client struct {
 	clientRepository RepositoryCIAM
-	clientKMS        TokenSigningClient
 	clientEmail      SMTPClient
+	tokenIssuer      Issuer
 }
 
 // SigninAnonym executes anonym's authentication flow:
 //
 //	Fingerprint found in DB -> No  -> Create \
 //							-> Yes ->  --	-> Generate refresh and access JWT -> Return generates JWT.
-func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, error) {
+func (c client) SigninAnonym(ctx context.Context, fingerprint string) ([]byte, error) {
 	if fingerprint == "" {
-		return Tokens{}, errors.New("fingerprint must be provided")
+		return nil, errors.New("fingerprint must be provided")
 	}
 
 	var (
@@ -97,28 +69,30 @@ func (c client) SigninAnonym(ctx context.Context, fingerprint string) (Tokens, e
 
 	userID, isActive, err := c.clientRepository.LookupUserByFingerprint(ctx, fingerprint)
 	if err != nil {
-		return Tokens{}, err
+		return nil, err
 	}
 
 	if userID != "" && !isActive {
-		return Tokens{}, errors.New("user was deactivated")
+		return nil, errors.New("user was deactivated")
 	}
 
 	if userID == "" {
 		userID = utils.NewUUID()
-		if err := c.clientRepository.CreateUser(ctx, userID, "", fingerprint, true); err != nil {
-			return Tokens{}, err
+		if err := c.clientRepository.CreateUser(
+			ctx, userID, "", fingerprint, true, uint8(diagram.RoleAnonymUser),
+		); err != nil {
+			return nil, err
 		}
 	}
 
-	return c.issueTokens(ctx, userID, "", fingerprint, false)
+	return c.issueTokens(ctx, diagram.User{ID: userID, Role: diagram.RoleAnonymUser}, "", fingerprint)
 }
 
 // SigninUser executes user's authentication flow:
 //
 //	Email found in DB -> No  -> Create \
 //			 	   	  -> Yes ->	--	  -> Generate secret and id JWT -> Send secret to email -> Return id JWT.
-func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT, error) {
+func (c client) SigninUser(ctx context.Context, email, fingerprint string) ([]byte, error) {
 	if email == "" {
 		return nil, errors.New("email must be provided")
 	}
@@ -126,23 +100,8 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 	const defaultExpirationSecret = 10 * time.Minute
 
 	var (
-		userID     string
-		err        error
-		newIDToken = func(userID, email, fingerprint string, iat time.Time) (JWT, error) {
-			t, err := NewIDToken(userID, email, fingerprint, false, 0, WithCustomIat(iat))
-			if err != nil {
-				return nil, err
-			}
-			t, err = Sign(
-				t, func(signingString string) (signature []byte, alg string, err error) {
-					return c.clientKMS.Sign(ctx, signingString)
-				},
-			)
-			if err != nil {
-				return nil, err
-			}
-			return t, nil
-		}
+		userID string
+		err    error
 	)
 
 	userID, isActive, err := c.clientRepository.LookupUserByEmail(ctx, email)
@@ -153,7 +112,9 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 	switch userID == "" {
 	case true:
 		userID = utils.NewUUID()
-		if err := c.clientRepository.CreateUser(ctx, userID, email, fingerprint, false); err != nil {
+		if err := c.clientRepository.CreateUser(
+			ctx, userID, email, fingerprint, false, uint8(diagram.RoleRegisteredUser),
+		); err != nil {
 			return nil, err
 		}
 	default:
@@ -165,144 +126,119 @@ func (c client) SigninUser(ctx context.Context, email, fingerprint string) (JWT,
 			return nil, err
 		}
 		if found && iat.Add(defaultExpirationSecret).After(time.Now().UTC()) {
-			return newIDToken(userID, email, fingerprint, iat)
+			tkn, err := c.tokenIssuer.NewIDToken(
+				userID, email, fingerprint, WithValidityDuration(defaultExpirationSecret),
+			)
+			if err != nil {
+				return nil, err
+			}
+			return []byte(tkn), nil
 		}
 	}
 
 	secret := generateOnetimeSecret()
 	iat := time.Now().UTC()
 
-	if err := c.clientEmail.SendSignInEmail(email, secret); err != nil {
-		return nil, err
-	}
 	if err := c.clientRepository.WriteOneTimeSecret(ctx, userID, secret, iat); err != nil {
 		return nil, err
 	}
-	return newIDToken(userID, email, fingerprint, iat)
+	if err := c.clientEmail.SendSignInEmail(email, secret); err != nil {
+		return nil, err
+	}
+	tkn, err := c.tokenIssuer.NewIDToken(
+		userID, email, fingerprint, WithCustomIat(iat), WithValidityDuration(defaultExpirationSecret),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(tkn), nil
 }
 
-func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identityToken, secret string) (Tokens, error) {
-	t, err := ParseToken(identityToken)
+func (c client) IssueTokensAfterSecretConfirmation(ctx context.Context, identityToken, secret string) ([]byte, error) {
+	userID, email, fingerprint, err := c.tokenIssuer.ParseIDToken(identityToken)
 	if err != nil {
-		return Tokens{}, err
-	}
-	if err := t.Validate(
-		func(signingString string, signature []byte) error {
-			return c.clientKMS.Verify(ctx, signingString, signature)
-		},
-	); err != nil {
-		return Tokens{}, err
+		return nil, err
 	}
 
-	found, secretRef, _, err := c.clientRepository.ReadOneTimeSecret(ctx, t.UserID())
+	found, secretRef, _, err := c.clientRepository.ReadOneTimeSecret(ctx, userID)
 	if err != nil {
-		return Tokens{}, err
+		return nil, err
 	}
 
 	if !found {
-		return Tokens{}, errors.New("no secret was sent")
+		return nil, errors.New("no secret was sent")
 	}
 
 	if secret != secretRef {
-		return Tokens{}, errors.New("secret is wrong")
+		return nil, errors.New("secret is wrong")
 	}
 
-	if err := c.clientRepository.UpdateUserSetEmailVerified(ctx, t.UserID()); err != nil {
-		return Tokens{}, err
+	if err := c.clientRepository.UpdateUserSetActive(ctx, userID); err != nil {
+		return nil, err
 	}
 
-	_ = c.clientRepository.DeleteOneTimeSecret(ctx, t.UserID())
+	_ = c.clientRepository.DeleteOneTimeSecret(ctx, userID)
 
-	return c.issueTokens(ctx, t.UserID(), t.UserEmail(), t.UserDeviceFingerprint(), true)
+	return c.issueTokens(ctx, diagram.User{ID: userID, Role: diagram.RoleRegisteredUser}, email, fingerprint)
 }
 
-func (c client) issueTokens(ctx context.Context, userID, email, fingerprint string, emailVerified bool) (
-	Tokens, error,
+func (c client) issueTokens(_ context.Context, user diagram.User, email, fingerprint string) (
+	[]byte, error,
 ) {
-	signFn := func(signingString string) (signature []byte, alg string, err error) {
-		return c.clientKMS.Sign(ctx, signingString)
-	}
-
 	iat := time.Now().UTC()
 
-	idToken, err := NewIDToken(userID, email, fingerprint, emailVerified, 0, WithCustomIat(iat))
-	if err != nil {
-		return Tokens{}, err
-	}
-
-	idToken, err = Sign(idToken, signFn)
-	if err != nil {
-		return Tokens{}, err
-	}
-
-	accessToken, err := NewAccessToken(userID, emailVerified, WithCustomIat(iat))
-	if err != nil {
-		return Tokens{}, err
-	}
-
-	accessToken, err = Sign(accessToken, signFn)
-	if err != nil {
-		return Tokens{}, err
-	}
-
-	refreshToken, err := NewRefreshToken(userID, WithCustomIat(iat))
-	if err != nil {
-		return Tokens{}, err
-	}
-
-	refreshToken, err = Sign(refreshToken, signFn)
-	if err != nil {
-		return Tokens{}, err
-	}
-
-	return Tokens{
-		id:      idToken,
-		refresh: refreshToken,
-		access:  accessToken,
-	}, nil
-}
-
-func (c client) ParseAndValidateToken(ctx context.Context, token string) (JWT, error) {
-	t, err := ParseToken(token)
+	idToken, err := c.tokenIssuer.NewIDToken(user.ID, email, fingerprint, WithCustomIat(iat))
 	if err != nil {
 		return nil, err
 	}
-	if err := t.Validate(
-		func(signingString string, signature []byte) error {
-			return c.clientKMS.Verify(ctx, signingString, signature)
-		},
-	); err != nil {
+
+	accessToken, err := c.tokenIssuer.NewAccessToken(user, WithCustomIat(iat))
+	if err != nil {
 		return nil, err
 	}
-	return t, nil
+
+	refreshToken, err := c.tokenIssuer.NewRefreshToken(user.ID, WithCustomIat(iat))
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(
+		struct {
+			ID      *string `json:"id,omitempty"`
+			Refresh *string `json:"refresh,omitempty"`
+			Access  *string `json:"access,omitempty"`
+		}{
+			ID:      pointerStr(idToken),
+			Refresh: pointerStr(refreshToken),
+			Access:  pointerStr(accessToken),
+		},
+	)
 }
 
-func (c client) RefreshTokens(ctx context.Context, refreshToken string) (Tokens, error) {
-	t, err := ParseToken(refreshToken)
+func (c client) ParseAccessToken(_ context.Context, token string) (diagram.User, error) {
+	return c.tokenIssuer.ParseAccessToken(token)
+}
+
+func (c client) RefreshTokens(ctx context.Context, refreshToken string) ([]byte, error) {
+	userID, err := c.tokenIssuer.ParseRefreshToken(refreshToken)
 	if err != nil {
-		return Tokens{}, err
+		return nil, err
 	}
-	if err := t.Validate(
-		func(signingString string, signature []byte) error {
-			return c.clientKMS.Verify(ctx, signingString, signature)
-		},
-	); err != nil {
-		return Tokens{}, err
-	}
-	found, isActive, emailVerified, email, fingerprint, err := c.clientRepository.ReadUser(ctx, t.UserID())
+	found, isActive, roleID, email, fingerprint, err := c.clientRepository.ReadUser(ctx, userID)
 	if err != nil {
-		return Tokens{}, err
+		return nil, err
 	}
 	if !found {
-		return Tokens{}, errors.New("user not found")
+		return nil, errors.New("user not found")
 	}
 	if !isActive {
-		return Tokens{}, errors.New("user was deactivated")
+		return nil, errors.New("user was deactivated")
 	}
-	if email != "" && !emailVerified {
-		return Tokens{}, errors.New("user's email was not verified yet")
+	role := diagram.Role(roleID)
+	if email != "" && role == diagram.RoleAnonymUser {
+		return nil, errors.New("user's email was not verified yet")
 	}
-	return c.issueTokens(ctx, t.UserID(), email, fingerprint, emailVerified)
+	return c.issueTokens(ctx, diagram.User{ID: userID, Role: role}, email, fingerprint)
 }
 
 func generateOnetimeSecret() string {
@@ -318,72 +254,7 @@ func generateOnetimeSecret() string {
 	return string(b)
 }
 
-type MockCIAMClient struct {
-	Err                        error
-	UserID, Email, Fingerprint string
-	tokens                     Tokens
-}
-
-func (m *MockCIAMClient) Tokens() Tokens {
-	return m.tokens
-}
-
-func (m *MockCIAMClient) output() (Tokens, error) {
-	if m.Err != nil {
-		return Tokens{}, m.Err
-	}
-
-	userID := m.UserID
-	if userID == "" {
-		userID = utils.NewUUID()
-	}
-
-	emailVerified := false
-	if m.Email != "" {
-		emailVerified = true
-	}
-
-	iat := time.Now().UTC()
-
-	acc, _ := NewAccessToken(userID, emailVerified, WithCustomIat(iat))
-	ref, _ := NewRefreshToken(userID, WithCustomIat(iat))
-	id, _ := NewIDToken(userID, m.Email, m.Fingerprint, emailVerified, 0, WithCustomIat(iat))
-
-	m.tokens = Tokens{
-		id:      id,
-		refresh: ref,
-		access:  acc,
-	}
-
-	return m.Tokens(), nil
-}
-
-func (m *MockCIAMClient) SigninAnonym(_ context.Context, _ string) (Tokens, error) {
-	return m.output()
-}
-
-func (m *MockCIAMClient) SigninUser(_ context.Context, _, _ string) (identityToken JWT, err error) {
-	t, err := m.output()
-	if err != nil {
-		return nil, err
-	}
-	return t.id, nil
-}
-
-func (m *MockCIAMClient) IssueTokensAfterSecretConfirmation(_ context.Context, _, _ string) (
-	Tokens, error,
-) {
-	return m.output()
-}
-
-func (m *MockCIAMClient) RefreshTokens(_ context.Context, _ string) (Tokens, error) {
-	return m.output()
-}
-
-func (m *MockCIAMClient) ParseAndValidateToken(_ context.Context, _ string) (JWT, error) {
-	if m.Err != nil {
-		return nil, m.Err
-	}
-	// FIXME: make stateless method
-	return m.tokens.access, nil
+func GenerateCertificate() ed25519.PrivateKey {
+	_, o, _ := ed25519.GenerateKey(rand.New(rand.NewSource(0)))
+	return o
 }
