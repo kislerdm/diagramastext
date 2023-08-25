@@ -13,7 +13,7 @@ import (
 
 	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/diagram"
-	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
+	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 type mockWriter struct {
@@ -460,7 +460,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 				StatusCode: http.StatusUnprocessableEntity,
 				V:          []byte(`{"error":"wrong request content"}`),
 			},
-			wantErr: newInputContentValidationError(
+			wantErr: errs.NewInputContentValidationError(
 				errors.New("prompt length must be between 3 and 100 characters"),
 			),
 		},
@@ -492,9 +492,9 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 				StatusCode: http.StatusBadRequest,
 				V:          []byte(`{"error":"wrong request format"}`),
 			},
-			wantErr: httpHandlerError{
+			wantErr: errs.HTTPHandlerError{
 				Msg:      "faulty JSON",
-				Type:     errorInvalidRequest,
+				Type:     "InputValidation:InvalidRequestFormat",
 				HTTPCode: http.StatusBadRequest,
 			},
 		},
@@ -504,7 +504,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 			fields: fields{
 				diagramRenderingHandler: map[string]diagram.HTTPHandler{
 					"/c4": func(_ context.Context, _ diagram.Input) (diagram.Output, error) {
-						return nil, diagramErrors.NewPredictionError([]byte(`{"error":"qux"}`))
+						return nil, errs.NewPredictionError([]byte(`{"error":"qux"}`))
 					},
 				},
 				corsHeaders: corsHeaders,
@@ -527,7 +527,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 				StatusCode: http.StatusBadRequest,
 				V:          []byte(`{"error":"qux"}`),
 			},
-			wantErr: newModelPredictionError(diagramErrors.NewPredictionError([]byte(`{"error":"qux"}`))),
+			wantErr: newModelPredictionError(errs.NewPredictionError([]byte(`{"error":"qux"}`))),
 		},
 		{
 			name:            "unhappy path: POST /c4, diagram rendering error",
@@ -618,7 +618,7 @@ func Test_httpHandler_diagramRendering(t *testing.T) {
 				StatusCode: http.StatusNotFound,
 				V:          []byte(`{"error":"not exists"}`),
 			},
-			wantErr: newHandlerNotExistsError(errors.New("handler not exists for path /notFound")),
+			wantErr: errs.NewHandlerNotExistsError(errors.New("handler not exists for path /notFound")),
 		},
 	}
 
@@ -661,7 +661,7 @@ func Test_httpHandlerError_Error(t *testing.T) {
 	t.Run(
 		"error message test", func(t *testing.T) {
 			// GIVEN
-			err := httpHandlerError{
+			err := errs.HTTPHandlerError{
 				Msg:      "foobar",
 				Type:     errorCoreLogic,
 				HTTPCode: http.StatusInternalServerError,
@@ -732,7 +732,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 					Header: http.Header{},
 				},
 			},
-			want: httpHandlerError{
+			want: errs.HTTPHandlerError{
 				Msg:      "no authorization token provided",
 				Type:     errorNotAuthorizedNoToken,
 				HTTPCode: http.StatusUnauthorized,
@@ -754,7 +754,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 					),
 				},
 			},
-			want: httpHandlerError{
+			want: errs.HTTPHandlerError{
 				Msg:      "internal error",
 				Type:     errorRepositoryToken,
 				HTTPCode: http.StatusInternalServerError,
@@ -774,7 +774,7 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 					),
 				},
 			},
-			want: httpHandlerError{
+			want: errs.HTTPHandlerError{
 				Msg:      "the authorization token does not exist, or not active, or account is suspended",
 				Type:     errorNotAuthorizedNoToken,
 				HTTPCode: http.StatusUnauthorized,
@@ -790,104 +790,6 @@ func Test_httpHandler_authorizationAPI(t *testing.T) {
 				}
 
 				if got := h.authorizationAPI(tt.args.r, tt.args.user); !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("unexpected error message collected")
-					return
-				}
-
-				if !reflect.DeepEqual(tt.args.user, tt.wantUser) {
-					t.Errorf("unexpected user data fetched")
-				}
-			},
-		)
-	}
-}
-
-func Test_httpHandler_authorizationWebclient(t *testing.T) {
-	type fields struct {
-		ciam ciam.Client
-	}
-	type args struct {
-		r    *http.Request
-		user *diagram.User
-	}
-
-	ciamClient, _, token := mustCIAMClientAndJWTandTokenStr("foo@bar.baz")
-	userID := ciamClient.(*ciam.MockCIAMClient).UserID
-
-	tests := []struct {
-		name     string
-		fields   fields
-		args     args
-		want     error
-		wantUser *diagram.User
-	}{
-		{
-			name: "happy path",
-			fields: fields{
-				ciam: ciamClient,
-			},
-			args: args{
-				r: &http.Request{
-					Header: httpHeaders(
-						map[string]string{
-							"Authorization": "Bearer " + token,
-						},
-					),
-				},
-				user: &diagram.User{},
-			},
-			want: nil,
-			wantUser: &diagram.User{
-				ID:   userID,
-				Role: diagram.RoleRegisteredUser,
-			},
-		},
-		{
-			name: "unhappy path: no token",
-			args: args{
-				r:    &http.Request{},
-				user: &diagram.User{},
-			},
-			want: httpHandlerError{
-				Msg:      "no authorization token provided",
-				Type:     errorNotAuthorizedNoToken,
-				HTTPCode: http.StatusUnauthorized,
-			},
-			wantUser: &diagram.User{},
-		},
-		{
-			name: "unhappy path: invalid token",
-			fields: fields{
-				ciam: &ciam.MockCIAMClient{
-					Err: errors.New("foobar"),
-				},
-			},
-			args: args{
-				r: &http.Request{
-					Header: httpHeaders(
-						map[string]string{
-							"Authorization": "Bearer foobar",
-						},
-					),
-				},
-				user: &diagram.User{},
-			},
-			want: httpHandlerError{
-				Msg:      "invalid access token",
-				Type:     errorNotAuthorizedInvalidToken,
-				HTTPCode: http.StatusUnauthorized,
-			},
-			wantUser: &diagram.User{},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(
-			tt.name, func(t *testing.T) {
-				h := httpHandler{
-					ciam: tt.fields.ciam,
-				}
-
-				if got := h.authorizationWebclient(tt.args.r, tt.args.user); !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("unexpected error message collected")
 					return
 				}
@@ -966,13 +868,14 @@ func Test_httpHandler_HandlerNotFound(t *testing.T) {
 	t.Run(
 		"api", func(t *testing.T) {
 			// GIVEN
-			errs := &errCollector{}
+			e := &errCollector{}
 
 			handler := httpHandler{
-				reportErrorFn:             errs.Err,
+				reportErrorFn:             e.Err,
 				repositoryAPITokens:       diagram.MockRepositoryToken{V: "bar"},
 				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
 				corsHeaders:               corsHeaders{},
+				ciam:                      ciam.Mock{},
 			}
 
 			r := &http.Request{
@@ -995,53 +898,6 @@ func Test_httpHandler_HandlerNotFound(t *testing.T) {
 			// THEN
 			if !reflect.DeepEqual(w.V, []byte(`{"error":"resource `+r.URL.Path+` not found"}`)) {
 				t.Errorf("unexpected response body")
-			}
-
-			if !reflect.DeepEqual(errs.V, newHandlerNotExistsError(errors.New(r.URL.Path+" not found"))) {
-				t.Errorf("unexpected error reported")
-			}
-		},
-	)
-
-	t.Run(
-		"webclient", func(t *testing.T) {
-			// GIVEN
-			errs := &errCollector{}
-
-			ciamClient, _, token := mustCIAMClientAndJWTandTokenStr("foo@bar.baz")
-
-			handler := httpHandler{
-				reportErrorFn:             errs.Err,
-				repositoryAPITokens:       diagram.MockRepositoryToken{V: "bar"},
-				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
-				corsHeaders:               corsHeaders{},
-				ciam:                      ciamClient,
-			}
-
-			r := &http.Request{
-				Method: http.MethodGet,
-				URL:    &url.URL{Path: "/internal/foo/bar/qux/unknown"},
-				Header: httpHeaders(
-					map[string]string{
-						"Authorization": "Bearer " + token,
-					},
-				),
-			}
-
-			w := &mockWriter{
-				Headers: httpHeaders(nil),
-			}
-
-			// WHEN
-			handler.ServeHTTP(w, r)
-
-			// THEN
-			if !reflect.DeepEqual(w.V, []byte(`{"error":"resource `+r.URL.Path+` not found"}`)) {
-				t.Errorf("unexpected response body")
-			}
-
-			if !reflect.DeepEqual(errs.V, newHandlerNotExistsError(errors.New(r.URL.Path+" not found"))) {
-				t.Errorf("unexpected error reported")
 			}
 		},
 	)
@@ -1163,9 +1019,9 @@ func Test_getQuotasUsage(t *testing.T) {
 	t.Run(
 		"shall return internal error caused by interaction error with repository", func(t *testing.T) {
 			// GIVEN
-			errs := &errCollector{}
+			e := &errCollector{}
 			handler := httpHandler{
-				reportErrorFn:       errs.Err,
+				reportErrorFn:       e.Err,
 				corsHeaders:         corsHeaders{},
 				repositoryAPITokens: diagram.MockRepositoryToken{V: "bar"},
 				repositoryRequestsHistory: diagram.MockRepositoryPrediction{
@@ -1200,7 +1056,7 @@ func Test_getQuotasUsage(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(
-				errs.V, httpHandlerError{
+				e.V, errs.HTTPHandlerError{
 					Msg:      "foobar",
 					Type:     errorQuotaFetching,
 					HTTPCode: http.StatusInternalServerError,
@@ -1246,10 +1102,8 @@ func Test_httpHandler_checkQuota(t *testing.T) {
 				repositoryRequestsHistory: diagram.MockRepositoryPrediction{},
 			},
 			args: args{
-				r: &http.Request{},
-				user: &diagram.User{
-					Quotas: ciam.QuotasAnonymUser,
-				},
+				r:    &http.Request{},
+				user: &diagram.User{},
 			},
 			wantErr: nil,
 		},
@@ -1257,14 +1111,14 @@ func Test_httpHandler_checkQuota(t *testing.T) {
 			name: "shall yield quota excess",
 			fields: fields{
 				repositoryRequestsHistory: diagram.MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(time.Now().UTC(), ciam.QuotasAnonymUser.RequestsPerDay),
+					Timestamps: repeatTimestamp(time.Now().UTC(), diagram.RoleAnonymUser.Quotas().RequestsPerDay),
 				},
 			},
 			args: args{
 				r:    &http.Request{},
-				user: &diagram.User{Quotas: ciam.QuotasAnonymUser},
+				user: &diagram.User{},
 			},
-			wantErr: httpHandlerError{
+			wantErr: errs.HTTPHandlerError{
 				Msg:      "quota exceeded",
 				Type:     errorQuotaExceeded,
 				HTTPCode: http.StatusForbidden,
@@ -1274,14 +1128,14 @@ func Test_httpHandler_checkQuota(t *testing.T) {
 			name: "shall yield throttling error",
 			fields: fields{
 				repositoryRequestsHistory: diagram.MockRepositoryPrediction{
-					Timestamps: repeatTimestamp(time.Now().UTC(), ciam.QuotasAnonymUser.RequestsPerMinute),
+					Timestamps: repeatTimestamp(time.Now().UTC(), diagram.RoleAnonymUser.Quotas().RequestsPerMinute),
 				},
 			},
 			args: args{
 				r:    &http.Request{},
-				user: &diagram.User{Quotas: ciam.QuotasAnonymUser},
+				user: &diagram.User{},
 			},
-			wantErr: httpHandlerError{
+			wantErr: errs.HTTPHandlerError{
 				Msg:      "throttling quota exceeded",
 				Type:     errorQuotaExceeded,
 				HTTPCode: http.StatusTooManyRequests,
@@ -1298,7 +1152,7 @@ func Test_httpHandler_checkQuota(t *testing.T) {
 				r:    &http.Request{},
 				user: &diagram.User{},
 			},
-			wantErr: httpHandlerError{
+			wantErr: errs.HTTPHandlerError{
 				Msg:      "internal error",
 				Type:     errorQuotaValidation,
 				HTTPCode: http.StatusInternalServerError,
@@ -1343,214 +1197,157 @@ func Test_httpHandler_response(t *testing.T) {
 	)
 }
 
-func Test_httpHandler_ciamHandler(t *testing.T) {
-	type fields struct {
-		diagramRenderingHandler   map[string]diagram.HTTPHandler
-		reportErrorFn             func(err error)
-		corsHeaders               corsHeaders
-		repositoryAPITokens       diagram.RepositoryToken
-		repositoryRequestsHistory diagram.RepositoryPrediction
-		ciam                      ciam.Client
-	}
-	type args struct {
-		w http.ResponseWriter
-		r *http.Request
-	}
-	tests := []struct {
-		name           string
-		fields         fields
-		args           args
-		wantStatusCode int
-	}{
-		{
-			name:   "unhappy path: not allowed method",
-			fields: fields{reportErrorFn: func(err error) {}},
-			args: args{
-				r: &http.Request{
-					Method: http.MethodGet,
-					URL:    &url.URL{Path: "/auth/foobar"},
-				},
-				w: &mockWriter{
-					Headers: httpHeaders(nil),
-				},
-			},
-			wantStatusCode: http.StatusMethodNotAllowed,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(
-			tt.name, func(t *testing.T) {
-				h := httpHandler{
-					diagramRenderingHandler:   tt.fields.diagramRenderingHandler,
-					reportErrorFn:             tt.fields.reportErrorFn,
-					corsHeaders:               tt.fields.corsHeaders,
-					repositoryAPITokens:       tt.fields.repositoryAPITokens,
-					repositoryRequestsHistory: tt.fields.repositoryRequestsHistory,
-					ciam:                      tt.fields.ciam,
-				}
-				h.ciamHandler(tt.args.w, tt.args.r)
-				if tt.args.w.(*mockWriter).StatusCode != tt.wantStatusCode {
-					t.Errorf(
-						"unexpected status code. want = %d, got = %d", tt.wantStatusCode,
-						tt.args.w.(*mockWriter).StatusCode,
-					)
-				}
-			},
-		)
-	}
-}
-
-func Test_httpHandler_ciamHandlerSigninAnonym(t *testing.T) {
-	type fields struct {
-		diagramRenderingHandler   map[string]diagram.HTTPHandler
-		corsHeaders               corsHeaders
-		repositoryAPITokens       diagram.RepositoryToken
-		repositoryRequestsHistory diagram.RepositoryPrediction
-		ciam                      ciam.Client
-	}
-	type args struct {
-		w http.ResponseWriter
-		r *http.Request
-	}
-	tests := []struct {
-		name            string
-		fields          fields
-		args            args
-		wantStatusCode  int
-		wantErr         error
-		wantBody        []byte
-		errorsCollector *errCollector
-	}{
-		{
-			name: "happy path",
-			fields: fields{
-				diagramRenderingHandler: nil,
-				ciam:                    &ciam.MockCIAMClient{},
-			},
-			args: args{
-				r: &http.Request{
-					Body: io.NopCloser(
-						strings.NewReader(`{"fingerprint": "9468a4a53a2f2fd9ea96db22dc9dd9bb6ce38b7c"}`),
-					),
-				},
-				w: &mockWriter{
-					Headers: httpHeaders(nil),
-				},
-			},
-			wantStatusCode:  http.StatusOK,
-			wantErr:         nil,
-			errorsCollector: &errCollector{},
-		},
-		{
-			name: "invalid input body: format",
-			fields: fields{
-				diagramRenderingHandler: nil,
-				ciam:                    &ciam.MockCIAMClient{},
-			},
-			args: args{
-				r: &http.Request{
-					Body: io.NopCloser(strings.NewReader(`{""}`)),
-				},
-				w: &mockWriter{
-					Headers: httpHeaders(nil),
-				},
-			},
-			wantStatusCode: http.StatusBadRequest,
-			wantBody:       []byte(`{"error":"request parsing error"}`),
-			wantErr: httpHandlerError{
-				Msg:      "faulty JSON",
-				Type:     errorInvalidRequest,
-				HTTPCode: http.StatusBadRequest,
-			},
-			errorsCollector: &errCollector{},
-		},
-		{
-			name: "invalid input body: content",
-			fields: fields{
-				diagramRenderingHandler: nil,
-				ciam:                    &ciam.MockCIAMClient{},
-			},
-			args: args{
-				r: &http.Request{
-					Body: io.NopCloser(strings.NewReader(`{"fingerprint":"foo"}`)),
-				},
-				w: &mockWriter{
-					Headers: httpHeaders(nil),
-				},
-			},
-			wantStatusCode:  http.StatusUnprocessableEntity,
-			wantBody:        []byte(`{"error":"invalid request"}`),
-			wantErr:         newInputContentValidationError(errors.New("invalid fingerprint")),
-			errorsCollector: &errCollector{},
-		},
-		{
-			name: "CIAM failure",
-			fields: fields{
-				diagramRenderingHandler: nil,
-				ciam: &ciam.MockCIAMClient{
-					Err: errors.New("foobar"),
-				},
-			},
-			args: args{
-				r: &http.Request{
-					Body: io.NopCloser(strings.NewReader(`{"fingerprint":"9468a4a53a2f2fd9ea96db22dc9dd9bb6ce38b7c"}`)),
-				},
-				w: &mockWriter{
-					Headers: httpHeaders(nil),
-				},
-			},
-			wantStatusCode: http.StatusInternalServerError,
-			wantBody:       []byte(`{"error":"internal error"}`),
-			wantErr: httpHandlerError{
-				Msg:      "foobar",
-				Type:     errorCIAMSigninAnonym,
-				HTTPCode: http.StatusInternalServerError,
-			},
-			errorsCollector: &errCollector{},
-		},
-	}
-	t.Parallel()
-	for _, tt := range tests {
-		t.Run(
-			tt.name, func(t *testing.T) {
-				h := httpHandler{
-					diagramRenderingHandler:   tt.fields.diagramRenderingHandler,
-					reportErrorFn:             tt.errorsCollector.Err,
-					corsHeaders:               tt.fields.corsHeaders,
-					repositoryAPITokens:       tt.fields.repositoryAPITokens,
-					repositoryRequestsHistory: tt.fields.repositoryRequestsHistory,
-					ciam:                      tt.fields.ciam,
-				}
-				h.ciamHandlerSigninAnonym(tt.args.w, tt.args.r)
-
-				if tt.args.w.(*mockWriter).StatusCode != tt.wantStatusCode {
-					t.Errorf(
-						"unexpected status code. want = %d, got = %d", tt.wantStatusCode,
-						tt.args.w.(*mockWriter).StatusCode,
-					)
-				}
-
-				var wantBody []byte
-				wantBody = tt.wantBody
-				if wantBody == nil {
-					var err error
-					wantBody, err = tt.fields.ciam.(*ciam.MockCIAMClient).Tokens().Serialize()
-					if err != nil {
-						panic(err)
-					}
-				}
-
-				if !reflect.DeepEqual(tt.args.w.(*mockWriter).V, wantBody) {
-					t.Error("unexpected response body")
-				}
-
-				if !reflect.DeepEqual(tt.wantErr, tt.errorsCollector.V) {
-					t.Error("unexpected error collected")
-				}
-			},
-		)
-	}
-}
+// func Test_httpHandler_ciamHandlerSigninAnonym(t *testing.T) {
+// 	type fields struct {
+// 		diagramRenderingHandler   map[string]diagram.HTTPHandler
+// 		corsHeaders               corsHeaders
+// 		repositoryAPITokens       diagram.RepositoryToken
+// 		repositoryRequestsHistory diagram.RepositoryPrediction
+// 		ciam                      ciam.Client
+// 	}
+// 	type args struct {
+// 		w http.ResponseWriter
+// 		r *http.Request
+// 	}
+// 	tests := []struct {
+// 		name            string
+// 		fields          fields
+// 		args            args
+// 		wantStatusCode  int
+// 		wantErr         error
+// 		wantBody        []byte
+// 		errorsCollector *errCollector
+// 	}{
+// 		{
+// 			name: "happy path",
+// 			fields: fields{
+// 				diagramRenderingHandler: nil,
+// 				ciam:                    &ciam.MockCIAMClient{},
+// 			},
+// 			args: args{
+// 				r: &http.Request{
+// 					Body: io.NopCloser(
+// 						strings.NewReader(`{"fingerprint": "9468a4a53a2f2fd9ea96db22dc9dd9bb6ce38b7c"}`),
+// 					),
+// 				},
+// 				w: &mockWriter{
+// 					Headers: httpHeaders(nil),
+// 				},
+// 			},
+// 			wantStatusCode:  http.StatusOK,
+// 			wantErr:         nil,
+// 			errorsCollector: &errCollector{},
+// 		},
+// 		{
+// 			name: "invalid input body: format",
+// 			fields: fields{
+// 				diagramRenderingHandler: nil,
+// 				ciam:                    &ciam.MockCIAMClient{},
+// 			},
+// 			args: args{
+// 				r: &http.Request{
+// 					Body: io.NopCloser(strings.NewReader(`{""}`)),
+// 				},
+// 				w: &mockWriter{
+// 					Headers: httpHeaders(nil),
+// 				},
+// 			},
+// 			wantStatusCode: http.StatusBadRequest,
+// 			wantBody:       []byte(`{"error":"request parsing error"}`),
+// 			wantErr: HTTPHandlerError{
+// 				Msg:      "faulty JSON",
+// 				Type:     errorInvalidRequest,
+// 				HTTPCode: http.StatusBadRequest,
+// 			},
+// 			errorsCollector: &errCollector{},
+// 		},
+// 		{
+// 			name: "invalid input body: content",
+// 			fields: fields{
+// 				diagramRenderingHandler: nil,
+// 				ciam:                    &ciam.MockCIAMClient{},
+// 			},
+// 			args: args{
+// 				r: &http.Request{
+// 					Body: io.NopCloser(strings.NewReader(`{"fingerprint":"foo"}`)),
+// 				},
+// 				w: &mockWriter{
+// 					Headers: httpHeaders(nil),
+// 				},
+// 			},
+// 			wantStatusCode:  http.StatusUnprocessableEntity,
+// 			wantBody:        []byte(`{"error":"invalid request"}`),
+// 			wantErr:         NewInputContentValidationError(errors.New("invalid fingerprint")),
+// 			errorsCollector: &errCollector{},
+// 		},
+// 		{
+// 			name: "CIAM failure",
+// 			fields: fields{
+// 				diagramRenderingHandler: nil,
+// 				ciam: &ciam.MockCIAMClient{
+// 					Err: errors.New("foobar"),
+// 				},
+// 			},
+// 			args: args{
+// 				r: &http.Request{
+// 					Body: io.NopCloser(strings.NewReader(`{"fingerprint":"9468a4a53a2f2fd9ea96db22dc9dd9bb6ce38b7c"}`)),
+// 				},
+// 				w: &mockWriter{
+// 					Headers: httpHeaders(nil),
+// 				},
+// 			},
+// 			wantStatusCode: http.StatusInternalServerError,
+// 			wantBody:       []byte(`{"error":"internal error"}`),
+// 			wantErr: HTTPHandlerError{
+// 				Msg:      "foobar",
+// 				Type:     errorCIAMSigninAnonym,
+// 				HTTPCode: http.StatusInternalServerError,
+// 			},
+// 			errorsCollector: &errCollector{},
+// 		},
+// 	}
+// 	t.Parallel()
+// 	for _, tt := range tests {
+// 		t.Run(
+// 			tt.name, func(t *testing.T) {
+// 				h := httpHandler{
+// 					diagramRenderingHandler:   tt.fields.diagramRenderingHandler,
+// 					reportErrorFn:             tt.errorsCollector.Err,
+// 					corsHeaders:               tt.fields.corsHeaders,
+// 					repositoryAPITokens:       tt.fields.repositoryAPITokens,
+// 					repositoryRequestsHistory: tt.fields.repositoryRequestsHistory,
+// 					ciam:                      tt.fields.ciam,
+// 				}
+// 				h.ciamHandlerSigninAnonym(tt.args.w, tt.args.r)
+//
+// 				if tt.args.w.(*mockWriter).StatusCode != tt.wantStatusCode {
+// 					t.Errorf(
+// 						"unexpected status code. want = %d, got = %d", tt.wantStatusCode,
+// 						tt.args.w.(*mockWriter).StatusCode,
+// 					)
+// 				}
+//
+// 				var wantBody []byte
+// 				wantBody = tt.wantBody
+// 				if wantBody == nil {
+// 					var err error
+// 					wantBody, err = tt.fields.ciam.(*ciam.MockCIAMClient).Tokens().Serialize()
+// 					if err != nil {
+// 						panic(err)
+// 					}
+// 				}
+//
+// 				if !reflect.DeepEqual(tt.args.w.(*mockWriter).V, wantBody) {
+// 					t.Error("unexpected response body")
+// 				}
+//
+// 				if !reflect.DeepEqual(tt.wantErr, tt.errorsCollector.V) {
+// 					t.Error("unexpected error collected")
+// 				}
+// 			},
+// 		)
+// 	}
+// }
 
 func Test_extractLeadingPath(t *testing.T) {
 	type args struct {

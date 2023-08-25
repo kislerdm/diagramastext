@@ -11,7 +11,7 @@ import (
 	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/diagram/c4container"
-	diagramErrors "github.com/kislerdm/diagramastext/server/core/errors"
+	errs "github.com/kislerdm/diagramastext/server/core/errors"
 )
 
 // NewHTTPHandler initialises HTTP handler.
@@ -59,7 +59,7 @@ func (h httpHandler) response(w http.ResponseWriter, body []byte, err error) {
 
 	if err != nil {
 		h.reportErrorFn(err)
-		status = err.(httpHandlerError).HTTPCode
+		status = err.(errs.HTTPHandlerError).HTTPCode
 	}
 
 	h.corsHeaders.setHeaders(w.Header())
@@ -75,7 +75,6 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		pathStatus = "/status"
 		pathQuotas = "/quotas"
-		pathCIAM   = "/auth"
 	)
 
 	if r.Method == http.MethodOptions {
@@ -102,21 +101,30 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case pathQuotas:
 		h.getQuotasUsage(w, r, &user)
 		return
-	case pathCIAM:
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathCIAM)
-		h.ciamHandler(w, r)
+	case h.ciam.LeadingPath():
+		if r.Method != http.MethodPost {
+			h.response(
+				w, nil, newInvalidMethodError(
+					errors.New("method "+r.Method+" not allowed for path: "+r.URL.Path),
+				),
+			)
+			return
+		}
+
+		o, err := h.ciam.HTTPHandler(r)
+		h.response(w, o, err)
 		return
 	}
 
 	switch strings.HasPrefix(r.URL.Path, pathPrefixInternal) {
 	case false:
 		if err := h.authorizationAPI(r, &user); err != nil {
-			h.response(w, []byte(`{"error":"`+err.(httpHandlerError).Msg+`"}`), err)
+			h.response(w, []byte(`{"error":"`+err.(errs.HTTPHandlerError).Msg+`"}`), err)
 			return
 		}
 	default:
 		if err := h.authorizationWebclient(r, &user); err != nil {
-			h.response(w, []byte(`{"error":"`+err.(httpHandlerError).Msg+`"}`), err)
+			h.response(w, []byte(`{"error":"`+err.(errs.HTTPHandlerError).Msg+`"}`), err)
 			return
 		}
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefixInternal)
@@ -130,7 +138,7 @@ func (h httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	h.response(
 		w, []byte(`{"error":"resource `+r.URL.Path+` not found"}`),
-		newHandlerNotExistsError(errors.New(r.URL.Path+" not found")),
+		errs.NewHandlerNotExistsError(errors.New(r.URL.Path+" not found")),
 	)
 }
 
@@ -149,7 +157,7 @@ func (h httpHandler) authorizationWebclient(r *http.Request, user *diagram.User)
 	authToken := readAuthHeaderValue(r.Header)
 
 	if authToken == "" {
-		return httpHandlerError{
+		return errs.HTTPHandlerError{
 			Msg:      "no authorization token provided",
 			Type:     errorNotAuthorizedNoToken,
 			HTTPCode: http.StatusUnauthorized,
@@ -158,7 +166,7 @@ func (h httpHandler) authorizationWebclient(r *http.Request, user *diagram.User)
 
 	t, err := h.ciam.ParseAccessToken(r.Context(), authToken)
 	if err != nil {
-		return httpHandlerError{
+		return errs.HTTPHandlerError{
 			Msg:      "invalid access token",
 			Type:     errorNotAuthorizedInvalidToken,
 			HTTPCode: http.StatusUnauthorized,
@@ -173,7 +181,7 @@ func (h httpHandler) authorizationWebclient(r *http.Request, user *diagram.User)
 func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error {
 	authToken := readAuthHeaderValue(r.Header)
 	if authToken == "" {
-		return httpHandlerError{
+		return errs.HTTPHandlerError{
 			Msg:      "no authorization token provided",
 			Type:     errorNotAuthorizedNoToken,
 			HTTPCode: http.StatusUnauthorized,
@@ -181,14 +189,14 @@ func (h httpHandler) authorizationAPI(r *http.Request, user *diagram.User) error
 	}
 	userID, err := h.repositoryAPITokens.GetActiveUserIDByActiveTokenID(r.Context(), authToken)
 	if err != nil {
-		return httpHandlerError{
+		return errs.HTTPHandlerError{
 			Msg:      "internal error",
 			Type:     errorRepositoryToken,
 			HTTPCode: http.StatusInternalServerError,
 		}
 	}
 	if userID == "" {
-		return httpHandlerError{
+		return errs.HTTPHandlerError{
 			Msg:      "the authorization token does not exist, or not active, or account is suspended",
 			Type:     errorNotAuthorizedNoToken,
 			HTTPCode: http.StatusUnauthorized,
@@ -215,21 +223,21 @@ func readAuthHeaderValue(header http.Header) string {
 func (h httpHandler) checkQuota(r *http.Request, user *diagram.User) error {
 	throttling, quotaExceeded, err := diagram.ValidateRequestsQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
 	if err != nil {
-		return httpHandlerError{
+		return errs.HTTPHandlerError{
 			Msg:      "internal error",
 			Type:     errorQuotaValidation,
 			HTTPCode: http.StatusInternalServerError,
 		}
 	}
 	if quotaExceeded {
-		return httpHandlerError{
+		return errs.HTTPHandlerError{
 			Msg:      "quota exceeded",
 			Type:     errorQuotaExceeded,
 			HTTPCode: http.StatusForbidden,
 		}
 	}
 	if throttling {
-		return httpHandlerError{
+		return errs.HTTPHandlerError{
 			Msg:      "throttling quota exceeded",
 			Type:     errorQuotaExceeded,
 			HTTPCode: http.StatusTooManyRequests,
@@ -245,7 +253,7 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request, us
 	if !ok {
 		h.response(
 			w, []byte(`{"error":"not exists"}`),
-			newHandlerNotExistsError(errors.New("handler not exists for path "+routePath)),
+			errs.NewHandlerNotExistsError(errors.New("handler not exists for path "+routePath)),
 		)
 		return
 	}
@@ -262,19 +270,19 @@ func (h httpHandler) diagramRendering(w http.ResponseWriter, r *http.Request, us
 
 		defer func() { _ = r.Body.Close() }()
 		if err := json.NewDecoder(r.Body).Decode(&requestContract); err != nil {
-			h.response(w, []byte(`{"error":"wrong request format"}`), newInputFormatValidationError(err))
+			h.response(w, []byte(`{"error":"wrong request format"}`), errs.NewInputFormatValidationError(err))
 			return
 		}
 
 		input, err := diagram.NewInput(requestContract.Prompt, user)
 		if err != nil {
-			h.response(w, []byte(`{"error":"wrong request content"}`), newInputContentValidationError(err))
+			h.response(w, []byte(`{"error":"wrong request content"}`), errs.NewInputContentValidationError(err))
 			return
 		}
 
 		result, err := renderingHandler(r.Context(), input)
 		if err != nil {
-			if v, ok := err.(diagramErrors.ModelPredictionError); ok {
+			if v, ok := err.(errs.ModelPredictionError); ok {
 				h.response(w, v.RawJSON, newModelPredictionError(err))
 				return
 			}
@@ -307,7 +315,7 @@ func (h httpHandler) getQuotasUsage(w http.ResponseWriter, r *http.Request, user
 		quotasUsage, err := diagram.GetQuotaUsage(r.Context(), h.repositoryRequestsHistory, user)
 		if err != nil {
 			h.response(
-				w, []byte(`{"error":"internal error"}`), httpHandlerError{
+				w, []byte(`{"error":"internal error"}`), errs.HTTPHandlerError{
 					Msg:      err.Error(),
 					Type:     errorQuotaFetching,
 					HTTPCode: http.StatusInternalServerError,
@@ -319,7 +327,7 @@ func (h httpHandler) getQuotasUsage(w http.ResponseWriter, r *http.Request, user
 		oBytes, err := json.Marshal(quotasUsage)
 		if err != nil {
 			h.response(
-				w, []byte(`{"error":"internal error"}`), httpHandlerError{
+				w, []byte(`{"error":"internal error"}`), errs.HTTPHandlerError{
 					Msg:      err.Error(),
 					Type:     errorQuotaDataSerialization,
 					HTTPCode: http.StatusInternalServerError,
@@ -338,76 +346,4 @@ func (h httpHandler) getQuotasUsage(w http.ResponseWriter, r *http.Request, user
 		)
 		return
 	}
-}
-
-func (h httpHandler) ciamHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		h.response(
-			w, nil, newInvalidMethodError(
-				errors.New("method "+r.Method+" not allowed for path: "+r.URL.Path),
-			),
-		)
-		return
-	}
-
-	switch r.URL.Path {
-	case "/anonym":
-		h.ciamHandlerSigninAnonym(w, r)
-	case "/signin/init":
-		h.ciamHandlerSigninUserInit(w, r)
-	case "/signin/confirm":
-		h.ciamHandlerSigninUserConfirm(w, r)
-	case "/refresh":
-		h.ciamRefreshTokens(w, r)
-	default:
-		h.response(
-			w, []byte(`{"error":"CIAM resource `+r.URL.Path+` not found"}`),
-			newHandlerNotExistsError(errors.New("CIAM: "+r.URL.Path+" not found")),
-		)
-	}
-	return
-}
-
-func (h httpHandler) ciamHandlerSigninAnonym(w http.ResponseWriter, r *http.Request) {
-	defer func() { _ = r.Body.Close() }()
-	var req ciamRequestAnonym
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.response(w, []byte(`{"error":"request parsing error"}`), newInputFormatValidationError(err))
-		return
-	}
-	if !req.IsValid() {
-		h.response(
-			w, []byte(`{"error":"invalid request"}`),
-			newInputContentValidationError(errors.New("invalid fingerprint")),
-		)
-		return
-	}
-
-	o, err := h.ciam.SigninAnonym(r.Context(), req.Fingerprint)
-	if err != nil {
-		h.response(
-			w, []byte(`{"error":"internal error"}`),
-			httpHandlerError{
-				Msg:      err.Error(),
-				Type:     errorCIAMSigninAnonym,
-				HTTPCode: http.StatusInternalServerError,
-			},
-		)
-		return
-	}
-
-	h.response(w, o, nil)
-	return
-}
-
-func (h httpHandler) ciamHandlerSigninUserInit(w http.ResponseWriter, r *http.Request) {
-	panic("todo: signin/init logic")
-}
-
-func (h httpHandler) ciamHandlerSigninUserConfirm(w http.ResponseWriter, r *http.Request) {
-	panic("todo: signin/confirm logic")
-}
-
-func (h httpHandler) ciamRefreshTokens(w http.ResponseWriter, r *http.Request) {
-	panic("todo: refresh logic")
 }

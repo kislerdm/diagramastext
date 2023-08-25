@@ -85,7 +85,7 @@ func init() {
 		cfg.CIAM.SmtpUser, cfg.CIAM.SmtpPassword, cfg.CIAM.SmtpHost, cfg.CIAM.SmtpPort, cfg.CIAM.SmtpSenderEmail,
 	)
 
-	ciamClient, err := ciam.NewClient(postgresClient, ciamSMTPClient, cfg.CIAM.PrivateKey)
+	ciamHandler, err := ciam.NewClient(postgresClient, ciamSMTPClient, cfg.CIAM.PrivateKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func init() {
 		),
 		corsHeaders,
 		postgresClient,
-		ciamClient,
+		ciamHandler,
 	)
 	if err != nil {
 		log.Fatal(err)

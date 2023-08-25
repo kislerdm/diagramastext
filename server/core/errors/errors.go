@@ -3,8 +3,10 @@ package errors
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -99,4 +101,59 @@ func NewPredictionError(v []byte) error {
 		return ModelPredictionError{RawJSON: v, msg: string(v)}
 	}
 	return ModelPredictionError{RawJSON: v, msg: o.Error}
+}
+
+type HTTPHandlerError struct {
+	Msg      string
+	Type     string
+	HTTPCode int
+}
+
+func (e HTTPHandlerError) Error() string {
+	var o strings.Builder
+	writeStrings(&o, "[type:", e.Type, "][code:", strconv.Itoa(e.HTTPCode), "] ", e.Msg)
+	return o.String()
+}
+
+func writeStrings(o *strings.Builder, text ...string) {
+	for _, s := range text {
+		_, _ = o.WriteString(s)
+	}
+}
+
+func NewInputFormatValidationError(err error) error {
+	msg := err.Error()
+
+	switch err.(type) {
+	case *json.SyntaxError:
+		msg = "faulty JSON"
+	}
+
+	return HTTPHandlerError{
+		Msg:      msg,
+		Type:     ErrorInvalidRequest,
+		HTTPCode: http.StatusBadRequest,
+	}
+}
+
+func NewInputContentValidationError(err error) error {
+	return HTTPHandlerError{
+		Msg:      err.Error(),
+		Type:     ErrorInvalidPrompt,
+		HTTPCode: http.StatusUnprocessableEntity,
+	}
+}
+
+const (
+	ErrorInvalidPrompt  = "InputValidation:InvalidRequestContent"
+	ErrorInvalidRequest = "InputValidation:InvalidRequestFormat"
+	ErrorNotExists      = "Request:HandlerNotExists"
+)
+
+func NewHandlerNotExistsError(err error) error {
+	return HTTPHandlerError{
+		Msg:      err.Error(),
+		Type:     ErrorNotExists,
+		HTTPCode: http.StatusNotFound,
+	}
 }

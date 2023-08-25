@@ -7,28 +7,44 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
+	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/kislerdm/diagramastext/server/core/diagram"
+	errs "github.com/kislerdm/diagramastext/server/core/errors"
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
-// Client defines the CIAM client.
+type Mock struct {
+	LeadPath string
+	Err      error
+	O        []byte
+	User     diagram.User
+}
+
+func (m Mock) LeadingPath() string {
+	return m.LeadPath
+}
+
+func (m Mock) HTTPHandler(_ *http.Request) ([]byte, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return m.O, nil
+}
+
+func (m Mock) ParseAccessToken(_ context.Context, _ string) (diagram.User, error) {
+	if m.Err != nil {
+		return diagram.User{}, m.Err
+	}
+	return m.User, nil
+}
+
 type Client interface {
-	// SigninAnonym executes anonym's authentication flow.
-	SigninAnonym(ctx context.Context, fingerprint string) (tokens []byte, err error)
-
-	// SigninUser executes user's authentication flow.
-	SigninUser(ctx context.Context, email, fingerprint string) (identityToken []byte, err error)
-
-	// IssueTokensAfterSecretConfirmation validates user's confirmation.
-	// The method requires successful invocation of SigninUser and a feedback from the user.
-	IssueTokensAfterSecretConfirmation(ctx context.Context, identityToken, secret string) (tokens []byte, err error)
-
-	// RefreshTokens refreshes access token given the refresh token.
-	RefreshTokens(ctx context.Context, refreshToken string) ([]byte, error)
-
-	// ParseAccessToken parses token string and validates JWT.
+	LeadingPath() string
+	HTTPHandler(req *http.Request) ([]byte, error)
 	ParseAccessToken(ctx context.Context, token string) (diagram.User, error)
 }
 
@@ -53,40 +69,54 @@ type client struct {
 	tokenIssuer      Issuer
 }
 
-// SigninAnonym executes anonym's authentication flow:
-//
-//	Fingerprint found in DB -> No  -> Create \
-//							-> Yes ->  --	-> Generate refresh and access JWT -> Return generates JWT.
-func (c client) SigninAnonym(ctx context.Context, fingerprint string) ([]byte, error) {
-	if fingerprint == "" {
-		return nil, errors.New("fingerprint must be provided")
-	}
+func (c client) HTTPHandler(r *http.Request) ([]byte, error) {
+	path := strings.TrimPrefix(r.URL.Path, c.LeadingPath())
+	switch path {
+	// anonym's authentication flow:
+	// Fingerprint found in DB -> No  -> Create \
+	//							-> Yes ->  --	-> Generate id, refresh and access JWT -> Return generated tokens.
+	case "/anonym":
+		defer func() { _ = r.Body.Close() }()
+		var req struct {
+			Fingerprint string `json:"fingerprint"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			return []byte(`{"error":"request parsing error"}`), errs.NewInputFormatValidationError(err)
+		}
+		if f, _ := regexp.MatchString(`^[a-f0-9]{40}$`, req.Fingerprint); !f {
+			return []byte(`{"error":"invalid request"}`),
+				errs.NewInputContentValidationError(errors.New("invalid fingerprint"))
+		}
 
-	var (
-		userID string
-		err    error
-	)
-
-	userID, isActive, err := c.clientRepository.LookupUserByFingerprint(ctx, fingerprint)
-	if err != nil {
-		return nil, err
-	}
-
-	if userID != "" && !isActive {
-		return nil, errors.New("user was deactivated")
-	}
-
-	if userID == "" {
-		userID = utils.NewUUID()
-		role := uint8(diagram.RoleAnonymUser)
-		if err := c.clientRepository.CreateUser(
-			ctx, userID, "", fingerprint, true, &role,
-		); err != nil {
+		userID, isActive, err := c.clientRepository.LookupUserByFingerprint(r.Context(), req.Fingerprint)
+		if err != nil {
 			return nil, err
 		}
-	}
 
-	return c.issueTokens(ctx, diagram.User{ID: userID, Role: diagram.RoleAnonymUser}, "", fingerprint)
+		if userID != "" && !isActive {
+			return nil, errors.New("user was deactivated")
+		}
+
+		if userID == "" {
+			userID = utils.NewUUID()
+			role := uint8(diagram.RoleAnonymUser)
+			if err := c.clientRepository.CreateUser(
+				r.Context(), userID, "", req.Fingerprint, true, &role,
+			); err != nil {
+				return nil, err
+			}
+		}
+
+		return c.issueTokens(r.Context(), diagram.User{ID: userID, Role: diagram.RoleAnonymUser}, "", req.Fingerprint)
+	// 	TODO: case "/init", "/confirm", "/refresh", "/resend"
+	default:
+		return []byte(`{"error":"CIAM resource ` + r.URL.Path + ` not found"}`),
+			errs.NewHandlerNotExistsError(errors.New("CIAM: " + r.URL.Path + " not found"))
+	}
+}
+
+func (c client) LeadingPath() string {
+	return "/auth"
 }
 
 // SigninUser executes user's authentication flow:
