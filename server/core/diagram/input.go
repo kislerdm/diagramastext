@@ -11,7 +11,8 @@ import (
 // Input defines the entrypoint interface.
 type Input interface {
 	Validate() error
-	GetUser() *User
+	GetUserID() string
+	GetUserAPIToken() string
 	GetPrompt() string
 	GetRequestID() string
 }
@@ -20,15 +21,20 @@ type MockInput struct {
 	Err       error
 	Prompt    string
 	RequestID string
-	User      *User
+	UserID    string
+	APIToken  string
 }
 
 func (v MockInput) Validate() error {
 	return v.Err
 }
 
-func (v MockInput) GetUser() *User {
-	return v.User
+func (v MockInput) GetUserID() string {
+	return v.UserID
+}
+
+func (v MockInput) GetUserAPIToken() string {
+	return v.APIToken
 }
 
 func (v MockInput) GetPrompt() string {
@@ -40,9 +46,11 @@ func (v MockInput) GetRequestID() string {
 }
 
 type inquiry struct {
-	Prompt    string
-	RequestID string
-	User      *User
+	Prompt          string
+	RequestID       string
+	UserID          string
+	APIToken        string
+	PromptLengthMax uint16
 }
 
 const promptLengthMin = 3
@@ -55,12 +63,16 @@ func (v inquiry) GetRequestID() string {
 	return v.RequestID
 }
 
-func (v inquiry) GetUser() *User {
-	return v.User
+func (v inquiry) GetUserID() string {
+	return v.UserID
+}
+
+func (v inquiry) GetUserAPIToken() string {
+	return v.APIToken
 }
 
 func (v inquiry) Validate() error {
-	max := int(v.GetUser().Role.Quotas().PromptLengthMax)
+	max := int(v.PromptLengthMax)
 
 	prompt := strings.ReplaceAll(v.Prompt, "\n", "")
 
@@ -75,11 +87,13 @@ func (v inquiry) Validate() error {
 }
 
 // NewInput initialises the `Input` object.
-func NewInput(prompt string, user *User) (Input, error) {
+func NewInput(prompt string, userID string, apiToken string, promptLengthMax uint16) (Input, error) {
 	o := &inquiry{
-		Prompt:    prompt,
-		User:      user,
-		RequestID: utils.NewUUID(),
+		Prompt:          prompt,
+		UserID:          userID,
+		PromptLengthMax: promptLengthMax,
+		APIToken:        apiToken,
+		RequestID:       utils.NewUUID(),
 	}
 
 	if err := o.Validate(); err != nil {

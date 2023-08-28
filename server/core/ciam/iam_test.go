@@ -1,4 +1,4 @@
-package diagram
+package ciam
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/kislerdm/diagramastext/server/core/diagram"
 )
 
 func mustGenerateTimestamps(tsStr ...string) []time.Time {
@@ -25,7 +27,7 @@ func mustGenerateTimestamps(tsStr ...string) []time.Time {
 func TestValidateRequestsQuotaUsage(t *testing.T) {
 	type args struct {
 		ctx              context.Context
-		clientRepository RepositoryPrediction
+		clientRepository diagram.RepositoryPrediction
 		user             *User
 	}
 
@@ -45,7 +47,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			name: "no request made so far",
 			args: args{
 				ctx:              context.TODO(),
-				clientRepository: MockRepositoryPrediction{},
+				clientRepository: diagram.MockRepositoryPrediction{},
 				user:             &User{},
 			},
 			wantThrottling:    false,
@@ -56,7 +58,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			name: "throttling quota exceeded",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: MockRepositoryPrediction{
+				clientRepository: diagram.MockRepositoryPrediction{
 					Timestamps: repeatTimestamp(genNowMinute(), RoleRegisteredUser.Quotas().RequestsPerMinute+1),
 				},
 				user: &User{},
@@ -69,7 +71,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			name: "daily quota exceeded",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: MockRepositoryPrediction{
+				clientRepository: diagram.MockRepositoryPrediction{
 					Timestamps: repeatTimestamp(genNowDate(), RoleRegisteredUser.Quotas().RequestsPerDay+1),
 				},
 				user: &User{},
@@ -82,7 +84,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			name: "unhappy path",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: MockRepositoryPrediction{
+				clientRepository: diagram.MockRepositoryPrediction{
 					Err: errors.New("foo"),
 				},
 				user: &User{},
@@ -192,7 +194,7 @@ var quotasController = newQuotaIssuer()
 func TestGetQuotaUsage(t *testing.T) {
 	type args struct {
 		ctx              context.Context
-		clientRepository RepositoryPrediction
+		clientRepository diagram.RepositoryPrediction
 	}
 
 	user := &User{}
@@ -207,7 +209,7 @@ func TestGetQuotaUsage(t *testing.T) {
 			name: "no previous requests",
 			args: args{
 				ctx:              context.TODO(),
-				clientRepository: MockRepositoryPrediction{},
+				clientRepository: diagram.MockRepositoryPrediction{},
 			},
 			want:    quotasController.quotaUsage(user),
 			wantErr: false,
@@ -216,7 +218,7 @@ func TestGetQuotaUsage(t *testing.T) {
 			name: "a single requests",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: MockRepositoryPrediction{
+				clientRepository: diagram.MockRepositoryPrediction{
 					Timestamps: repeatTimestamp(quotasController.minuteNow, 1),
 				},
 			},
@@ -239,7 +241,7 @@ func TestGetQuotaUsage(t *testing.T) {
 			name: "daily quota exceeded",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: MockRepositoryPrediction{
+				clientRepository: diagram.MockRepositoryPrediction{
 					Timestamps: repeatTimestamp(quotasController.minuteNow, user.Role.Quotas().RequestsPerDay),
 				},
 			},
@@ -262,7 +264,7 @@ func TestGetQuotaUsage(t *testing.T) {
 			name: "throttling quota exceeded",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: MockRepositoryPrediction{
+				clientRepository: diagram.MockRepositoryPrediction{
 					Timestamps: repeatTimestamp(quotasController.minuteNow, user.Role.Quotas().RequestsPerMinute),
 				},
 			},

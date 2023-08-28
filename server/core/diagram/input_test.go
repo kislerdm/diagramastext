@@ -20,8 +20,8 @@ func randomString(length uint16) string {
 
 func Test_inquiry_Validate(t *testing.T) {
 	type fields struct {
-		Prompt string
-		User   *User
+		Prompt          string
+		PromptLengthMax uint16
 	}
 
 	const promptLengthMax = 100
@@ -34,24 +34,24 @@ func Test_inquiry_Validate(t *testing.T) {
 		{
 			name: "happy path",
 			fields: fields{
-				Prompt: randomString(RoleAnonymUser.Quotas().PromptLengthMax - 1),
-				User:   &User{},
+				Prompt:          randomString(promptLengthMax - 1),
+				PromptLengthMax: promptLengthMax,
 			},
 			wantErr: false,
 		},
 		{
 			name: "unhappy path - too long",
 			fields: fields{
-				Prompt: randomString(RoleRegisteredUser.Quotas().PromptLengthMax + 1),
-				User:   &User{},
+				Prompt:          randomString(promptLengthMax + 1),
+				PromptLengthMax: promptLengthMax,
 			},
 			wantErr: true,
 		},
 		{
 			name: "unhappy path - too short",
 			fields: fields{
-				Prompt: randomString(promptLengthMin - 1),
-				User:   &User{},
+				Prompt:          randomString(3 - 1),
+				PromptLengthMax: promptLengthMax,
 			},
 			wantErr: true,
 		},
@@ -60,8 +60,8 @@ func Test_inquiry_Validate(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				v := inquiry{
-					Prompt: tt.fields.Prompt,
-					User:   tt.fields.User,
+					Prompt:          tt.fields.Prompt,
+					PromptLengthMax: tt.fields.PromptLengthMax,
 				}
 				if err := v.Validate(); (err != nil) != tt.wantErr {
 					t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
@@ -73,8 +73,10 @@ func Test_inquiry_Validate(t *testing.T) {
 
 func TestNewInput(t *testing.T) {
 	type args struct {
-		prompt string
-		user   *User
+		prompt          string
+		userID          string
+		apiToken        string
+		promptLengthMax uint16
 	}
 
 	const promptLengthMax = 100
@@ -90,26 +92,24 @@ func TestNewInput(t *testing.T) {
 		{
 			name: "happy path",
 			args: args{
-				prompt: validPrompt,
-				user: &User{
-					ID: "00000000-0000-0000-0000-000000000000",
-				},
+				prompt:          validPrompt,
+				userID:          "00000000-0000-0000-0000-000000000000",
+				promptLengthMax: promptLengthMax,
+				apiToken:        "foobar",
 			},
 			want: &inquiry{
-				Prompt: validPrompt,
-				User: &User{
-					ID: "00000000-0000-0000-0000-000000000000",
-				},
+				Prompt:   validPrompt,
+				UserID:   "00000000-0000-0000-0000-000000000000",
+				APIToken: "foobar",
 			},
 			wantErr: false,
 		},
 		{
 			name: "unhappy path: invalid prompt",
 			args: args{
-				prompt: randomString(promptLengthMin - 1),
-				user: &User{
-					ID: "00000000-0000-0000-0000-000000000000",
-				},
+				prompt:          randomString(promptLengthMin - 1),
+				userID:          "00000000-0000-0000-0000-000000000000",
+				promptLengthMax: promptLengthMax,
 			},
 			want:    nil,
 			wantErr: true,
@@ -118,19 +118,23 @@ func TestNewInput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := NewInput(tt.args.prompt, tt.args.user)
+				got, err := NewInput(tt.args.prompt, tt.args.userID, tt.args.apiToken, tt.args.promptLengthMax)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("NewInputDriverHTTP() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 
 				if err == nil {
-					if !reflect.DeepEqual(got.GetUser(), tt.want.GetUser()) {
-						t.Errorf("NewInputDriverHTTP() unexpected user: got = %v, want %v", got, tt.want)
+					if !reflect.DeepEqual(got.GetUserID(), tt.want.GetUserID()) {
+						t.Errorf("NewInputDriverHTTP() unexpected userID: got = %v, want %v", got, tt.want)
 					}
 
 					if !reflect.DeepEqual(got.GetPrompt(), tt.want.GetPrompt()) {
 						t.Errorf("NewInputDriverHTTP() unexpected prompt: got = %v, want %v", got, tt.want)
+					}
+
+					if !reflect.DeepEqual(got.GetUserAPIToken(), tt.want.GetUserAPIToken()) {
+						t.Errorf("NewInputDriverHTTP() unexpected userAPIToken: got = %v, want %v", got, tt.want)
 					}
 				}
 			},
@@ -159,11 +163,8 @@ func TestMockInput(t *testing.T) {
 	t.Run(
 		"getters", func(t *testing.T) {
 			// GIVEN
-			wantUser := &User{
-				ID: "id",
-			}
-
 			const (
+				wantUserID    = "id"
 				wantPrompt    = "foobarbaz"
 				wantRequestID = "bar"
 			)
@@ -171,12 +172,12 @@ func TestMockInput(t *testing.T) {
 			input := MockInput{
 				Prompt:    wantPrompt,
 				RequestID: wantRequestID,
-				User:      wantUser,
+				UserID:    wantUserID,
 			}
 
 			// WHEN
 			err := input.Validate()
-			gotUser := input.GetUser()
+			gotUserID := input.GetUserID()
 			gotRequestID := input.GetRequestID()
 			gotPrompt := input.GetPrompt()
 
@@ -184,7 +185,8 @@ func TestMockInput(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error")
 			}
-			if !reflect.DeepEqual(wantUser, gotUser) {
+
+			if !reflect.DeepEqual(wantUserID, gotUserID) {
 				t.Fatalf("unexpected user attr")
 			}
 			if wantPrompt != gotPrompt {

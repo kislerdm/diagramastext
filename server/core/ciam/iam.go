@@ -1,11 +1,13 @@
-package diagram
+package ciam
 
 import (
 	"context"
 	"time"
+
+	"github.com/kislerdm/diagramastext/server/core/diagram"
 )
 
-type User struct {
+type UserIAM struct {
 	ID       string
 	APIToken string
 	Role     Role
@@ -62,21 +64,21 @@ type QuotaRequestsConsumption struct {
 	Reset int64  `json:"reset"`
 }
 
-func (v quotaIssuer) quotaRPM(user *User) QuotaRequestsConsumption {
+func (v quotaIssuer) quotaRPM(user *UserIAM) QuotaRequestsConsumption {
 	return QuotaRequestsConsumption{
 		Limit: user.Role.Quotas().RequestsPerMinute,
 		Reset: v.minuteNext.Unix(),
 	}
 }
 
-func (v quotaIssuer) quotaRPD(user *User) QuotaRequestsConsumption {
+func (v quotaIssuer) quotaRPD(user *UserIAM) QuotaRequestsConsumption {
 	return QuotaRequestsConsumption{
 		Limit: user.Role.Quotas().RequestsPerDay,
 		Reset: v.dayNext.Unix(),
 	}
 }
 
-func (v quotaIssuer) quotaUsage(user *User) QuotasUsage {
+func (v quotaIssuer) quotaUsage(user *UserIAM) QuotasUsage {
 	return QuotasUsage{
 		PromptLengthMax: user.Role.Quotas().PromptLengthMax,
 		RateMinute:      v.quotaRPM(user),
@@ -115,7 +117,7 @@ func newQuotaIssuer() quotaIssuer {
 }
 
 // ValidateRequestsQuotaUsage checks if the requests' quota was exceeded.
-func ValidateRequestsQuotaUsage(ctx context.Context, clientRepository RepositoryPrediction, user *User) (
+func ValidateRequestsQuotaUsage(ctx context.Context, clientRepository diagram.RepositoryPrediction, user *UserIAM) (
 	throttling bool, quotaExceeded bool, err error,
 ) {
 	quotasUsage, err := GetQuotaUsage(ctx, clientRepository, user)
@@ -151,7 +153,9 @@ func sliceWithinWindow(ts []time.Time, tsMin, tsMax time.Time) []time.Time {
 }
 
 // GetQuotaUsage read current usage of the quota.
-func GetQuotaUsage(ctx context.Context, clientRepository RepositoryPrediction, user *User) (QuotasUsage, error) {
+func GetQuotaUsage(ctx context.Context, clientRepository diagram.RepositoryPrediction, user *UserIAM) (
+	QuotasUsage, error,
+) {
 	requestsTimestamps, err := clientRepository.GetDailySuccessfulResultsTimestampsByUserID(ctx, user.ID)
 	if err != nil {
 		return QuotasUsage{}, err

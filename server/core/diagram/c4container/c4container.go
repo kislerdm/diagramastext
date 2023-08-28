@@ -72,14 +72,13 @@ func NewC4ContainersHTTPHandler(
 
 		if clientRepositoryPrediction != nil {
 			if err := clientRepositoryPrediction.WriteInputPrompt(
-				ctx, input.GetRequestID(), input.GetUser().ID, input.GetPrompt(),
+				ctx, input.GetRequestID(), input.GetUserID(), input.GetPrompt(),
 			); err != nil {
 				// FIXME: add proper logging
 				log.Printf("clientRepositoryPrediction.WriteInputPrompt err: %+v", err)
 			}
 		}
 
-		model := defineModel(input.GetUser())
 		predictionRaw, diagramPrediction, usageTokensPrompt, usageTokensCompletions, err := clientModelInference.Do(
 			ctx, input.GetPrompt(), contentSystem, model,
 		)
@@ -89,7 +88,7 @@ func NewC4ContainersHTTPHandler(
 
 		if clientRepositoryPrediction != nil {
 			if err := clientRepositoryPrediction.WriteModelResult(
-				ctx, input.GetRequestID(), input.GetUser().ID, predictionRaw, string(diagramPrediction), model,
+				ctx, input.GetRequestID(), input.GetUserID(), predictionRaw, string(diagramPrediction), model,
 				usageTokensPrompt, usageTokensCompletions,
 			); err != nil {
 				// FIXME: add proper logging
@@ -113,7 +112,7 @@ func NewC4ContainersHTTPHandler(
 
 		if clientRepositoryPrediction != nil {
 			if err := clientRepositoryPrediction.WriteSuccessFlag(
-				ctx, input.GetRequestID(), input.GetUser().ID, input.GetUser().APIToken,
+				ctx, input.GetRequestID(), input.GetUserID(), input.GetUserAPIToken(),
 			); err != nil {
 				// FIXME: add proper logging
 				log.Printf("clientRepositoryPrediction.WriteSuccessFlag err: %+v", err)
@@ -125,18 +124,7 @@ func NewC4ContainersHTTPHandler(
 	}, nil
 }
 
-const (
-	notRegisteredModel = "gpt-3.5-turbo"
-	registeredModel    = notRegisteredModel
-)
-
-func defineModel(user *diagram.User) string {
-	if user != nil && user.Role.IsRegisteredUser() {
-		// FIXME: change for fine-tuned model after it's trained
-		return registeredModel
-	}
-	return notRegisteredModel
-}
+const model = "gpt-3.5-turbo"
 
 const contentSystem =
 // instruction
