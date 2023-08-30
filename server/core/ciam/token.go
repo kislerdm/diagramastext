@@ -10,8 +10,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/kislerdm/diagramastext/server/core/diagram"
 )
 
 const (
@@ -59,14 +57,14 @@ type ClaimsOps func(claims *stdClaims)
 
 type idTokenClaims struct {
 	stdClaims
-	Email       *string `json:"email,omitempty"`
-	Fingerprint *string `json:"fingerprint,omitempty"`
+	Email       string `json:"email,omitempty"`
+	Fingerprint string `json:"fingerprint,omitempty"`
 }
 
 type accessTokenClaims struct {
 	stdClaims
-	Role   diagram.Role   `json:"role"`
-	Quotas diagram.Quotas `json:"quotas"`
+	Role   Role   `json:"role"`
+	Quotas Quotas `json:"quotas"`
 }
 
 type refreshTokenClaims struct {
@@ -96,7 +94,7 @@ type Issuer interface {
 	// NewIDToken issuer id JWT.
 	NewIDToken(userID, email, fingerprint string, fnOps ...ClaimsOps) (string, error)
 	// NewAccessToken issuer access JWT.
-	NewAccessToken(user diagram.User, fnOps ...ClaimsOps) (string, error)
+	NewAccessToken(user User, fnOps ...ClaimsOps) (string, error)
 	// NewRefreshToken issuer refresh JWT.
 	NewRefreshToken(userID string, fnOps ...ClaimsOps) (string, error)
 	// ParseIDToken parses id JWT.
@@ -104,7 +102,7 @@ type Issuer interface {
 	// ParseRefreshToken parses refresh JWT.
 	ParseRefreshToken(token string) (userID string, err error)
 	// ParseAccessToken parses access JWT.
-	ParseAccessToken(token string) (user diagram.User, err error)
+	ParseAccessToken(token string) (user User, err error)
 }
 
 func NewIssuer(key ed25519.PrivateKey) (Issuer, error) {
@@ -154,23 +152,16 @@ func (i issuer) serializeAndSign(tkn interface{}) (string, error) {
 	return signingStr + "." + encodeSegment(signature), nil
 }
 
-func pointerStr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 func (i issuer) NewIDToken(userID, email, fingerprint string, fnOps ...ClaimsOps) (string, error) {
 	tkn := idTokenClaims{
-		Email:       pointerStr(email),
-		Fingerprint: pointerStr(fingerprint),
+		Email:       email,
+		Fingerprint: fingerprint,
 		stdClaims:   newStdClaims(userID, defaultExpirationDurationIdentity, fnOps...),
 	}
 	return i.serializeAndSign(tkn)
 }
 
-func (i issuer) NewAccessToken(user diagram.User, fnOps ...ClaimsOps) (string, error) {
+func (i issuer) NewAccessToken(user User, fnOps ...ClaimsOps) (string, error) {
 	tkn := accessTokenClaims{
 		Role:      user.Role,
 		Quotas:    user.Role.Quotas(),
@@ -223,7 +214,7 @@ func (i issuer) ParseIDToken(token string) (userID, email, fingerprint string, e
 	if err := tkn.IsValidToken(); err != nil {
 		return "", "", "", err
 	}
-	return tkn.Sub, *tkn.Email, *tkn.Fingerprint, nil
+	return tkn.Sub, tkn.Email, tkn.Fingerprint, nil
 }
 
 func (i issuer) ParseRefreshToken(token string) (userID string, err error) {
@@ -237,7 +228,7 @@ func (i issuer) ParseRefreshToken(token string) (userID string, err error) {
 	return tkn.Sub, nil
 }
 
-func (i issuer) ParseAccessToken(token string) (user diagram.User, err error) {
+func (i issuer) ParseAccessToken(token string) (user User, err error) {
 	var tkn accessTokenClaims
 	if err = i.parseToken(token, &tkn); err != nil {
 		return
@@ -251,7 +242,7 @@ func (i issuer) ParseAccessToken(token string) (user diagram.User, err error) {
 		return
 	}
 
-	user = diagram.User{ID: tkn.Sub, Role: tkn.Role}
+	user = User{ID: tkn.Sub, Role: tkn.Role}
 	return
 }
 

@@ -25,10 +25,6 @@ type RepositoryPrediction interface {
 	// based on the model's prediction result.
 	WriteSuccessFlag(ctx context.Context, requestID, userID, token string) error
 
-	// GetDailySuccessfulResultsTimestampsByUserID reads the timestamps of all user's successful requests
-	// which led to successful diagrams generation over the last 24 hours / day.
-	GetDailySuccessfulResultsTimestampsByUserID(ctx context.Context, userID string) ([]time.Time, error)
-
 	// Close closes connection to persistence service.
 	Close(ctx context.Context) error
 }
@@ -36,15 +32,6 @@ type RepositoryPrediction interface {
 type MockRepositoryPrediction struct {
 	Timestamps []time.Time
 	Err        error
-}
-
-func (m MockRepositoryPrediction) GetDailySuccessfulResultsTimestampsByUserID(_ context.Context, _ string) (
-	[]time.Time, error,
-) {
-	if m.Err != nil {
-		return nil, m.Err
-	}
-	return m.Timestamps, nil
 }
 
 func (m MockRepositoryPrediction) WriteInputPrompt(_ context.Context, _, _, _ string) error {
@@ -115,20 +102,4 @@ func (m MockHTTPClient) Do(_ *http.Request) (*http.Response, error) {
 		return nil, m.Err
 	}
 	return m.V, nil
-}
-
-// RepositoryToken defines the communication port to persistence layer hosting API access tokens.
-type RepositoryToken interface {
-	// GetActiveUserIDByActiveTokenID reads userID from the repository given the tokenID.
-	// It returns a non-empty value if and only if the token and user are active.
-	GetActiveUserIDByActiveTokenID(ctx context.Context, id string) (string, error)
-}
-
-type MockRepositoryToken struct {
-	V   string
-	Err error
-}
-
-func (m MockRepositoryToken) GetActiveUserIDByActiveTokenID(_ context.Context, _ string) (string, error) {
-	return m.V, m.Err
 }

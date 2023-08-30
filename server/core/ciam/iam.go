@@ -3,11 +3,9 @@ package ciam
 import (
 	"context"
 	"time"
-
-	"github.com/kislerdm/diagramastext/server/core/diagram"
 )
 
-type UserIAM struct {
+type User struct {
 	ID       string
 	APIToken string
 	Role     Role
@@ -64,21 +62,21 @@ type QuotaRequestsConsumption struct {
 	Reset int64  `json:"reset"`
 }
 
-func (v quotaIssuer) quotaRPM(user *UserIAM) QuotaRequestsConsumption {
+func (v quotaIssuer) quotaRPM(user *User) QuotaRequestsConsumption {
 	return QuotaRequestsConsumption{
 		Limit: user.Role.Quotas().RequestsPerMinute,
 		Reset: v.minuteNext.Unix(),
 	}
 }
 
-func (v quotaIssuer) quotaRPD(user *UserIAM) QuotaRequestsConsumption {
+func (v quotaIssuer) quotaRPD(user *User) QuotaRequestsConsumption {
 	return QuotaRequestsConsumption{
 		Limit: user.Role.Quotas().RequestsPerDay,
 		Reset: v.dayNext.Unix(),
 	}
 }
 
-func (v quotaIssuer) quotaUsage(user *UserIAM) QuotasUsage {
+func (v quotaIssuer) quotaUsage(user *User) QuotasUsage {
 	return QuotasUsage{
 		PromptLengthMax: user.Role.Quotas().PromptLengthMax,
 		RateMinute:      v.quotaRPM(user),
@@ -116,26 +114,6 @@ func newQuotaIssuer() quotaIssuer {
 	}
 }
 
-// ValidateRequestsQuotaUsage checks if the requests' quota was exceeded.
-func ValidateRequestsQuotaUsage(ctx context.Context, clientRepository diagram.RepositoryPrediction, user *UserIAM) (
-	throttling bool, quotaExceeded bool, err error,
-) {
-	quotasUsage, err := GetQuotaUsage(ctx, clientRepository, user)
-	if err != nil {
-		return
-	}
-
-	if quotasUsage.RateDay.Used >= quotasUsage.RateDay.Limit {
-		quotaExceeded = true
-	}
-
-	if quotasUsage.RateMinute.Used >= quotasUsage.RateMinute.Limit {
-		throttling = true
-	}
-
-	return
-}
-
 type QuotasUsage struct {
 	PromptLengthMax uint16                   `json:"prompt_length_max"`
 	RateMinute      QuotaRequestsConsumption `json:"rate_minute"`
@@ -152,8 +130,8 @@ func sliceWithinWindow(ts []time.Time, tsMin, tsMax time.Time) []time.Time {
 	return o
 }
 
-// GetQuotaUsage read current usage of the quota.
-func GetQuotaUsage(ctx context.Context, clientRepository diagram.RepositoryPrediction, user *UserIAM) (
+// getQuotaUsage read current usage of the quota.
+func getQuotaUsage(ctx context.Context, clientRepository RepositoryCIAM, user *User) (
 	QuotasUsage, error,
 ) {
 	requestsTimestamps, err := clientRepository.GetDailySuccessfulResultsTimestampsByUserID(ctx, user.ID)
@@ -182,4 +160,15 @@ func GetQuotaUsage(ctx context.Context, clientRepository diagram.RepositoryPredi
 	}
 
 	return quotas, nil
+}
+
+var userKey = struct{}{}
+
+func NewContext(ctx context.Context, user *User) context.Context {
+	return context.WithValue(ctx, userKey, user)
+}
+
+func FromContext(ctx context.Context) (*User, bool) {
+	u, ok := ctx.Value(userKey).(*User)
+	return u, ok
 }

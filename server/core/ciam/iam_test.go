@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/kislerdm/diagramastext/server/core/diagram"
 )
 
 func mustGenerateTimestamps(tsStr ...string) []time.Time {
@@ -27,14 +25,9 @@ func mustGenerateTimestamps(tsStr ...string) []time.Time {
 func TestValidateRequestsQuotaUsage(t *testing.T) {
 	type args struct {
 		ctx              context.Context
-		clientRepository diagram.RepositoryPrediction
+		clientRepository RepositoryCIAM
 		user             *User
 	}
-
-	const (
-		quotaRPMMax = 2
-		quotaRPDMax = 10
-	)
 
 	tests := []struct {
 		name              string
@@ -47,7 +40,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			name: "no request made so far",
 			args: args{
 				ctx:              context.TODO(),
-				clientRepository: diagram.MockRepositoryPrediction{},
+				clientRepository: &MockRepositoryCIAM{},
 				user:             &User{},
 			},
 			wantThrottling:    false,
@@ -58,7 +51,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			name: "throttling quota exceeded",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: diagram.MockRepositoryPrediction{
+				clientRepository: &MockRepositoryCIAM{
 					Timestamps: repeatTimestamp(genNowMinute(), RoleRegisteredUser.Quotas().RequestsPerMinute+1),
 				},
 				user: &User{},
@@ -71,7 +64,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			name: "daily quota exceeded",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: diagram.MockRepositoryPrediction{
+				clientRepository: &MockRepositoryCIAM{
 					Timestamps: repeatTimestamp(genNowDate(), RoleRegisteredUser.Quotas().RequestsPerDay+1),
 				},
 				user: &User{},
@@ -84,7 +77,7 @@ func TestValidateRequestsQuotaUsage(t *testing.T) {
 			name: "unhappy path",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: diagram.MockRepositoryPrediction{
+				clientRepository: &MockRepositoryCIAM{
 					Err: errors.New("foo"),
 				},
 				user: &User{},
@@ -194,7 +187,7 @@ var quotasController = newQuotaIssuer()
 func TestGetQuotaUsage(t *testing.T) {
 	type args struct {
 		ctx              context.Context
-		clientRepository diagram.RepositoryPrediction
+		clientRepository RepositoryCIAM
 	}
 
 	user := &User{}
@@ -209,7 +202,7 @@ func TestGetQuotaUsage(t *testing.T) {
 			name: "no previous requests",
 			args: args{
 				ctx:              context.TODO(),
-				clientRepository: diagram.MockRepositoryPrediction{},
+				clientRepository: &MockRepositoryCIAM{},
 			},
 			want:    quotasController.quotaUsage(user),
 			wantErr: false,
@@ -218,7 +211,7 @@ func TestGetQuotaUsage(t *testing.T) {
 			name: "a single requests",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: diagram.MockRepositoryPrediction{
+				clientRepository: &MockRepositoryCIAM{
 					Timestamps: repeatTimestamp(quotasController.minuteNow, 1),
 				},
 			},
@@ -241,7 +234,7 @@ func TestGetQuotaUsage(t *testing.T) {
 			name: "daily quota exceeded",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: diagram.MockRepositoryPrediction{
+				clientRepository: &MockRepositoryCIAM{
 					Timestamps: repeatTimestamp(quotasController.minuteNow, user.Role.Quotas().RequestsPerDay),
 				},
 			},
@@ -264,7 +257,7 @@ func TestGetQuotaUsage(t *testing.T) {
 			name: "throttling quota exceeded",
 			args: args{
 				ctx: context.TODO(),
-				clientRepository: diagram.MockRepositoryPrediction{
+				clientRepository: &MockRepositoryCIAM{
 					Timestamps: repeatTimestamp(quotasController.minuteNow, user.Role.Quotas().RequestsPerMinute),
 				},
 			},
@@ -287,13 +280,13 @@ func TestGetQuotaUsage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, err := GetQuotaUsage(tt.args.ctx, tt.args.clientRepository, user)
+				got, err := getQuotaUsage(tt.args.ctx, tt.args.clientRepository, user)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("GetQuotaUsage() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("getQuotaUsage() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
 				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("GetQuotaUsage() got = %v, want %v", got, tt.want)
+					t.Errorf("getQuotaUsage() got = %v, want %v", got, tt.want)
 				}
 			},
 		)

@@ -23,9 +23,17 @@ type RepositoryCIAM interface {
 	WriteOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error
 	ReadOneTimeSecret(ctx context.Context, userID string) (found bool, secret string, issuedAt time.Time, err error)
 	DeleteOneTimeSecret(ctx context.Context, userID string) error
+
+	// GetDailySuccessfulResultsTimestampsByUserID reads the timestamps of all user's successful requests
+	// which led to successful diagrams generation over the last 24 hours / day.
+	GetDailySuccessfulResultsTimestampsByUserID(ctx context.Context, userID string) ([]time.Time, error)
+
+	// GetActiveUserIDByActiveTokenID reads userID from the repository given the tokenID.
+	// It returns a non-empty value if and only if the token and user are active.
+	GetActiveUserIDByActiveTokenID(ctx context.Context, token string) (userID string, err error)
 }
 
-type User struct {
+type userContainer struct {
 	ID, Email, Fingerprint string
 	IsActive               bool
 	RoleID                 uint8
@@ -37,11 +45,13 @@ type Secret struct {
 }
 
 type MockRepositoryCIAM struct {
-	UserID          map[string]*User
-	UserEmail       map[string]*User
-	UserFingerprint map[string]*User
+	UserID          map[string]*userContainer
+	UserEmail       map[string]*userContainer
+	UserFingerprint map[string]*userContainer
 	Secret          map[string]Secret
 	Err             error
+	Timestamps      []time.Time
+	Token           string
 }
 
 func (m *MockRepositoryCIAM) CreateUser(
@@ -51,7 +61,7 @@ func (m *MockRepositoryCIAM) CreateUser(
 		return m.Err
 	}
 	m.setUser(
-		&User{
+		&userContainer{
 			ID:          id,
 			Email:       email,
 			Fingerprint: fingerprint,
@@ -73,19 +83,19 @@ func (m *MockRepositoryCIAM) UpdateUserSetActive(_ context.Context, userID strin
 	return nil
 }
 
-func (m *MockRepositoryCIAM) setUser(u *User) {
+func (m *MockRepositoryCIAM) setUser(u *userContainer) {
 	if m.UserEmail == nil {
-		m.UserEmail = map[string]*User{}
+		m.UserEmail = map[string]*userContainer{}
 	}
 	m.UserEmail[u.Email] = u
 
 	if m.UserFingerprint == nil {
-		m.UserFingerprint = map[string]*User{}
+		m.UserFingerprint = map[string]*userContainer{}
 	}
 	m.UserFingerprint[u.Fingerprint] = u
 
 	if m.UserID == nil {
-		m.UserID = map[string]*User{}
+		m.UserID = map[string]*userContainer{}
 	}
 	m.UserID[u.ID] = u
 }
@@ -124,25 +134,6 @@ func (m *MockRepositoryCIAM) LookupUserByFingerprint(_ context.Context, fingerpr
 	return "", false, nil
 }
 
-func (m *MockRepositoryCIAM) UpdateUserSetEmailVerified(ctx context.Context, id string) error {
-	if m.Err != nil {
-		return m.Err
-	}
-	found, _, _, email, fingerprint, _ := m.ReadUser(ctx, id)
-	if !found {
-		return errors.New("user not found")
-	}
-	m.setUser(
-		&User{
-			ID:          id,
-			Email:       email,
-			Fingerprint: fingerprint,
-			IsActive:    true,
-		},
-	)
-	return nil
-}
-
 func (m *MockRepositoryCIAM) WriteOneTimeSecret(_ context.Context, userID, secret string, createdAt time.Time) error {
 	if m.Err != nil {
 		return m.Err
@@ -175,4 +166,20 @@ func (m *MockRepositoryCIAM) DeleteOneTimeSecret(_ context.Context, userID strin
 	}
 	delete(m.Secret, userID)
 	return nil
+}
+
+func (m *MockRepositoryCIAM) GetDailySuccessfulResultsTimestampsByUserID(_ context.Context, _ string) (
+	[]time.Time, error,
+) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return m.Timestamps, nil
+}
+
+func (m *MockRepositoryCIAM) GetActiveUserIDByActiveTokenID(_ context.Context, _ string) (string, error) {
+	if m.Err != nil {
+		return "", m.Err
+	}
+	return m.Token, nil
 }

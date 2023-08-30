@@ -3,7 +3,6 @@ package errors
 import (
 	"bytes"
 	"encoding/json"
-	"net/http"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -118,42 +117,5 @@ func (e HTTPHandlerError) Error() string {
 func writeStrings(o *strings.Builder, text ...string) {
 	for _, s := range text {
 		_, _ = o.WriteString(s)
-	}
-}
-
-func NewInputFormatValidationError(err error) error {
-	msg := err.Error()
-
-	switch err.(type) {
-	case *json.SyntaxError:
-		msg = "faulty JSON"
-	}
-
-	return HTTPHandlerError{
-		Msg:      msg,
-		Type:     ErrorInvalidRequest,
-		HTTPCode: http.StatusBadRequest,
-	}
-}
-
-func NewInputContentValidationError(err error) error {
-	return HTTPHandlerError{
-		Msg:      err.Error(),
-		Type:     ErrorInvalidPrompt,
-		HTTPCode: http.StatusUnprocessableEntity,
-	}
-}
-
-const (
-	ErrorInvalidPrompt  = "InputValidation:InvalidRequestContent"
-	ErrorInvalidRequest = "InputValidation:InvalidRequestFormat"
-	ErrorNotExists      = "Request:HandlerNotExists"
-)
-
-func NewHandlerNotExistsError(err error) error {
-	return HTTPHandlerError{
-		Msg:      err.Error(),
-		Type:     ErrorNotExists,
-		HTTPCode: http.StatusNotFound,
 	}
 }

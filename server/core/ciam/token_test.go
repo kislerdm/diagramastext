@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
@@ -21,9 +20,9 @@ func TestCircular(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userWant := diagram.User{
+	userWant := User{
 		ID:   utils.NewUUID(),
-		Role: diagram.RoleRegisteredUser,
+		Role: RoleRegisteredUser,
 	}
 	const (
 		email       = "foo@bar.baz"
