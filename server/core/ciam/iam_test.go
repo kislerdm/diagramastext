@@ -3,6 +3,7 @@ package ciam
 import (
 	"context"
 	"errors"
+	"net/http"
 	"reflect"
 	"testing"
 	"time"
@@ -22,91 +23,96 @@ func mustGenerateTimestamps(tsStr ...string) []time.Time {
 	return o
 }
 
-func TestValidateRequestsQuotaUsage(t *testing.T) {
+func Test_validateRequestsQuotaUsage(t *testing.T) {
 	type args struct {
-		ctx              context.Context
 		clientRepository RepositoryCIAM
 		user             *User
+		writer           http.ResponseWriter
 	}
 
+	certificate := GenerateCertificate()
+
 	tests := []struct {
-		name              string
-		args              args
-		wantThrottling    bool
-		wantQuotaExceeded bool
-		wantErr           bool
+		name          string
+		args          args
+		wantFn        func(w http.ResponseWriter) error
+		want          bool
+		wantBody      []byte
+		wantStatuCode int
 	}{
 		{
 			name: "no request made so far",
 			args: args{
-				ctx:              context.TODO(),
 				clientRepository: &MockRepositoryCIAM{},
 				user:             &User{},
+				writer:           &MockWriter{},
 			},
-			wantThrottling:    false,
-			wantQuotaExceeded: false,
-			wantErr:           false,
+			wantStatuCode: 0,
+			wantBody:      nil,
+			want:          true,
 		},
 		{
 			name: "throttling quota exceeded",
 			args: args{
-				ctx: context.TODO(),
 				clientRepository: &MockRepositoryCIAM{
 					Timestamps: repeatTimestamp(genNowMinute(), RoleRegisteredUser.Quotas().RequestsPerMinute+1),
 				},
-				user: &User{},
+				user:   &User{},
+				writer: &MockWriter{},
 			},
-			wantThrottling:    true,
-			wantQuotaExceeded: false,
-			wantErr:           false,
+			wantStatuCode: http.StatusTooManyRequests,
+			wantBody:      []byte(`{"error":"throttling quota exceeded"}`),
+			want:          false,
 		},
 		{
 			name: "daily quota exceeded",
 			args: args{
-				ctx: context.TODO(),
 				clientRepository: &MockRepositoryCIAM{
 					Timestamps: repeatTimestamp(genNowDate(), RoleRegisteredUser.Quotas().RequestsPerDay+1),
 				},
-				user: &User{},
+				user:   &User{},
+				writer: &MockWriter{},
 			},
-			wantThrottling:    true,
-			wantQuotaExceeded: true,
-			wantErr:           false,
+			wantStatuCode: http.StatusForbidden,
+			wantBody:      []byte(`{"error":"quota exceeded"}`),
+			want:          false,
 		},
 		{
 			name: "unhappy path",
 			args: args{
-				ctx: context.TODO(),
 				clientRepository: &MockRepositoryCIAM{
 					Err: errors.New("foo"),
 				},
-				user: &User{},
+				user:   &User{},
+				writer: &MockWriter{},
 			},
-			wantThrottling:    false,
-			wantQuotaExceeded: false,
-			wantErr:           true,
+			wantStatuCode: http.StatusInternalServerError,
+			wantBody:      []byte(`{"error":"internal error"}`),
+			want:          false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				gotThrottling, gotQuotaExceeded, err := ValidateRequestsQuotaUsage(
-					tt.args.ctx, tt.args.clientRepository, tt.args.user,
-				)
-				if (err != nil) != tt.wantErr {
-					t.Errorf("ValidateRequestsQuotaUsage() error = %v, wantErr %v", err, tt.wantErr)
-					return
+				c, err := HTTPHandler(tt.args.clientRepository, &MockSMTPClient{}, certificate)
+				if err != nil {
+					t.Fatal(err)
 				}
-				if gotThrottling != tt.wantThrottling {
-					t.Errorf(
-						"ValidateRequestsQuotaUsage() gotThrottling = %v, want %v", gotThrottling, tt.wantThrottling,
-					)
+
+				got := c(nil).(client).validateRequestsQuotaUsage(tt.args.writer, &http.Request{}, tt.args.user)
+
+				if got != tt.want {
+					t.Errorf("unexpected return value. want: %v, got: %v", tt.want, got)
 				}
-				if gotQuotaExceeded != tt.wantQuotaExceeded {
-					t.Errorf(
-						"ValidateRequestsQuotaUsage() gotQuotaExceeded = %v, want %v", gotQuotaExceeded,
-						tt.wantQuotaExceeded,
-					)
+
+				gotStatusCode := tt.args.writer.(*MockWriter).StatusCode
+				if tt.wantStatuCode != gotStatusCode {
+					t.Errorf("wrong status code. want: %d, got: %d", tt.wantStatuCode, gotStatusCode)
+				}
+
+				gotBody := tt.args.writer.(*MockWriter).V
+				if !reflect.DeepEqual(gotBody, tt.wantBody) {
+					t.Errorf("wrong body. want: %v, got: %v", tt.wantBody, gotBody)
 				}
 			},
 		)
@@ -184,7 +190,7 @@ func Test_sliceWithinWindow(t *testing.T) {
 
 var quotasController = newQuotaIssuer()
 
-func TestGetQuotaUsage(t *testing.T) {
+func Test_getQuotaUsage(t *testing.T) {
 	type args struct {
 		ctx              context.Context
 		clientRepository RepositoryCIAM
