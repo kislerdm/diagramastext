@@ -51,50 +51,6 @@ type client struct {
 	tokenIssuer      Issuer
 }
 
-// getQuotaUsage reads current usage of the quota.
-func (c client) getQuotaUsage(w http.ResponseWriter, r *http.Request, user *User) {
-	quotas, err := getQuotaUsage(r.Context(), c.clientRepository, user)
-	if err != nil {
-		c.internalError(w, err)
-		return
-	}
-
-	o, err := json.Marshal(quotas)
-	if err != nil {
-		c.internalError(w, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(o)
-	return
-}
-
-// checks if the requests' quota was exceeded.
-func (c client) validateRequestsQuotaUsage(w http.ResponseWriter, r *http.Request, user *User) bool {
-	quotasUsage, err := getQuotaUsage(r.Context(), c.clientRepository, user)
-	if err != nil {
-		c.internalError(w, err)
-		return false
-	}
-
-	if quotasUsage.RateDay.Used >= quotasUsage.RateDay.Limit {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"error":"quota exceeded"}`))
-		c.logger.Printf("quota exceeded for user %s", user.ID)
-		return false
-	}
-
-	if quotasUsage.RateMinute.Used >= quotasUsage.RateMinute.Limit {
-		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = w.Write([]byte(`{"error":"throttling quota exceeded"}`))
-		c.logger.Printf("throttling quota exceeded for user %s", user.ID)
-		return false
-	}
-
-	return true
-}
-
 func (c client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/auth") && r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -142,6 +98,56 @@ func (c client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(NewContext(r.Context(), user))
 		c.next.ServeHTTP(w, r)
 	}
+}
+
+// getQuotaUsage reads current usage of the quota.
+func (c client) getQuotaUsage(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte(`{"error":"` + r.Method + ` is not allowed"}`))
+		return
+	}
+
+	quotas, err := getQuotaUsage(r.Context(), c.clientRepository, user)
+	if err != nil {
+		c.internalError(w, err)
+		return
+	}
+
+	o, err := json.Marshal(quotas)
+	if err != nil {
+		c.internalError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(o)
+	return
+}
+
+// checks if the requests' quota was exceeded.
+func (c client) validateRequestsQuotaUsage(w http.ResponseWriter, r *http.Request, user *User) bool {
+	quotasUsage, err := getQuotaUsage(r.Context(), c.clientRepository, user)
+	if err != nil {
+		c.internalError(w, err)
+		return false
+	}
+
+	if quotasUsage.RateDay.Used >= quotasUsage.RateDay.Limit {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":"quota exceeded"}`))
+		c.logger.Printf("quota exceeded for user %s", user.ID)
+		return false
+	}
+
+	if quotasUsage.RateMinute.Used >= quotasUsage.RateMinute.Limit {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":"throttling quota exceeded"}`))
+		c.logger.Printf("throttling quota exceeded for user %s", user.ID)
+		return false
+	}
+
+	return true
 }
 
 // anonym's authentication flow:

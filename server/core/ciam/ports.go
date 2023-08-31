@@ -51,7 +51,7 @@ type MockRepositoryCIAM struct {
 	Secret          map[string]Secret
 	Err             error
 	Timestamps      []time.Time
-	Token           string
+	UserToken       map[string]string
 }
 
 func (m *MockRepositoryCIAM) CreateUser(
@@ -177,9 +177,12 @@ func (m *MockRepositoryCIAM) GetDailySuccessfulResultsTimestampsByUserID(_ conte
 	return m.Timestamps, nil
 }
 
-func (m *MockRepositoryCIAM) GetActiveUserIDByActiveTokenID(_ context.Context, _ string) (string, error) {
+func (m *MockRepositoryCIAM) GetActiveUserIDByActiveTokenID(_ context.Context, token string) (string, error) {
 	if m.Err != nil {
 		return "", m.Err
 	}
-	return m.Token, nil
+	if v, ok := m.UserToken[token]; ok {
+		return v, nil
+	}
+	return "", errors.New("token not found")
 }
