@@ -96,7 +96,10 @@ func (c client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		r = r.WithContext(NewContext(r.Context(), user))
-		c.next.ServeHTTP(w, r)
+
+		if c.next != nil {
+			c.next.ServeHTTP(w, r)
+		}
 	}
 }
 

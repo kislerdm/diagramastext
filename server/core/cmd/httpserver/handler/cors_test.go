@@ -1,21 +1,38 @@
-package main_test
+package handler_test
 
 import (
 	"net/http"
 	"testing"
 
-	"httpserver"
-
-	"github.com/kislerdm/diagramastext/server/core/httphandler"
+	"httpserver/handler"
 )
+
+type MockWriter struct {
+	Headers    http.Header
+	StatusCode int
+	V          []byte
+}
+
+func (m *MockWriter) Header() http.Header {
+	return m.Headers
+}
+
+func (m *MockWriter) Write(bytes []byte) (int, error) {
+	m.V = bytes
+	return len(bytes), nil
+}
+
+func (m *MockWriter) WriteHeader(statusCode int) {
+	m.StatusCode = statusCode
+}
 
 func Test_cordHandler_ServeHTTP(t *testing.T) {
 	t.Parallel()
 	t.Run(
 		`shall set Access-Control-Allow-Origin on "" input`, func(t *testing.T) {
-			w := &httphandler.MockWriter{Headers: http.Header{}}
+			w := &MockWriter{Headers: http.Header{}}
 
-			main.CORSHandler(
+			handler.CORSHandler(
 				map[string]string{
 					"Access-Control-Allow-Origin": "",
 				},
@@ -30,9 +47,9 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 
 	t.Run(
 		`shall set Access-Control-Allow-Origin on '*' input`, func(t *testing.T) {
-			w := &httphandler.MockWriter{Headers: http.Header{}}
+			w := &MockWriter{Headers: http.Header{}}
 
-			main.CORSHandler(
+			handler.CORSHandler(
 				map[string]string{
 					"Access-Control-Allow-Origin": "'*'",
 				},
@@ -47,13 +64,13 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 
 	t.Run(
 		`shall only set the headers foo and bar to values qux and quxx respectively`, func(t *testing.T) {
-			w := &httphandler.MockWriter{Headers: http.Header{}}
+			w := &MockWriter{Headers: http.Header{}}
 			m := map[string]string{
 				"foo": "qux",
 				"bar": "quxx",
 			}
 
-			main.CORSHandler(m, nil).ServeHTTP(w, &http.Request{})
+			handler.CORSHandler(m, nil).ServeHTTP(w, &http.Request{})
 
 			for k, want := range m {
 				got := w.Header().Get(k)
@@ -70,14 +87,14 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 
 	t.Run(
 		"shall shorten the handlers chain on OPTIONS request", func(t *testing.T) {
-			w := &httphandler.MockWriter{Headers: http.Header{}}
+			w := &MockWriter{Headers: http.Header{}}
 			m := map[string]string{
 				"foo": "bar",
 			}
 			// Note: it must differ from 200
 			const probeStatus = 201
 
-			main.CORSHandler(
+			handler.CORSHandler(
 				m,
 				chainHandler{probeStatus},
 			).ServeHTTP(w, &http.Request{Method: http.MethodOptions})

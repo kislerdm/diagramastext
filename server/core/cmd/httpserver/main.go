@@ -11,6 +11,8 @@ import (
 	"os"
 	"time"
 
+	handlerPkg "httpserver/handler"
+
 	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/config"
 	"github.com/kislerdm/diagramastext/server/core/diagram"
@@ -106,9 +108,9 @@ func init() {
 		log.Fatal(err)
 	}
 
-	handler = CORSHandler(
+	handler = handlerPkg.CORSHandler(
 		corsHeaders,
-		ResponseTypeHandler(
+		handlerPkg.ResponseTypeHandler(
 			"application/json",
 			ciamHandler(
 				diagram.HTTPHandlers(
