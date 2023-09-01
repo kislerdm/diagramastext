@@ -31,12 +31,12 @@ func (h httphandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	const prefix = "/generate"
 
-	t := strings.TrimLeft(r.URL.Path, prefix)
+	t := strings.TrimPrefix(r.URL.Path, prefix)
 
 	handler, ok := h.diagramHandler[t]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"error":"handler for path ` + r.URL.Path + ` is not allowed"}`))
+		_, _ = w.Write([]byte(`{"error":"` + r.URL.Path + ` not found"}`))
 		return
 	}
 

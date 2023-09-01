@@ -17,10 +17,12 @@ import (
 	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
+type HTTPHandlerFn func(next http.Handler) http.Handler
+
 // HTTPHandler initializes the CIAM client.
 func HTTPHandler(
 	clientRepository RepositoryCIAM, clientEmail SMTPClient, privateKey ed25519.PrivateKey,
-) (func(next http.Handler) http.Handler, error) {
+) (HTTPHandlerFn, error) {
 	if clientRepository == nil {
 		return nil, errors.New("repo client is required")
 	}

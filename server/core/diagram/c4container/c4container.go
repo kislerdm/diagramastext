@@ -54,7 +54,7 @@ type rel struct {
 	Technology string `json:"technology,omitempty"`
 }
 
-// NewC4ContainersHTTPHandler initialises the handler to generate C4 containers diagram.
+// NewC4ContainersHTTPHandler initialises the httphandler to generate C4 containers diagram.
 func NewC4ContainersHTTPHandler(
 	clientModelInference diagram.ModelInference, clientRepositoryPrediction diagram.RepositoryPrediction,
 	httpClient diagram.HTTPClient,

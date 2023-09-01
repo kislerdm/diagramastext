@@ -1,10 +1,10 @@
-package handler_test
+package httphandler_test
 
 import (
 	"net/http"
 	"testing"
 
-	"httpserver/handler"
+	"github.com/kislerdm/diagramastext/server/core/httphandler"
 )
 
 type MockWriter struct {
@@ -32,7 +32,7 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 		`shall set Access-Control-Allow-Origin on "" input`, func(t *testing.T) {
 			w := &MockWriter{Headers: http.Header{}}
 
-			handler.CORSHandler(
+			httphandler.CORSHandler(
 				map[string]string{
 					"Access-Control-Allow-Origin": "",
 				},
@@ -49,7 +49,7 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 		`shall set Access-Control-Allow-Origin on '*' input`, func(t *testing.T) {
 			w := &MockWriter{Headers: http.Header{}}
 
-			handler.CORSHandler(
+			httphandler.CORSHandler(
 				map[string]string{
 					"Access-Control-Allow-Origin": "'*'",
 				},
@@ -70,7 +70,7 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 				"bar": "quxx",
 			}
 
-			handler.CORSHandler(m, nil).ServeHTTP(w, &http.Request{})
+			httphandler.CORSHandler(m, nil).ServeHTTP(w, &http.Request{})
 
 			for k, want := range m {
 				got := w.Header().Get(k)
@@ -94,7 +94,7 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 			// Note: it must differ from 200
 			const probeStatus = 201
 
-			handler.CORSHandler(
+			httphandler.CORSHandler(
 				m,
 				chainHandler{probeStatus},
 			).ServeHTTP(w, &http.Request{Method: http.MethodOptions})

@@ -23,7 +23,7 @@ func TestServeHTTP(t *testing.T) {
 			t.Parallel()
 
 			var init = func(t *testing.T) (
-				http.Handler, *MockWriter, ed25519.PrivateKey,
+				http.Handler, *utils.MockWriter, ed25519.PrivateKey,
 			) {
 				clientRepo := &MockRepositoryCIAM{}
 				smtpClient := &MockSMTPClient{}
@@ -34,7 +34,7 @@ func TestServeHTTP(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				w := &MockWriter{}
+				w := &utils.MockWriter{}
 				return h(nil), w, key
 			}
 
@@ -226,7 +226,7 @@ func TestServeHTTP(t *testing.T) {
 						),
 					}
 
-					writer := &MockWriter{}
+					writer := &utils.MockWriter{}
 
 					// WHEN
 					handler.ServeHTTP(writer, request)
@@ -329,7 +329,7 @@ func TestServeHTTP(t *testing.T) {
 						),
 					}
 
-					writer := &MockWriter{}
+					writer := &utils.MockWriter{}
 
 					// WHEN
 					handler.ServeHTTP(writer, request)
@@ -430,7 +430,7 @@ func TestServeHTTP(t *testing.T) {
 						Header: header,
 					}
 
-					writer := &MockWriter{}
+					writer := &utils.MockWriter{}
 
 					// WHEN
 					handler.ServeHTTP(writer, request)
@@ -469,7 +469,7 @@ func TestServeHTTP(t *testing.T) {
 			)
 
 			t.Run(
-				"shall process API call by the next handler given a valid API-KEY, the used has not used the service yet",
+				"shall process API call by the next httphandler given a valid API-KEY, the used has not used the service yet",
 				func(t *testing.T) {
 					// GIVEN
 					clientRepo, header, userID := initApiCallByRegisteredUser()
@@ -489,7 +489,7 @@ func TestServeHTTP(t *testing.T) {
 						Header: header,
 					}
 
-					writer := &MockWriter{}
+					writer := &utils.MockWriter{}
 
 					// WHEN
 					handler.ServeHTTP(writer, request)
@@ -525,7 +525,7 @@ func TestServeHTTP(t *testing.T) {
 						Header: header,
 					}
 
-					writer := &MockWriter{}
+					writer := &utils.MockWriter{}
 
 					// WHEN
 					handler.ServeHTTP(writer, request)
@@ -556,7 +556,7 @@ func TestServeHTTP(t *testing.T) {
 						},
 					}
 
-					writer := &MockWriter{}
+					writer := &utils.MockWriter{}
 
 					// WHEN
 					handler.ServeHTTP(writer, request)
@@ -593,7 +593,7 @@ func TestServeHTTP(t *testing.T) {
 						Header: header,
 					}
 
-					writer := &MockWriter{}
+					writer := &utils.MockWriter{}
 
 					// WHEN
 					handler.ServeHTTP(writer, request)

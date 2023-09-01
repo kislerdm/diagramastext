@@ -11,12 +11,11 @@ import (
 	"os"
 	"time"
 
-	handlerPkg "httpserver/handler"
-
 	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/config"
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/diagram/c4container"
+	handlerPkg "github.com/kislerdm/diagramastext/server/core/httphandler"
 	"github.com/kislerdm/diagramastext/server/core/pkg/gcpsecretsmanager"
 	"github.com/kislerdm/diagramastext/server/core/pkg/httpclient"
 	"github.com/kislerdm/diagramastext/server/core/pkg/openai"
@@ -108,17 +107,11 @@ func init() {
 		log.Fatal(err)
 	}
 
-	handler = handlerPkg.CORSHandler(
-		corsHeaders,
-		handlerPkg.ResponseTypeHandler(
-			"application/json",
-			ciamHandler(
-				diagram.HTTPHandlers(
-					map[string]diagram.HTTPHandler{
-						"/c4": c4DiagramHandler,
-					},
-				),
-			),
+	handler = handlerPkg.NewHandler(
+		ciamHandler, corsHeaders, diagram.HTTPHandlers(
+			map[string]diagram.HTTPHandler{
+				"/c4": c4DiagramHandler,
+			},
 		),
 	)
 }

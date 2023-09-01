@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
 
 func mustGenerateTimestamps(tsStr ...string) []time.Time {
@@ -253,7 +255,7 @@ func Test_client_validateRequestsQuotaUsage(t *testing.T) {
 			args: args{
 				clientRepository: &MockRepositoryCIAM{},
 				user:             &User{},
-				writer:           &MockWriter{},
+				writer:           &utils.MockWriter{},
 			},
 			wantStatuCode: 0,
 			wantBody:      nil,
@@ -266,7 +268,7 @@ func Test_client_validateRequestsQuotaUsage(t *testing.T) {
 					Timestamps: repeatTimestamp(genNowMinute(), RoleRegisteredUser.Quotas().RequestsPerMinute+1),
 				},
 				user:   &User{},
-				writer: &MockWriter{},
+				writer: &utils.MockWriter{},
 			},
 			wantStatuCode: http.StatusTooManyRequests,
 			wantBody:      []byte(`{"error":"throttling quota exceeded"}`),
@@ -279,7 +281,7 @@ func Test_client_validateRequestsQuotaUsage(t *testing.T) {
 					Timestamps: repeatTimestamp(genNowDate(), RoleRegisteredUser.Quotas().RequestsPerDay+1),
 				},
 				user:   &User{},
-				writer: &MockWriter{},
+				writer: &utils.MockWriter{},
 			},
 			wantStatuCode: http.StatusForbidden,
 			wantBody:      []byte(`{"error":"quota exceeded"}`),
@@ -292,7 +294,7 @@ func Test_client_validateRequestsQuotaUsage(t *testing.T) {
 					Err: errors.New("foo"),
 				},
 				user:   &User{},
-				writer: &MockWriter{},
+				writer: &utils.MockWriter{},
 			},
 			wantStatuCode: http.StatusInternalServerError,
 			wantBody:      []byte(`{"error":"internal error"}`),
@@ -313,12 +315,12 @@ func Test_client_validateRequestsQuotaUsage(t *testing.T) {
 					t.Errorf("unexpected return value. want: %v, got: %v", tt.want, got)
 				}
 
-				gotStatusCode := tt.args.writer.(*MockWriter).StatusCode
+				gotStatusCode := tt.args.writer.(*utils.MockWriter).StatusCode
 				if tt.wantStatuCode != gotStatusCode {
 					t.Errorf("wrong status code. want: %d, got: %d", tt.wantStatuCode, gotStatusCode)
 				}
 
-				gotBody := tt.args.writer.(*MockWriter).V
+				gotBody := tt.args.writer.(*utils.MockWriter).V
 				if !reflect.DeepEqual(gotBody, tt.wantBody) {
 					t.Errorf("wrong body. want: %v, got: %v", tt.wantBody, gotBody)
 				}
