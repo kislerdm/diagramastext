@@ -11,8 +11,26 @@ import (
 	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 	"github.com/kislerdm/diagramastext/server/core/diagram/c4container"
-	"github.com/kislerdm/diagramastext/server/core/internal/utils"
 )
+
+type mockWriter struct {
+	Headers    http.Header
+	StatusCode int
+	V          []byte
+}
+
+func (m *mockWriter) Header() http.Header {
+	return m.Headers
+}
+
+func (m *mockWriter) Write(bytes []byte) (int, error) {
+	m.V = bytes
+	return len(bytes), nil
+}
+
+func (m *mockWriter) WriteHeader(statusCode int) {
+	m.StatusCode = statusCode
+}
 
 const mockDiagram = `<?xml version="1.0" encoding="us-ascii" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" contentstyletype="text/css" height="179px" preserveAspectRatio="none" version="1.1" viewBox="0 0 375 179" width="375px" zoomAndPan="magnify">
@@ -48,7 +66,7 @@ func TestE2e(t *testing.T) {
 				"shall issue tokens, and generate diagram using acc token", func(t *testing.T) {
 					// GIVEN
 
-					// CIAM httphandler
+					// CIAM http handler
 					key := ciam.GenerateCertificate()
 					mockCIAMRepo := &ciam.MockRepositoryCIAM{}
 					mockSMTP := &ciam.MockSMTPClient{}
@@ -58,7 +76,7 @@ func TestE2e(t *testing.T) {
 						t.Fatal(err)
 					}
 
-					// diagram http handler
+					// diagram's http handler
 					diagramHandler, err := c4container.NewC4ContainersHTTPHandler(
 						&diagram.MockModelInference{V: []byte(`{"nodes":[{"id":"0"}]}`)},
 						&diagram.MockRepositoryPrediction{},
@@ -86,17 +104,16 @@ func TestE2e(t *testing.T) {
 					}
 
 					handler := NewHandler(
-						handlerCIAM, corsHeadersMap, diagram.HTTPHandlers(
-							map[string]diagram.HTTPHandler{
-								"/c4": diagramHandler,
-							},
-						),
+						handlerCIAM, corsHeadersMap,
+						map[string]diagram.HTTPHandler{
+							"/c4": diagramHandler,
+						},
 					)
 
 					// WHEN
 
 					// authenticate anonym user
-					w := &utils.MockWriter{
+					w := &mockWriter{
 						Headers: http.Header{},
 					}
 					r := &http.Request{
@@ -129,7 +146,7 @@ func TestE2e(t *testing.T) {
 
 					// diagram is generated
 
-					w = &utils.MockWriter{
+					w = &mockWriter{
 						Headers: http.Header{},
 					}
 

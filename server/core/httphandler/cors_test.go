@@ -1,10 +1,8 @@
-package httphandler_test
+package httphandler
 
 import (
 	"net/http"
 	"testing"
-
-	"github.com/kislerdm/diagramastext/server/core/httphandler"
 )
 
 type MockWriter struct {
@@ -32,12 +30,12 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 		`shall set Access-Control-Allow-Origin on "" input`, func(t *testing.T) {
 			w := &MockWriter{Headers: http.Header{}}
 
-			httphandler.CORSHandler(
+			handlerCORS{
 				map[string]string{
 					"Access-Control-Allow-Origin": "",
 				},
 				nil,
-			).ServeHTTP(w, &http.Request{})
+			}.ServeHTTP(w, &http.Request{})
 
 			if w.Header().Get("Access-Control-Allow-Origin") != "*" {
 				t.Fatalf("Access-Control-Allow-Origin expected to be set to *")
@@ -49,12 +47,12 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 		`shall set Access-Control-Allow-Origin on '*' input`, func(t *testing.T) {
 			w := &MockWriter{Headers: http.Header{}}
 
-			httphandler.CORSHandler(
+			handlerCORS{
 				map[string]string{
 					"Access-Control-Allow-Origin": "'*'",
 				},
 				nil,
-			).ServeHTTP(w, &http.Request{})
+			}.ServeHTTP(w, &http.Request{})
 
 			if w.Header().Get("Access-Control-Allow-Origin") != "*" {
 				t.Error("Access-Control-Allow-Origin expected to be set to *")
@@ -70,7 +68,7 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 				"bar": "quxx",
 			}
 
-			httphandler.CORSHandler(m, nil).ServeHTTP(w, &http.Request{})
+			handlerCORS{m, nil}.ServeHTTP(w, &http.Request{})
 
 			for k, want := range m {
 				got := w.Header().Get(k)
@@ -94,10 +92,10 @@ func Test_cordHandler_ServeHTTP(t *testing.T) {
 			// Note: it must differ from 200
 			const probeStatus = 201
 
-			httphandler.CORSHandler(
+			handlerCORS{
 				m,
 				chainHandler{probeStatus},
-			).ServeHTTP(w, &http.Request{Method: http.MethodOptions})
+			}.ServeHTTP(w, &http.Request{Method: http.MethodOptions})
 
 			if w.StatusCode == probeStatus {
 				t.Error("200 is expected as the status code")
