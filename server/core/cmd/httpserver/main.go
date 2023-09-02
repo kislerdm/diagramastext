@@ -108,11 +108,10 @@ func init() {
 	}
 
 	handler = handlerPkg.NewHandler(
-		ciamHandler, corsHeaders, diagram.HTTPHandlers(
-			map[string]diagram.HTTPHandler{
-				"/c4": c4DiagramHandler,
-			},
-		),
+		ciamHandler, corsHeaders,
+		map[string]diagram.HTTPHandler{
+			"/c4": c4DiagramHandler,
+		},
 	)
 }
 
