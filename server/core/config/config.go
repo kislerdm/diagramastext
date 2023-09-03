@@ -22,6 +22,7 @@ const (
 	tableOneTimeSecret        = "user_auth_secrets"
 
 	defaultSenderEmail = "support@diagramastext.dev"
+	defaultSMPTPort    = "587"
 )
 
 type repositoryPredictionConfig struct {
@@ -90,6 +91,7 @@ func LoadDefaultConfig(ctx context.Context, clientSecretsManager diagram.Reposit
 		CIAM: ciamCfg{
 			TableOneTimeSecret: tableOneTimeSecret,
 			SmtpSenderEmail:    defaultSenderEmail,
+			SmtpPort:           defaultSMPTPort,
 		},
 	}
 
@@ -120,9 +122,15 @@ func loadFromSecretsManager(
 
 		cfg.CIAM.SmtpUser = s.SmtpUser
 		cfg.CIAM.SmtpPassword = s.SmtpPassword
-		cfg.CIAM.SmtpSenderEmail = s.SmtpSenderEmail
 		cfg.CIAM.SmtpHost = s.SmtpHost
-		cfg.CIAM.SmtpPort = s.SmtpPort
+
+		if s.SmtpSenderEmail != "" {
+			cfg.CIAM.SmtpSenderEmail = s.SmtpSenderEmail
+		}
+
+		if s.SmtpPort != "" {
+			cfg.CIAM.SmtpPort = s.SmtpPort
+		}
 	}
 }
 
