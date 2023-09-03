@@ -237,7 +237,7 @@ func (c client) signinUserInit(w http.ResponseWriter, r *http.Request) {
 
 	const defaultExpirationSecret = 10 * time.Minute
 
-	userID, isActive, err := c.clientRepository.LookupUserByEmail(r.Context(), req.Email)
+	userID, _, err := c.clientRepository.LookupUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		c.internalError(w, err)
 		return
@@ -252,11 +252,6 @@ func (c client) signinUserInit(w http.ResponseWriter, r *http.Request) {
 			c.internalError(w, err)
 			return
 		}
-	} else if !isActive {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"error":"user was deactivated"}`))
-		c.logger.Printf("user %s was deactivated\n", userID)
-		return
 	}
 
 	secret := generateOnetimeSecret()
