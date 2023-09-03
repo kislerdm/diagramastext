@@ -1446,10 +1446,11 @@ func TestClient_UpdateUserSetActive(t *testing.T) {
 		id  string
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
+		name      string
+		fields    fields
+		args      args
+		wantErr   bool
+		wantQuery string
 	}{
 		{
 			name: "happy path",
@@ -1461,7 +1462,8 @@ func TestClient_UpdateUserSetActive(t *testing.T) {
 				ctx: context.TODO(),
 				id:  "ccb42cbf-92c5-4069-bd01-ae25d49d9727",
 			},
-			wantErr: false,
+			wantErr:   false,
+			wantQuery: "UPDATE users SET is_active = TRUE WHERE user_id = $1",
 		},
 		{
 			name: "unhappy path: no user id provided",
@@ -1501,8 +1503,12 @@ func TestClient_UpdateUserSetActive(t *testing.T) {
 					tableUsers:                tt.fields.tableUsers,
 					tableTokens:               tt.fields.tableTokens,
 				}
-				if err := c.UpdateUserSetActive(tt.args.ctx, tt.args.id); (err != nil) != tt.wantErr {
+				err := c.UpdateUserSetActive(tt.args.ctx, tt.args.id)
+				if (err != nil) != tt.wantErr {
 					t.Errorf("UpdateUserSetActive() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if err == nil && tt.wantQuery != "" && c.c.(*mockDbClient).query != tt.wantQuery {
+					t.Error("WriteOneTimeSecret() executed unexpected query")
 				}
 			},
 		)
@@ -1545,7 +1551,7 @@ func TestClient_WriteOneTimeSecret(t *testing.T) {
 				createdAt: time.Now().UTC().Add(-1 * time.Minute),
 			},
 			wantErr:   false,
-			wantQuery: "INSERT INTO secret (user_id, secret, created_at) VALUES ($1, $2, $3) ON CONFLICT DO UPDATE SET user_id = $1, secret = $2, created_at = $3",
+			wantQuery: "INSERT INTO secret (user_id, secret, created_at) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET secret = $2, created_at = $3",
 		},
 		{
 			name: "unhappy path: no user id provided",

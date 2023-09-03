@@ -383,7 +383,7 @@ func (c Client) UpdateUserSetActive(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("id is required")
 	}
-	_, err := c.c.Exec(ctx, "UPDATE "+c.tableUsers+" SET is_active = TRUE WHERE user_id = %1", id)
+	_, err := c.c.Exec(ctx, "UPDATE "+c.tableUsers+" SET is_active = TRUE WHERE user_id = $1", id)
 	return err
 }
 
@@ -399,7 +399,7 @@ func (c Client) WriteOneTimeSecret(ctx context.Context, userID, secret string, c
 	}
 	_, err := c.c.Exec(
 		ctx, "INSERT INTO "+c.tableOneTimeSecret+" (user_id, secret, created_at) VALUES ($1, $2, $3)"+
-			" ON CONFLICT DO UPDATE SET user_id = $1, secret = $2, created_at = $3",
+			" ON CONFLICT (user_id) DO UPDATE SET secret = $2, created_at = $3",
 		userID, secret, createdAt,
 	)
 	return err
