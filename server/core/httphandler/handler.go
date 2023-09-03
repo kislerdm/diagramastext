@@ -18,12 +18,16 @@ func NewHandler(
 		headersMap: corsHeaders,
 		next: handlerResponseType{
 			mimeType: "application/json",
-			next: ciamHandler(
-				handlerDiagrams{
-					diagramHandlers: diagramHandlers,
-					log:             log.New(os.Stderr, "diagram-generator", log.Lmicroseconds|log.LUTC|log.Lshortfile),
-				},
-			),
+			next: handlerStatus{
+				next: ciamHandler(
+					handlerDiagrams{
+						diagramHandlers: diagramHandlers,
+						log: log.New(
+							os.Stderr, "diagram-generator", log.Lmicroseconds|log.LUTC|log.Lshortfile,
+						),
+					},
+				),
+			},
 		},
 	}
 }
@@ -129,6 +133,21 @@ type handlerResponseType struct {
 
 func (h handlerResponseType) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", h.mimeType)
+	if h.next != nil {
+		h.next.ServeHTTP(w, r)
+	}
+}
+
+type handlerStatus struct {
+	next http.Handler
+}
+
+func (h handlerStatus) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet && r.URL.Path == "/status" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if h.next != nil {
 		h.next.ServeHTTP(w, r)
 	}
