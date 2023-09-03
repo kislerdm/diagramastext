@@ -489,8 +489,3 @@ func generateOnetimeSecret() string {
 	}
 	return string(b)
 }
-
-func GenerateCertificate() ed25519.PrivateKey {
-	_, o, _ := ed25519.GenerateKey(rand.New(rand.NewSource(0)))
-	return o
-}

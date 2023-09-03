@@ -39,7 +39,7 @@ type repositoryPredictionConfig struct {
 }
 
 type ciamConfigStore struct {
-	PrivateKey         []byte `json:"private_key"`
+	PrivateKey         string `json:"private_key"`
 	SmtpUser           string `json:"smtp_user"`
 	SmtpPassword       string `json:"smtp_password"`
 	SmtpHost           string `json:"smtp_host"`
@@ -60,9 +60,7 @@ type modelInferenceConfig struct {
 }
 
 type ciamCfg struct {
-	PrivateKey ed25519.PrivateKey
-	// KMS key ID
-	KeyID              string
+	PrivateKey         ed25519.PrivateKey
 	TableOneTimeSecret string
 	SmtpUser           string
 	SmtpPassword       string
@@ -115,9 +113,12 @@ func loadFromSecretsManager(
 		cfg.RepositoryPredictionConfig.DBUser = s.DBUser
 		cfg.RepositoryPredictionConfig.DBPassword = s.DBPassword
 
-		if s.PrivateKey != nil {
-			// TODO: read private key from the secret
-			// cfg.CIAM.PrivateKey, _ = s.PrivateKey
+		if s.PrivateKey != "" {
+			var err error
+			cfg.CIAM.PrivateKey, err = ciam.ReadPrivateKey(s.PrivateKey)
+			if err != nil {
+				panic("cannot read key from secret: " + err.Error())
+			}
 		}
 
 		cfg.CIAM.SmtpUser = s.SmtpUser
@@ -192,9 +193,5 @@ func loadEnvVarConfig(cfg *Config) {
 
 	if v := os.Getenv("CIAM_SMTP_SENDER_EMAIL"); v != "" {
 		cfg.CIAM.SmtpSenderEmail = v
-	}
-
-	if v := os.Getenv("CIAM_KEY"); v != "" {
-		cfg.CIAM.KeyID = v
 	}
 }

@@ -2,10 +2,12 @@ package config
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"reflect"
 	"testing"
 
+	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/diagram"
 )
 
@@ -22,6 +24,8 @@ func Test_loadDefaultConfig(t *testing.T) {
 		ctx                  context.Context
 		clientSecretsManager diagram.RepositorySecretsVault
 	}
+
+	certificate := ciam.GenerateCertificate()
 
 	tests := []struct {
 		name    string
@@ -43,6 +47,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 								DBPassword: "postgres",
 							},
 							ciamConfigStore: ciamConfigStore{
+								PrivateKey:      mustMarshalKey(certificate),
 								SmtpUser:        "foo@bar.baz",
 								SmtpPassword:    "qux",
 								SmtpHost:        "smtphost",
@@ -80,6 +85,7 @@ func Test_loadDefaultConfig(t *testing.T) {
 					SmtpHost:           "smtphost",
 					SmtpPort:           "573",
 					SmtpSenderEmail:    "support@bar.baz",
+					PrivateKey:         certificate,
 				},
 			},
 		},
@@ -128,7 +134,6 @@ func Test_loadDefaultConfig(t *testing.T) {
 				"CIAM_SMTP_HOST":         "yy",
 				"CIAM_SMTP_PORT":         "44",
 				"CIAM_SMTP_SENDER_EMAIL": "dfdf",
-				"CIAM_KEY":               "projects/my-project/locations/us-east1/keyRings/my-key-ring/cryptoKeys/my-key",
 			},
 			want: &Config{
 				RepositoryPredictionConfig: repositoryPredictionConfig{
@@ -150,7 +155,6 @@ func Test_loadDefaultConfig(t *testing.T) {
 					SmtpHost:           "smtphost",
 					SmtpPort:           "573",
 					SmtpSenderEmail:    "support@bar.baz",
-					KeyID:              "projects/my-project/locations/us-east1/keyRings/my-key-ring/cryptoKeys/my-key",
 				},
 				ModelInferenceConfig: modelInferenceConfig{
 					Token:     "foobar",
@@ -207,7 +211,6 @@ func Test_loadDefaultConfig(t *testing.T) {
 					SmtpHost:           "yy",
 					SmtpPort:           "44",
 					SmtpSenderEmail:    "dfdf",
-					KeyID:              "projects/my-project/locations/us-east1/keyRings/my-key-ring/cryptoKeys/my-key",
 				},
 			},
 		},
@@ -257,4 +260,12 @@ func Test_loadDefaultConfig(t *testing.T) {
 			}
 		},
 	)
+}
+
+func mustMarshalKey(key ed25519.PrivateKey) string {
+	o, err := ciam.MarshalKey(key)
+	if err != nil {
+		panic(err)
+	}
+	return string(o)
 }
