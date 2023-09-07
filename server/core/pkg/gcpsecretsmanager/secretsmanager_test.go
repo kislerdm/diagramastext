@@ -15,8 +15,6 @@ import (
 var key []byte
 
 func TestNewSecretmanager(t *testing.T) {
-	t.Parallel()
-
 	t.Run(
 		"happy path", func(t *testing.T) {
 			// GIVEN

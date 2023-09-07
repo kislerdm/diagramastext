@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -99,4 +100,22 @@ func NewPredictionError(v []byte) error {
 		return ModelPredictionError{RawJSON: v, msg: string(v)}
 	}
 	return ModelPredictionError{RawJSON: v, msg: o.Error}
+}
+
+type HTTPHandlerError struct {
+	Msg      string
+	Type     string
+	HTTPCode int
+}
+
+func (e HTTPHandlerError) Error() string {
+	var o strings.Builder
+	writeStrings(&o, "[type:", e.Type, "][code:", strconv.Itoa(e.HTTPCode), "] ", e.Msg)
+	return o.String()
+}
+
+func writeStrings(o *strings.Builder, text ...string) {
+	for _, s := range text {
+		_, _ = o.WriteString(s)
+	}
 }

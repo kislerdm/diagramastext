@@ -3,13 +3,11 @@ package postgres
 import (
 	"context"
 	"errors"
-	"strconv"
+	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Config configuration of the postgres Client.
@@ -23,6 +21,7 @@ type Config struct {
 	TableSuccessStatus string `json:"table_success_status,omitempty"`
 	TableUsers         string `json:"table_users,omitempty"`
 	TableTokens        string `json:"table_tokens,omitempty"`
+	TableOneTimeSecret string `json:"table_one_time_secret,omitempty"`
 	SSLMode            string `json:"ssl_mode"`
 }
 
@@ -50,6 +49,9 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.TableTokens == "" {
 		return errors.New("table_tokens must be provided")
+	}
+	if cfg.TableOneTimeSecret == "" {
+		return errors.New("table_one_time_secret must be provided")
 	}
 	return validateSSLMode(cfg.SSLMode)
 }
@@ -105,6 +107,7 @@ func NewPostgresClient(ctx context.Context, cfg Config) (
 		tableWriteSuccessFlag:     cfg.TableSuccessStatus,
 		tableUsers:                cfg.TableUsers,
 		tableTokens:               cfg.TableTokens,
+		tableOneTimeSecret:        cfg.TableOneTimeSecret,
 	}, nil
 }
 
@@ -115,6 +118,7 @@ type Client struct {
 	tableWriteSuccessFlag     string
 	tableUsers                string
 	tableTokens               string
+	tableOneTimeSecret        string
 }
 
 func (c Client) GetDailySuccessfulResultsTimestampsByUserID(ctx context.Context, userID string) ([]time.Time, error) {
@@ -280,111 +284,154 @@ func (c Client) WriteSuccessFlag(ctx context.Context, requestID, userID, token s
 	return err
 }
 
-type mockDbClient struct {
-	err   error
-	query string
-	v     pgx.Rows
-}
-
-func (m *mockDbClient) Query(_ context.Context, query string, _ ...any) (pgx.Rows, error) {
-	m.query = query
-	if m.err != nil {
-		return nil, m.err
+func (c Client) CreateUser(ctx context.Context, id, email, fingerprint string, isActive bool, role *uint8) error {
+	if id == "" {
+		return errors.New("id is required")
 	}
-	return m.v, nil
-}
-
-func (m *mockDbClient) Close(_ context.Context) error {
-	return m.err
-}
-
-func (m *mockDbClient) Exec(_ context.Context, query string, _ ...any) (pgconn.CommandTag, error) {
-	m.query = query
-	if m.err != nil {
-		return pgconn.CommandTag{}, m.err
+	if role == nil {
+		return errors.New("role is required")
 	}
-	return pgconn.NewCommandTag(strings.ToUpper(strings.Split(query, " ")[0])), nil
+	_, err := c.c.Exec(
+		ctx,
+		"INSERT INTO "+c.tableUsers+" (user_id,email,web_fingerprint,is_active,role) VALUES ($1,$2,$3,$4,$5)",
+		id, email, fingerprint, isActive, int(*role),
+	)
+	return err
 }
 
-type dbClient interface {
-	Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, query string, args ...any) (pgx.Rows, error)
-	Close(ctx context.Context) error
+func (c Client) ReadUser(ctx context.Context, id string) (
+	found, isActive bool, role uint8, email, fingerprint string, err error,
+) {
+	if id == "" {
+		err = errors.New("id is required")
+		return
+	}
+	rows, err := c.c.Query(
+		ctx, `SELECT 
+	is_active
+	,email
+    ,role
+	,web_fingerprint
+FROM `+c.tableUsers+` WHERE user_id = $1`, id,
+	)
+	if err != nil {
+		return
+	}
+	if rows.Next() {
+		var r int
+		if err := rows.Scan(&isActive, &email, &r, &fingerprint); err != nil {
+			return false, false, 0, "", "", err
+		}
+		rows.Close()
+
+		role = uint8(r)
+		found = true
+		return
+	}
+	return false, false, 0, "", "", nil
 }
 
-type mockRows struct {
-	tag    pgconn.CommandTag
-	err    error
-	v      [][]any
-	rowCnt int
-	s      *sync.RWMutex
-}
-
-func (m *mockRows) Close() {
+func (c Client) LookupUserByEmail(ctx context.Context, email string) (id string, isActive bool, err error) {
+	if email == "" {
+		err = errors.New("email is required")
+		return
+	}
+	rows, err := c.c.Query(
+		ctx, `SELECT user_id, is_active FROM `+c.tableUsers+
+			// The last registered user with the given email will be selected
+			// FIXME: shall this behaviour be sustained?
+			// FIXME: consider alternatives to ORDER BY for the sake of performance
+			` WHERE email = $1 ORDER BY created_at LIMIT 1`, email,
+	)
+	if err != nil {
+		return
+	}
+	if rows.Next() {
+		if err = rows.Scan(&id, &isActive); err != nil {
+			return
+		}
+		rows.Close()
+	}
 	return
 }
 
-func (m *mockRows) Err() error {
-	return m.err
-}
-
-func (m *mockRows) CommandTag() pgconn.CommandTag {
-	return m.tag
-}
-
-func (m *mockRows) FieldDescriptions() []pgconn.FieldDescription {
-	return nil
-}
-
-func (m *mockRows) Next() bool {
-	m.s.Lock()
-	var f bool
-	if len(m.v) > m.rowCnt {
-		f = true
+func (c Client) LookupUserByFingerprint(ctx context.Context, fingerprint string) (id string, isActive bool, err error) {
+	if fingerprint == "" {
+		err = errors.New("fingerprint is required")
+		return
 	}
-	m.s.Unlock()
-	return f
-}
-
-func (m *mockRows) Scan(dest ...any) error {
-	if m.err != nil {
-		return m.err
+	rows, err := c.c.Query(
+		ctx, `SELECT user_id, is_active FROM `+c.tableUsers+
+			// The last registered user with the given fingerprint will be selected
+			// FIXME: shall this behaviour be sustained?
+			// FIXME: consider alternatives to ORDER BY for the sake of performance
+			` WHERE web_fingerprint = $1 ORDER BY created_at LIMIT 1`, fingerprint,
+	)
+	if err != nil {
+		return
 	}
-
-	m.s.Lock()
-	defer m.s.Unlock()
-	if len(m.v[m.rowCnt]) != len(dest) {
-		return errors.New(
-			"number of field descriptions must equal number of destinations, got " +
-				strconv.Itoa(len(m.v[m.rowCnt])) + " and " + strconv.Itoa(len(dest)),
-		)
-	}
-	for i, el := range m.v[m.rowCnt] {
-		switch dest[i].(type) {
-		case *string:
-			*dest[i].(*string) = el.(string)
-		case *bool:
-			*dest[i].(*bool) = el.(bool)
-		case *int:
-			*dest[i].(*int) = el.(int)
-		case *time.Time:
-			*dest[i].(*time.Time) = el.(time.Time)
+	if rows.Next() {
+		if err = rows.Scan(&id, &isActive); err != nil {
+			return
 		}
+		rows.Close()
 	}
-	m.rowCnt++
-	return nil
+	return
 }
 
-func (m *mockRows) Values() ([]any, error) {
-	m.s.Lock()
-	defer m.s.Unlock()
-	return m.v[m.rowCnt], m.Err()
+func (c Client) UpdateUserSetActive(ctx context.Context, id string) error {
+	if id == "" {
+		return errors.New("id is required")
+	}
+	_, err := c.c.Exec(ctx, "UPDATE "+c.tableUsers+" SET is_active = TRUE WHERE user_id = $1", id)
+	return err
 }
 
-func (m *mockRows) RawValues() [][]byte {
-	return nil
+func (c Client) WriteOneTimeSecret(ctx context.Context, userID, secret string, createdAt time.Time) error {
+	if userID == "" {
+		return errors.New("userID is required")
+	}
+	if secret == "" {
+		return errors.New("secret is required")
+	}
+	if reflect.DeepEqual(createdAt, time.Time{}) {
+		return errors.New("createdAt is required")
+	}
+	_, err := c.c.Exec(
+		ctx, "INSERT INTO "+c.tableOneTimeSecret+" (user_id, secret, created_at) VALUES ($1, $2, $3)"+
+			" ON CONFLICT (user_id) DO UPDATE SET secret = $2, created_at = $3",
+		userID, secret, createdAt,
+	)
+	return err
 }
 
-func (m *mockRows) Conn() *pgx.Conn {
-	return nil
+func (c Client) ReadOneTimeSecret(ctx context.Context, userID string) (
+	found bool, secret string, issuedAt time.Time, err error,
+) {
+	if userID == "" {
+		err = errors.New("userID is required")
+		return
+	}
+	var rows pgx.Rows
+	rows, err = c.c.Query(ctx, "SELECT secret, created_at FROM "+c.tableOneTimeSecret+" WHERE user_id = $1", userID)
+	if err != nil {
+		return
+	}
+
+	if rows.Next() {
+		if err := rows.Scan(&secret, &issuedAt); err != nil {
+			return false, "", time.Time{}, err
+		}
+		rows.Close()
+	}
+	found = true
+	return
+}
+
+func (c Client) DeleteOneTimeSecret(ctx context.Context, userID string) error {
+	if userID == "" {
+		return errors.New("userID is required")
+	}
+	_, err := c.c.Exec(ctx, "DELETE FROM "+c.tableOneTimeSecret+" WHERE user_id = $1", userID)
+	return err
 }

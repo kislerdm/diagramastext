@@ -233,41 +233,39 @@ func decodeResponse(respBytes []byte, model string) (
 	}
 }
 
-func decodeChatCompletionsResultV2(respBytes []byte) (string, []byte, uint16, uint16, error) {
-	var resp openAIResponseChat
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return "", nil, 0, 0, err
-	}
-	if len(resp.Choices) == 0 {
-		return "", nil, 0, 0, errors.New("unsuccessful prediction")
-	}
-	return string(respBytes), []byte(resp.Choices[0].Message.Content), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
-}
-
 func decodeChatCompletionsResult(respBytes []byte) (string, []byte, uint16, uint16, error) {
 	var resp openAIResponseChat
-	if err := json.Unmarshal(cleanRawBytesChatResponse(respBytes), &resp); err != nil {
-		// TODO: evaluate the response's data structure to potentially remove decodeChatCompletionsResult
-		return decodeChatCompletionsResultV2(respBytes)
+	rawResp := string(respBytes)
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		if err := json.Unmarshal(cleanRawBytesChatResponse(respBytes), &resp); err != nil {
+			return rawResp, nil, 0, 0, err
+		}
 	}
 
 	if len(resp.Choices) == 0 {
-		return "", nil, 0, 0, errors.New("unsuccessful prediction")
+		return rawResp, nil, 0, 0, errors.New("unsuccessful prediction")
 	}
 
-	s := cleanRawResponse(cleanRawChatResponse(resp.Choices[0].Message.Content))
+	s := cleanContent(resp.Choices[0].Message.Content)
+	s = cleanRawResponse(cleanRawChatResponse(s))
 
-	return string(respBytes), []byte(s), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
+	return rawResp, []byte(s), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
+}
+
+func cleanContent(s string) string {
+	s = strings.ReplaceAll(s, ":\n\n{", chatDescriptionSeparator+"{")
+	s = strings.ReplaceAll(s, `:\n\n{`, chatDescriptionSeparator+"{")
+	s = strings.ReplaceAll(s, "```", chatDescriptionSeparator)
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, `\n`, "")
+	return s
 }
 
 // chatDescriptionSeparator separates the code snippet from the chat's natural language description
 const chatDescriptionSeparator = `|S|`
 
 func cleanRawBytesChatResponse(respBytes []byte) []byte {
-	respBytes = bytes.ReplaceAll(respBytes, []byte(`:\n\n{`), []byte(chatDescriptionSeparator+"{"))
-	respBytes = bytes.ReplaceAll(respBytes, []byte("```"), []byte(chatDescriptionSeparator))
-	respBytes = bytes.ReplaceAll(respBytes, []byte("\n"), nil)
-	respBytes = bytes.ReplaceAll(respBytes, []byte(`\n`), nil)
+	respBytes = []byte(cleanContent(string(respBytes)))
 	respBytes = bytes.ReplaceAll(respBytes, []byte(` "`), nil)
 	respBytes = bytes.TrimSpace(respBytes)
 	return respBytes
@@ -283,17 +281,18 @@ func cleanRawChatResponse(s string) string {
 
 func decodeCompletionsResult(respBytes []byte) (string, []byte, uint16, uint16, error) {
 	var resp openAIResponse
+	rawResp := string(respBytes)
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return "", nil, 0, 0, err
+		return rawResp, nil, 0, 0, err
 	}
 
 	if len(resp.Choices) == 0 {
-		return "", nil, 0, 0, errors.New("unsuccessful prediction")
+		return rawResp, nil, 0, 0, errors.New("unsuccessful prediction")
 	}
 
 	s := cleanRawResponse(resp.Choices[0].Text)
 
-	return resp.Choices[0].Text, []byte(s), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
+	return rawResp, []byte(s), resp.Usage.PromptTokens, resp.Usage.CompletionTokens, nil
 }
 
 func cleanRawResponse(s string) string {

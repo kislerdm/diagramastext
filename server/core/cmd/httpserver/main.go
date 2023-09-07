@@ -11,8 +11,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/kislerdm/diagramastext/server/core/ciam"
 	"github.com/kislerdm/diagramastext/server/core/config"
-	"github.com/kislerdm/diagramastext/server/core/httphandler"
+	"github.com/kislerdm/diagramastext/server/core/diagram"
+	"github.com/kislerdm/diagramastext/server/core/diagram/c4container"
+	handlerPkg "github.com/kislerdm/diagramastext/server/core/httphandler"
 	"github.com/kislerdm/diagramastext/server/core/pkg/gcpsecretsmanager"
 	"github.com/kislerdm/diagramastext/server/core/pkg/httpclient"
 	"github.com/kislerdm/diagramastext/server/core/pkg/openai"
@@ -64,6 +67,7 @@ func init() {
 			TableSuccessStatus: cfg.RepositoryPredictionConfig.TableSuccessStatus,
 			TableUsers:         cfg.RepositoryPredictionConfig.TableUsers,
 			TableTokens:        cfg.RepositoryPredictionConfig.TableAPITokens,
+			TableOneTimeSecret: cfg.CIAM.TableOneTimeSecret,
 			SSLMode:            cfg.RepositoryPredictionConfig.SSLMode,
 		},
 	)
@@ -78,10 +82,17 @@ func init() {
 		}
 	}
 
-	handler, err = httphandler.NewHTTPHandler(
-		modelInferenceClient,
-		postgresClient,
-		httpclient.NewHTTPClient(
+	ciamSMTPClient := ciam.NewSMTPClient(
+		cfg.CIAM.SmtpUser, cfg.CIAM.SmtpPassword, cfg.CIAM.SmtpHost, cfg.CIAM.SmtpPort, cfg.CIAM.SmtpSenderEmail,
+	)
+
+	ciamHandler, err := ciam.HTTPHandler(postgresClient, ciamSMTPClient, cfg.CIAM.PrivateKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	c4DiagramHandler, err := c4container.NewC4ContainersHTTPHandler(
+		modelInferenceClient, postgresClient, httpclient.NewHTTPClient(
 			httpclient.Config{
 				Timeout: 1 * time.Minute,
 				Backoff: httpclient.Backoff{
@@ -91,12 +102,17 @@ func init() {
 				},
 			},
 		),
-		corsHeaders,
-		postgresClient,
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	handler = handlerPkg.NewHandler(
+		ciamHandler, corsHeaders,
+		map[string]diagram.HTTPHandler{
+			"/c4": c4DiagramHandler,
+		},
+	)
 }
 
 func main() {

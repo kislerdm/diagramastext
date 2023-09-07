@@ -7,7 +7,7 @@ info:
     ## Headers
     
     Make sure that the request headers are set properly: 
-      - `Authorization: Bearer ${DIAGRAMASTEXT_API_TOKEN}`
+      - `X-API-KEY: ${DIAGRAMASTEXT_API_TOKEN}`
       - `Accept: application/json`
       - `Content-Type: application/json`
     

@@ -75,9 +75,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			input: diagram.MockInput{
 				Prompt:    "foobar",
 				RequestID: "xxxx",
-				User: &diagram.User{
-					ID: placeholderUserID,
-				},
+				UserID:    placeholderUserID,
 			},
 			want: mustNewResult(
 				[]byte(`<?xml version="1.0" encoding="us-ascii" standalone="no"?>
@@ -123,12 +121,10 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			},
 			input: diagram.MockInput{
 				Prompt: "foobar",
-				User: &diagram.User{
-					ID: placeholderUserID,
-				},
+				UserID: placeholderUserID,
 			},
 			want:    nil,
-			wantErr: errors.New("diagram/c4container/c4container.go:87: foobar"),
+			wantErr: errors.New("diagram/c4container/c4container.go:86: foobar"),
 		},
 		{
 			name: "unhappy path: failed to predict",
@@ -141,9 +137,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			},
 			input: diagram.MockInput{
 				Prompt: "foobar",
-				User: &diagram.User{
-					ID: placeholderUserID,
-				},
+				UserID: placeholderUserID,
 			},
 			want:    nil,
 			wantErr: diagramErrors.NewPredictionError([]byte(`{"error":"foobar"}`)),
@@ -159,9 +153,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			},
 			input: diagram.MockInput{
 				Prompt: "foobar",
-				User: &diagram.User{
-					ID: placeholderUserID,
-				},
+				UserID: placeholderUserID,
 			},
 			want:    nil,
 			wantErr: errors.New("unexpected end of JSON input"),
@@ -179,9 +171,7 @@ func TestNewC4ContainersHandlerInitHappyPath(t *testing.T) {
 			},
 			input: diagram.MockInput{
 				Prompt: "foobar",
-				User: &diagram.User{
-					ID: placeholderUserID,
-				},
+				UserID: placeholderUserID,
 			},
 			want:    nil,
 			wantErr: errors.New("diagram/c4container/plantuml.go:41: foobar"),
@@ -267,40 +257,6 @@ func TestNewC4ContainersHandlerInitUnhappyPath(t *testing.T) {
 
 			if err == nil || err.Error() != "diagram/c4container/c4container.go:66: http client must be provided" {
 				t.Fatalf("unexpected error")
-			}
-		},
-	)
-}
-
-func Test_defineModel(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"not registered user", func(t *testing.T) {
-			// GIVEN
-			user := &diagram.User{ID: placeholderUserID}
-
-			// WHEN
-			got := defineModel(user)
-
-			// THEN
-			if got != notRegisteredModel {
-				t.Fatalf("unexpected Model")
-			}
-		},
-	)
-
-	t.Run(
-		"registered user", func(t *testing.T) {
-			// GIVEN
-			user := &diagram.User{ID: "foobar", IsRegistered: true}
-
-			// WHEN
-			got := defineModel(user)
-
-			// THEN
-			if got != registeredModel {
-				t.Fatalf("unexpected Model")
 			}
 		},
 	)
@@ -494,9 +450,7 @@ func TestC4ContainerHandlerRepositoryPredictionPersistence(t *testing.T) {
 			userInput := diagram.MockInput{
 				Prompt:    "foobar",
 				RequestID: "1410904f-f646-488f-ae08-cc341dfb321c",
-				User: &diagram.User{
-					ID: placeholderUserID,
-				},
+				UserID:    placeholderUserID,
 			}
 
 			handler, err := NewC4ContainersHTTPHandler(modelInferenceClient, repositoryPredictionClient, httpClient)
@@ -547,9 +501,7 @@ func TestC4ContainerHandlerRepositoryPredictionPersistence(t *testing.T) {
 			userInput := diagram.MockInput{
 				Prompt:    "foobar",
 				RequestID: "1410904f-f646-488f-ae08-cc341dfb321c",
-				User: &diagram.User{
-					ID: placeholderUserID,
-				},
+				UserID:    placeholderUserID,
 			}
 
 			handler, err := NewC4ContainersHTTPHandler(modelInferenceClient, repositoryPredictionClient, httpClient)
@@ -604,9 +556,7 @@ func TestC4ContainerHandlerRepositoryPredictionPersistence(t *testing.T) {
 			userInput := diagram.MockInput{
 				Prompt:    "foobar",
 				RequestID: "1410904f-f646-488f-ae08-cc341dfb321c",
-				User: &diagram.User{
-					ID: placeholderUserID,
-				},
+				UserID:    placeholderUserID,
 			}
 
 			handler, err := NewC4ContainersHTTPHandler(modelInferenceClient, repositoryPredictionClient, httpClient)

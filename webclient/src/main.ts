@@ -6,7 +6,7 @@ import Header from "./components/header";
 import {Loader, Popup} from "./components/popup";
 
 import {Config, IsResponseError, IsResponseSVG} from "./ports";
-import {User} from "./user";
+import {CIAMClient} from "./ciam";
 
 // @ts-ignore
 import placeholderOutputSVG from "./components/svg/output-placeholder.svg?raw";
@@ -31,9 +31,10 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
             InputLengthCounter: "3"
         };
 
-    const user = new User();
-    const promptLengthLimit = definePromptLengthLimit(cfg, user);
-
+    const ciamClient = new CIAMClient(cfg.urlAPI, cfg.cookieStore, cfg.fingerprintScanner, cfg.httpClientCIAM);
+    const promptLengthLimit = new PromptLengthLimit(
+        cfg.promptMinLength, ciamClient.getQuotas().prompt_length_max,
+    );
 
     mountPoint.innerHTML = `${Header}
 
@@ -42,8 +43,9 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
     <span style="font-style:italic;font-weight:bold">plain English</span> in no time!
 </div>
 
+<div id="inpt">
 ${Input(id.Trigger, id.InputLengthCounter, promptLengthLimit, placeholderInputPrompt)}
-
+</div>
 <i class="${arrow}"></i>
 
 ${Output(id.Output, id.Download, placeholderOutputSVG)}
@@ -96,7 +98,14 @@ ${Footer(cfg.version)}
         }
     });
 
-    triggerBtn.addEventListener("click", () => {
+    triggerBtn.addEventListener("click", async () => {
+        if (!ciamClient.isAuth()) {
+            // TODO: add popup for signup/signin using email
+            await ciamClient.signInAnonym();
+            new PromptLengthLimit(
+                cfg.promptMinLength, ciamClient.getQuotas().prompt_length_max,
+            );
+        }
         generateDiagram();
     });
 
@@ -118,11 +127,15 @@ ${Footer(cfg.version)}
         const timeout = setTimeout(() => elapsedRequestThreshold = true, elapsedThresholdMS);
 
         Loader.show(mountPoint);
-        fetch(`${cfg.urlAPI}/internal/generate/c4`, {
+
+        const headers = {
+            "Content-Type": "application/json",
+        };
+        Object.assign(headers, ciamClient.getHeaderAccess());
+
+        cfg.httpClientSVGRendering.do(`${cfg.urlAPI}/generate/c4`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers: headers,
             body: JSON.stringify({
                 "prompt": prompt,
             }),
@@ -156,7 +169,7 @@ ${Footer(cfg.version)}
             elapsedRequestThreshold = false;
             Loader.hide(mountPoint);
             if (e.name === "AbortError") {
-                Popup.show(mountPoint, "Request cancelled by user");
+                Popup.show(mountPoint, "Request cancelled by ciamClient");
             } else {
                 console.error(e);
                 showError();
@@ -205,19 +218,16 @@ export class PromptLengthLimit {
     }
 }
 
-function definePromptLengthLimit(cfg: Config, user: User): PromptLengthLimit {
-    if (user.is_registered()) {
-        return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserRegistered)
-    }
-    return new PromptLengthLimit(cfg.promptMinLength, cfg.promptMaxLengthUserBase)
-}
-
 export function Input(idTrigger: string,
                       idCounter: string,
                       promptLengthLimit: PromptLengthLimit,
                       placeholder: string): string {
-    function textAreaLengthMax(v: number): number {
+    function textAreaLengthMax(v: number | undefined | null): number {
         const multiplier = 1.2;
+        const defaultMax = 100;
+        if (v === undefined || v === null) {
+            return defaultMax;
+        }
         return Math.round(v * multiplier);
     }
 

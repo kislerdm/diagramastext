@@ -1,6 +1,7 @@
 import './global.css';
 import Main from "./main";
 import {Config} from "./ports";
+import {defaultHTTPClient} from "./httpclient";
 
 const cfg: Config = {
     // @ts-ignore
@@ -10,6 +11,7 @@ const cfg: Config = {
     promptMinLength: 3,
     promptMaxLengthUserBase: 100,
     promptMaxLengthUserRegistered: 300,
+    httpClientSVGRendering: new defaultHTTPClient(),
 }
 
 const mountPoint = document.querySelector<HTMLDivElement>("main")!;
