@@ -31,8 +31,10 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
             InputLengthCounter: "3"
         };
 
-    const user = new CIAMClient(cfg.urlAPI);
-    const promptLengthLimit = new PromptLengthLimit(cfg.promptMinLength, user.quotas.prompt_length_max);
+    const ciamClient = new CIAMClient(cfg.urlAPI, cfg.cookieStore, cfg.fingerprintScanner, cfg.httpClientCIAM);
+    const promptLengthLimit = new PromptLengthLimit(
+        cfg.promptMinLength, ciamClient.getQuotas().prompt_length_max,
+    );
 
     mountPoint.innerHTML = `${Header}
 
@@ -41,8 +43,9 @@ export default function Main(mountPoint: HTMLDivElement, cfg: Config) {
     <span style="font-style:italic;font-weight:bold">plain English</span> in no time!
 </div>
 
+<div id="inpt">
 ${Input(id.Trigger, id.InputLengthCounter, promptLengthLimit, placeholderInputPrompt)}
-
+</div>
 <i class="${arrow}"></i>
 
 ${Output(id.Output, id.Download, placeholderOutputSVG)}
@@ -95,7 +98,14 @@ ${Footer(cfg.version)}
         }
     });
 
-    triggerBtn.addEventListener("click", () => {
+    triggerBtn.addEventListener("click", async () => {
+        if (!ciamClient.isAuth()) {
+            // TODO: add popup for signup/signin using email
+            await ciamClient.signInAnonym();
+            new PromptLengthLimit(
+                cfg.promptMinLength, ciamClient.getQuotas().prompt_length_max,
+            );
+        }
         generateDiagram();
     });
 
@@ -117,11 +127,15 @@ ${Footer(cfg.version)}
         const timeout = setTimeout(() => elapsedRequestThreshold = true, elapsedThresholdMS);
 
         Loader.show(mountPoint);
-        fetch(`${cfg.urlAPI}/internal/generate/c4`, {
+
+        const headers = {
+            "Content-Type": "application/json",
+        };
+        Object.assign(headers, ciamClient.getHeaderAccess());
+
+        cfg.httpClientSVGRendering.do(`${cfg.urlAPI}/generate/c4`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers: headers,
             body: JSON.stringify({
                 "prompt": prompt,
             }),
@@ -155,7 +169,7 @@ ${Footer(cfg.version)}
             elapsedRequestThreshold = false;
             Loader.hide(mountPoint);
             if (e.name === "AbortError") {
-                Popup.show(mountPoint, "Request cancelled by user");
+                Popup.show(mountPoint, "Request cancelled by ciamClient");
             } else {
                 console.error(e);
                 showError();

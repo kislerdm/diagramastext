@@ -1,9 +1,16 @@
+import {FingerprintScanner, TokensStore} from "./ciam";
+import {HTTPClient} from "./httpclient";
+
 export declare type Config = {
     version: string
     urlAPI: string
     promptMinLength: number
     promptMaxLengthUserBase: number
     promptMaxLengthUserRegistered: number
+    httpClientSVGRendering: HTTPClient
+    cookieStore?: TokensStore
+    fingerprintScanner?: FingerprintScanner
+    httpClientCIAM?: HTTPClient
 }
 
 export type ResponseSVG = {

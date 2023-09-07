@@ -1,5 +1,6 @@
 import {getCookie, setCookie} from "typescript-cookie";
-import {v} from "msw/lib/glossary-de6278a9";
+import {defaultHTTPClient, HTTPClient} from "./httpclient";
+import {btoa, Buffer} from "buffer";
 
 const defaultNA: string = "";
 
@@ -23,8 +24,8 @@ type claimsStd = {
 type claimsRefresh = claimsStd;
 
 type claimsID = claimsStd & {
-    email: string;
-    fingerprint: string;
+    email?: string;
+    fingerprint?: string;
 }
 
 type claimsAccess = claimsStd & {
@@ -36,171 +37,180 @@ export function fromBase64(v: string): string {
     return Buffer.from(v, "base64").toString("binary");
 }
 
-interface Tokens {
-    id: string | undefined;
-    access: string | undefined;
-    refresh: string | undefined;
+export interface TokensStore {
+    read(): string | undefined
 
-    setID(s: string): void;
-
-    setAccess(s: string): void;
-
-    setRefresh(s: string): void;
-
-    userID(): string | undefined;
-
-    quotas(): user_quotas | undefined;
-
-    stringify(): string;
-
-    isAuthUser(): boolean;
+    write(value: string, path: string): void
 }
 
-class tokens implements Tokens {
-    id: string | undefined;
-    access: string | undefined;
-    refresh: string | undefined;
+class defaultCache implements TokensStore {
+    private readonly _cookie_tokens_key: string = "tokens";
+    private readonly _cookie_tokens_exp_days: number = 100;
 
-    private _id: claimsID | undefined;
-    private _access: claimsAccess | undefined;
-    private _refresh: claimsRefresh | undefined;
-
-    constructor(s: string | undefined) {
-        if (s === undefined || s === "") {
-            return
-        }
-
-        const tkns = JSON.parse(s);
-        if (tkns["id"] !== undefined) {
-            this.setID(tkns["id"]);
-        }
-
-        if (tkns["access"] !== undefined) {
-            this.setAccess(tkns["access"])
-        }
-
-        if (tkns["refresh"] !== undefined) {
-            this.setRefresh(tkns["refresh"])
-        }
+    read(): string | undefined {
+        return getCookie(this._cookie_tokens_key);
     }
 
-    setID(s: string): void {
-        this.id = s;
-        this._id = cast(this.parseJWTClaims(this.id), r("claimsID"));
-    }
-
-    setAccess(s: string): void {
-        this.access = s;
-        this._access = cast(this.parseJWTClaims(this.access), r("claimsAccess"));
-    }
-
-    setRefresh(s: string): void {
-        this.refresh = s;
-        this._refresh = cast(this.parseJWTClaims(this.refresh), r("claimsRefresh"));
-    }
-
-    stringify(): string {
-        return JSON.stringify({"id": this.id, "access": this.access, "refresh": this.refresh})
-    }
-
-    private parseJWTClaims(s: string): any {
-        const els = s.split(".");
-        if (els.length < 2) {
-            throw new Error("faulty JWT format")
-        }
-        return JSON.parse(fromBase64(els[1]));
-    }
-
-    quotas(): user_quotas {
-        if (this._access !== undefined) {
-            return this._access.quotas;
-        }
-        return defaultQuotas;
-    }
-
-    userID(): string | undefined {
-        return this._id?.sub;
-    }
-
-    isAuthUser(): boolean {
-        return this._access?.exp! > Date.now();
+    write(value: string, path: string): void {
+        setCookie(this._cookie_tokens_key, value, {
+            expires: this._cookie_tokens_exp_days,
+            sameSite: "strict",
+            secure: true,
+            path: path,
+            // TODO: add domain verification
+        })
     }
 }
 
-export class CIAMClient {
-    _cookie_tokens_key: string = "tokens";
-    _cookie_tokens_exp_days: number = 100;
-    private readonly _ciam_base_url: string;
+export interface FingerprintScanner {
+    scan(): string;
+}
 
-    private readonly _fingerprint: string;
-
-    readonly tokens: tokens;
-
-    constructor(ciam_base_url: string) {
-        this._ciam_base_url = ciam_base_url;
-        this.tokens = new tokens(getCookie(this._cookie_tokens_key));
-
+class defaultFingerprintScanner implements FingerprintScanner {
+    scan(): string {
         // TODO: add verification of the fingerprint
         // if the current fingerprint does not match the one in token
         // the CIAM shall be called to update the fingerprint and issue new tokens,
         // or to create a new anonym user
         // @ts-ignore
         const userAgent: string = import.meta.env.DEV ? "NA" : navigator.userAgent;
-        this._fingerprint = get_fingerprint(userAgent);
+        return get_fingerprint(userAgent);
+    }
+}
+
+type tokens = tokens_raw & {
+    claims_id: claimsID
+    claims_access?: claimsAccess
+    claims_refresh?: claimsRefresh
+};
+
+type tokens_raw = {
+    id: string
+    access?: string
+    refresh?: string
+}
+
+function parseJWTClaims(s: string): Object {
+    const els = s.split(".");
+    if (els.length < 2) {
+        throw new Error("faulty JWT format")
+    }
+    return JSON.parse(fromBase64(els[1]));
+}
+
+function unpack_tokens_raw(data: tokens_raw): tokens {
+    let o: tokens = {claims_id: {} as claimsID, id: ""};
+    if (data.id !== undefined) {
+        o.id = data.id
+        o.claims_id = parseJWTClaims(data.id) as claimsID
+    }
+
+    if (data.access !== undefined) {
+        o.access = data.access
+        o.claims_access = parseJWTClaims(data.access) as claimsAccess
+    }
+
+    if (data.refresh !== undefined) {
+        o.refresh = data.refresh
+        o.claims_refresh = parseJWTClaims(data.refresh) as claimsAccess
+    }
+    return o;
+}
+
+function unmarshal_tokes(s?: string): tokens {
+    if (s === undefined || s === "") {
+        return {id: "", claims_id: {}} as tokens;
+    }
+
+    const tkns = JSON.parse(s!);
+    return unpack_tokens_raw(tkns);
+}
+
+function stringify_tokens(t: tokens): string {
+    let o: Object = {id: t.id};
+    if (t.access !== "" && t.access !== undefined) {
+        Object.assign(o, {access: t.access})
+    }
+    if (t.refresh !== "" && t.refresh !== undefined) {
+        Object.assign(o, {refresh: t.refresh})
+    }
+    return JSON.stringify(o);
+}
+
+
+export class CIAMClient {
+    private readonly ciam_base_url: string;
+    private readonly tokensStore: TokensStore;
+
+    private readonly fingerprint: string;
+    private tokens: tokens;
+    private httpClient: HTTPClient;
+
+    constructor(ciam_base_url: string,
+                tokensStore?: TokensStore,
+                fingerprintScanner?: FingerprintScanner,
+                httpClient?: HTTPClient) {
+        this.ciam_base_url = ciam_base_url;
+
+        this.tokensStore = tokensStore === undefined ? new defaultCache() : tokensStore;
+        this.tokens = unmarshal_tokes(this.tokensStore.read());
+
+        this.fingerprint = fingerprintScanner === undefined ? new defaultFingerprintScanner().scan() : fingerprintScanner.scan();
+        this.httpClient = httpClient === undefined ? new defaultHTTPClient() : httpClient;
     }
 
     isAuth(): boolean {
-        return this.tokens.isAuthUser();
+        return this.tokens.claims_access !== undefined && this.tokens.claims_access.exp > Date.now();
     }
 
     // Implements the logic to signin anonym user.
-    signInAnonym(): void {
-        fetch(`${this._ciam_base_url}/auth/anonym`, {
+    async signInAnonym() {
+        const resp = await this.httpClient.do(`${this.ciam_base_url}/auth/anonym`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                "fingerprint": this._fingerprint,
+                fingerprint: this.fingerprint,
             }),
-        }).then(resp => {
-            if (resp.status !== 200) {
-                throw new Error("error auth anonym")
-            }
-            return resp.json()
-        }).then(data => {
-            this.tokens.setID(data["id"])
-            this.tokens.setAccess(data["access"])
-            this.tokens.setRefresh(data["refresh"])
         })
+
+        if (resp.status !== 200) {
+            throw new Error("error auth anonym")
+        }
+
+        const data = await resp.json();
+        this.tokens = unpack_tokens_raw(data);
+        this.setTokensCache();
     }
 
     private setTokensCache(): void {
-        setCookie(this._cookie_tokens_key, this.tokens?.stringify(), {
-            expires: this._cookie_tokens_exp_days,
-            sameSite: "strict",
-            secure: true,
-            path: "/",
-            // TODO: add domain verification
-        });
+        this.tokensStore.write(stringify_tokens(this.tokens), "/");
     }
 
     getHeaderAccess(): Object {
-        if (this.tokens.access === "") {
+        if (this.tokens.access === undefined || this.tokens.access === "") {
             return {}
         }
         return {
-            "Authorization": `Bearer ${this.tokens.access}`
+            Authorization: `Bearer ${this.tokens.access}`
         }
     }
 
     getHeaderRefresh(): Object {
-        if (this.tokens.refresh === "") {
+        if (this.tokens.refresh === undefined || this.tokens.refresh === "") {
             return {}
         }
         return {
-            "Authorization": `Bearer ${this.tokens.refresh}`
+            Authorization: `Bearer ${this.tokens.refresh}`
         }
+    }
+
+    getQuotas(): user_quotas {
+        if (!this.isAuth()) {
+            return defaultQuotas
+        }
+        return this.tokens.claims_access!.quotas
     }
 }
 
@@ -331,10 +341,6 @@ function l(typ: any) {
     return {literal: typ};
 }
 
-function a(typ: any) {
-    return {arrayItems: typ};
-}
-
 function u(...typs: any[]) {
     return {unionMembers: typs};
 }
@@ -347,11 +353,34 @@ function r(name: string) {
     return {ref: name};
 }
 
+const typeMapClaimsStd = o([
+    {json: "sub", js: "sub", typ: ""},
+    {json: "exp", js: "exp", typ: 0},
+], null);
+
 const typeMap: any = {
-    "Graph": o([
-        {json: "links", js: "links", typ: u(undefined, a(r("Link")))},
-        {json: "nodes", js: "nodes", typ: a(r("Node"))},
-    ], "any"),
+    "tokens_raw": o([
+        {json: "id", js: "id", typ: ""},
+        {json: "access", js: "access", typ: u(undefined, "")},
+        {json: "refresh", js: "refresh", typ: u(undefined, "")},
+    ], null),
+    "user_quotas": o([
+        {json: "prompt_length_max", js: "prompt_length_max", typ: 0},
+        {json: "rpm", js: "rpm", typ: 0},
+        {json: "rpd", js: "rpd", typ: 0},
+    ], null),
+    typeMapClaimsStd,
+    "claimsRefresh": typeMapClaimsStd,
+    "claimsID": o([
+        {json: "email", js: "email", typ: u(undefined, "")},
+        {json: "fingerprint", js: "fingerprint", typ: u(undefined, "")},
+        ...typeMapClaimsStd.props,
+    ], null),
+    "claimsAccess": o([
+        {json: "role", js: "role", typ: 0},
+        {json: "quotas", js: "quotas", typ: r("user_quotas")},
+        ...typeMapClaimsStd.props,
+    ], null),
 };
 
 /**
