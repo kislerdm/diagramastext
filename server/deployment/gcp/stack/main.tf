@@ -60,10 +60,6 @@ resource "google_cloud_run_v2_service" "this" {
         name  = "MODEL_MAX_TOKENS"
         value = var.model_max_tokens
       }
-      env {
-        name  = "CIAM_KEY"
-        value = google_kms_crypto_key.ciam.id
-      }
 
       dynamic "env" {
         for_each = var.cors_headers != null ? { foo = 0 } : {}
