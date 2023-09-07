@@ -11,7 +11,7 @@ type SMTPClient interface {
 	SendSignInEmail(recipient, authSecret string) error
 }
 
-func NewSMTClient(user, password, host, port, senderEmail string) SMTPClient {
+func NewSMTPClient(user, password, host, port, senderEmail string) SMTPClient {
 	return &smtClient{
 		auth:   smtp.PlainAuth("", user, password, host),
 		addr:   host + ":" + port,

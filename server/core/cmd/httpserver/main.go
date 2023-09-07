@@ -82,7 +82,7 @@ func init() {
 		}
 	}
 
-	ciamSMTPClient := ciam.NewSMTClient(
+	ciamSMTPClient := ciam.NewSMTPClient(
 		cfg.CIAM.SmtpUser, cfg.CIAM.SmtpPassword, cfg.CIAM.SmtpHost, cfg.CIAM.SmtpPort, cfg.CIAM.SmtpSenderEmail,
 	)
 
