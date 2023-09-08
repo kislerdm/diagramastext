@@ -1,6 +1,6 @@
 import {getCookie, setCookie} from "typescript-cookie";
 import {defaultHTTPClient, HTTPClient} from "./httpclient";
-import {btoa, Buffer} from "buffer";
+import {Buffer} from "buffer";
 
 const defaultNA: string = "";
 
@@ -57,7 +57,6 @@ class defaultCache implements TokensStore {
             sameSite: "strict",
             secure: true,
             path: path,
-            // TODO: add domain verification
         })
     }
 }
@@ -98,32 +97,31 @@ function parseJWTClaims(s: string): Object {
     return JSON.parse(fromBase64(els[1]));
 }
 
-function unpack_tokens_raw(data: tokens_raw): tokens {
-    let o: tokens = {claims_id: {} as claimsID, id: ""};
+function unpack_tokens_raw(init: tokens, data: tokens_raw): tokens {
     if (data.id !== undefined) {
-        o.id = data.id
-        o.claims_id = parseJWTClaims(data.id) as claimsID
+        init.id = data.id
+        init.claims_id = parseJWTClaims(data.id) as claimsID
     }
 
     if (data.access !== undefined) {
-        o.access = data.access
-        o.claims_access = parseJWTClaims(data.access) as claimsAccess
+        init.access = data.access
+        init.claims_access = parseJWTClaims(data.access) as claimsAccess
     }
 
     if (data.refresh !== undefined) {
-        o.refresh = data.refresh
-        o.claims_refresh = parseJWTClaims(data.refresh) as claimsAccess
+        init.refresh = data.refresh
+        init.claims_refresh = parseJWTClaims(data.refresh) as claimsAccess
     }
-    return o;
+    return init;
 }
 
 function unmarshal_tokes(s?: string): tokens {
+    let o: tokens = {id: "", claims_id: {}} as tokens;
     if (s === undefined || s === "") {
-        return {id: "", claims_id: {}} as tokens;
+        return o;
     }
-
     const tkns = JSON.parse(s!);
-    return unpack_tokens_raw(tkns);
+    return unpack_tokens_raw(o, tkns);
 }
 
 function stringify_tokens(t: tokens): string {
@@ -160,7 +158,14 @@ export class CIAMClient {
     }
 
     isAuth(): boolean {
-        return this.tokens.claims_access !== undefined && this.tokens.claims_access.exp > Date.now();
+        return this.tokens.claims_access !== undefined && !this.isExp()
+    }
+
+    isExp(): boolean {
+        // TODO: add the flow to handle refresh "seamlessly", i.e. when token is not expired on the client,
+        // TODO: but get expired upon request's delivery to the server
+        const margin10Sec = 10000;
+        return this.tokens.claims_access!.exp <= Date.now() - margin10Sec;
     }
 
     // Implements the logic to signin anonym user.
@@ -180,7 +185,28 @@ export class CIAMClient {
         }
 
         const data = await resp.json();
-        this.tokens = unpack_tokens_raw(data);
+        this.tokens = unpack_tokens_raw(this.tokens, data);
+        this.setTokensCache();
+    }
+
+    // Implements the logic to refresh access token, given that refresh token exists.
+    async refreshAccessToken() {
+        const resp = await this.httpClient.do(`${this.ciam_base_url}/auth/refresh`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                refresh_token: this.tokens!.refresh,
+            }),
+        })
+
+        if (resp.status !== 200) {
+            throw new Error("error refreshing the token")
+        }
+
+        const data = await resp.json();
+        this.tokens = unpack_tokens_raw(this.tokens, data);
         this.setTokensCache();
     }
 
