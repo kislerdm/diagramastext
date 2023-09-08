@@ -283,8 +283,8 @@ func Test_client_validateRequestsQuotaUsage(t *testing.T) {
 				user:   &User{},
 				writer: &utils.MockWriter{},
 			},
-			wantStatuCode: http.StatusForbidden,
-			wantBody:      []byte(`{"error":"quota exceeded"}`),
+			wantStatuCode: http.StatusTooManyRequests,
+			wantBody:      []byte(`{"error":"daily quota exceeded"}`),
 			want:          false,
 		},
 		{

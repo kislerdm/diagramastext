@@ -139,8 +139,8 @@ func (c client) validateRequestsQuotaUsage(w http.ResponseWriter, r *http.Reques
 	}
 
 	if quotasUsage.RateDay.Used >= quotasUsage.RateDay.Limit {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"error":"quota exceeded"}`))
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":"daily quota exceeded"}`))
 		c.logger.Printf("quota exceeded for user %s", user.ID)
 		return false
 	}
