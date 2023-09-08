@@ -371,7 +371,7 @@ function u(...typs: any[]) {
     return {unionMembers: typs};
 }
 
-function init(props: any[], additional: any) {
+function o(props: any[], additional: any) {
     return {props, additional};
 }
 
@@ -379,30 +379,30 @@ function r(name: string) {
     return {ref: name};
 }
 
-const typeMapClaimsStd = init([
+const typeMapClaimsStd = o([
     {json: "sub", js: "sub", typ: ""},
     {json: "exp", js: "exp", typ: 0},
 ], null);
 
 const typeMap: any = {
-    "tokens_raw": init([
+    "tokens_raw": o([
         {json: "id", js: "id", typ: ""},
         {json: "access", js: "access", typ: u(undefined, "")},
         {json: "refresh", js: "refresh", typ: u(undefined, "")},
     ], null),
-    "user_quotas": init([
+    "user_quotas": o([
         {json: "prompt_length_max", js: "prompt_length_max", typ: 0},
         {json: "rpm", js: "rpm", typ: 0},
         {json: "rpd", js: "rpd", typ: 0},
     ], null),
     typeMapClaimsStd,
     "claimsRefresh": typeMapClaimsStd,
-    "claimsID": init([
+    "claimsID": o([
         {json: "email", js: "email", typ: u(undefined, "")},
         {json: "fingerprint", js: "fingerprint", typ: u(undefined, "")},
         ...typeMapClaimsStd.props,
     ], null),
-    "claimsAccess": init([
+    "claimsAccess": o([
         {json: "role", js: "role", typ: 0},
         {json: "quotas", js: "quotas", typ: r("user_quotas")},
         ...typeMapClaimsStd.props,
