@@ -98,18 +98,11 @@ ${Footer(cfg.version)}
         }
     });
 
-    triggerBtn.addEventListener("click", async () => {
-        if (!ciamClient.isAuth()) {
-            // TODO: add popup for signup/signin using email
-            await ciamClient.signInAnonym();
-            new PromptLengthLimit(
-                cfg.promptMinLength, ciamClient.getQuotas().prompt_length_max,
-            );
-        }
+    triggerBtn.addEventListener("click", () => {
         generateDiagram();
     });
 
-    function generateDiagram() {
+    async function generateDiagram() {
         function showError(status: number = 0, msg: string = "") {
             const errorMsg = _fetchErrorCnt >= _fetchErrorCntMax ? `The errors repreat, please
 <a href="${generateFeedbackLink(prompt, cfg.version)}"
@@ -128,6 +121,27 @@ ${Footer(cfg.version)}
 
         Loader.show(mountPoint);
 
+        // TODO: add popup for signup/signin using email
+        try {
+            if (!ciamClient.isAuth()) {
+                await ciamClient.signInAnonym();
+            }
+            if (ciamClient.isExp()) {
+                await ciamClient.refreshAccessToken();
+            }
+        } catch (e) {
+            clearTimeout(timeout);
+            elapsedRequestThreshold = false;
+            Loader.hide(mountPoint);
+            // @ts-ignore
+            if (e.name === "AbortError") {
+                Popup.show(mountPoint, "Request cancelled by client");
+            } else {
+                console.error(e);
+                showError();
+            }
+        }
+
         const headers = {
             "Content-Type": "application/json",
         };
@@ -141,7 +155,7 @@ ${Footer(cfg.version)}
             }),
             signal: controller.signal,
         }).then((resp: Response) => {
-            if (!resp.ok) {
+            if (!resp.ok && resp.status !== 429) {
                 _fetchErrorCnt++;
             } else {
                 _fetchErrorCnt = 0;
@@ -169,7 +183,7 @@ ${Footer(cfg.version)}
             elapsedRequestThreshold = false;
             Loader.hide(mountPoint);
             if (e.name === "AbortError") {
-                Popup.show(mountPoint, "Request cancelled by ciamClient");
+                Popup.show(mountPoint, "Request cancelled by client");
             } else {
                 console.error(e);
                 showError();
@@ -317,7 +331,7 @@ function mapStatusCode(status: number, msg: string): string {
         case 422:
             return fallback("Faulty input");
         case 429:
-            return fallback("The server is experiencing high load, please try later");
+            return fallback("Your quota exceeded, please get in touch to adjust it");
         default:
             return fallback("Unexpected error, please repeat request");
     }
