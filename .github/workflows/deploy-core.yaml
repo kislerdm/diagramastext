@@ -32,7 +32,7 @@ jobs:
     outputs:
       modules: ${{ steps.ls.outputs.modules }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
       - name: ls
@@ -51,7 +51,7 @@ jobs:
       matrix:
         module: ${{ fromJSON(needs.list_modules.outputs.modules) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Set up Go
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     name: "Lint"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-go@v3
         with:
           go-version: 1.19
@@ -91,7 +91,7 @@ jobs:
       - unittest
       - lint
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Authenticate with GCP
@@ -131,7 +131,7 @@ jobs:
     needs:
       - deploy-stage
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Authenticate with GCP
