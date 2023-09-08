@@ -62,17 +62,17 @@ class defaultCache implements TokensStore {
 }
 
 export interface FingerprintScanner {
-    scan(): string;
+    scan(): string | undefined;
 }
 
 class defaultFingerprintScanner implements FingerprintScanner {
-    scan(): string {
+    scan(): string | undefined {
         // TODO: add verification of the fingerprint
         // if the current fingerprint does not match the one in token
         // the CIAM shall be called to update the fingerprint and issue new tokens,
         // or to create a new anonym user
         // @ts-ignore
-        const userAgent: string = import.meta.env.DEV ? "NA" : navigator.userAgent;
+        const userAgent: string = import.meta.env.DEV ? "" : navigator.userAgent;
         return get_fingerprint(userAgent);
     }
 }
@@ -92,7 +92,7 @@ type tokens_raw = {
 function parseJWTClaims(s: string): Object {
     const els = s.split(".");
     if (els.length < 2) {
-        throw new Error("faulty JWT format")
+        throw Error("faulty JWT format")
     }
     return JSON.parse(fromBase64(els[1]));
 }
@@ -140,7 +140,7 @@ export class CIAMClient {
     private readonly ciam_base_url: string;
     private readonly tokensStore: TokensStore;
 
-    private readonly fingerprint: string;
+    private readonly fingerprint?: string;
     private tokens: tokens;
     private httpClient: HTTPClient;
 
@@ -158,18 +158,22 @@ export class CIAMClient {
     }
 
     isAuth(): boolean {
-        return this.tokens.claims_access !== undefined && !this.isExp()
+        return this.isAccessToken() && !this.isExp()
     }
 
     isExp(): boolean {
         // TODO: add the flow to handle refresh "seamlessly", i.e. when token is not expired on the client,
         // TODO: but get expired upon request's delivery to the server
         const margin10Sec = 10000;
-        return this.tokens.claims_access!.exp <= Date.now() - margin10Sec;
+        return this.isAccessToken() && this.tokens.claims_access!.exp <= Date.now() - margin10Sec;
     }
 
     // Implements the logic to signin anonym user.
     async signInAnonym() {
+        if (this.fingerprint === undefined) {
+            throw Error("no client fingerprint defined")
+        }
+
         const resp = await this.httpClient.do(`${this.ciam_base_url}/auth/anonym`, {
             method: "POST",
             headers: {
@@ -181,7 +185,7 @@ export class CIAMClient {
         })
 
         if (resp.status !== 200) {
-            throw new Error("error auth anonym")
+            throw Error("error auth anonym")
         }
 
         const data = await resp.json();
@@ -202,11 +206,38 @@ export class CIAMClient {
         })
 
         if (resp.status !== 200) {
-            throw new Error("error refreshing the token")
+            throw Error("error refreshing the token")
         }
 
         const data = await resp.json();
         this.tokens = unpack_tokens_raw(this.tokens, data);
+        this.setTokensCache();
+    }
+
+    // Implements the logic in initiate the user's sign-in/up flow relying on passwordless auth method.
+    async signInInit(email: string) {
+        const req = {
+            email: email,
+        };
+
+        if (this.fingerprint !== undefined) {
+            Object.assign(req, {fingerprint: this.fingerprint})
+        }
+
+        const resp = await this.httpClient.do(`${this.ciam_base_url}/auth/init`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(req),
+        })
+
+        if (resp.status !== 200) {
+            throw Error("error signin:init")
+        }
+
+        const data = await resp.text();
+        this.tokens = unpack_tokens_raw(this.tokens, {id: data});
         this.setTokensCache();
     }
 
@@ -215,7 +246,7 @@ export class CIAMClient {
     }
 
     getHeaderAccess(): Object {
-        if (this.tokens.access === undefined || this.tokens.access === "") {
+        if (!this.isAccessToken()) {
             return {}
         }
         return {
@@ -224,7 +255,7 @@ export class CIAMClient {
     }
 
     getHeaderRefresh(): Object {
-        if (this.tokens.refresh === undefined || this.tokens.refresh === "") {
+        if (!this.isRefreshToken()) {
             return {}
         }
         return {
@@ -232,11 +263,27 @@ export class CIAMClient {
         }
     }
 
+    private isAccessToken() {
+        return this.tokens.access !== undefined &&
+            this.tokens.access !== "" &&
+            this.tokens.claims_access !== undefined;
+    }
+
+    private isRefreshToken() {
+        return this.tokens.refresh !== undefined &&
+            this.tokens.refresh !== "" &&
+            this.tokens.claims_refresh !== undefined;
+    }
+
     getQuotas(): user_quotas {
         if (!this.isAuth()) {
             return defaultQuotas
         }
         return this.tokens.claims_access!.quotas
+    }
+
+    isSignInInit(): boolean {
+        return this.tokens.claims_id.exp > Date.now() && !this.isAccessToken()
     }
 }
 
@@ -416,9 +463,9 @@ const typeMap: any = {
  * @param {string} userAgent: user-agent string.
  * @return {string} fingerprint string.
  */
-export function get_fingerprint(userAgent: string): string {
+export function get_fingerprint(userAgent: string): string | undefined {
     if (userAgent === "") {
-        return defaultNA;
+        return undefined;
     }
 
     function rotate_left(n: number, s: number): number {

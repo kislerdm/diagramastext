@@ -17,7 +17,7 @@ describe('fingerprint', () => {
     it('shall return NA on empty input', () => {
         // GIVEN
         const userAgent = "";
-        const want = "";
+        const want = undefined;
         // WHEN
         const got = get_fingerprint(userAgent);
 
@@ -70,13 +70,13 @@ class mockTokensStore implements TokensStore {
 }
 
 class mockFingerprintScanner implements FingerprintScanner {
-    s: string;
+    s: string | undefined;
 
-    constructor(s: string = "") {
+    constructor(s?: string) {
         this.s = s;
     }
 
-    scan(): string {
+    scan(): string | undefined {
         return this.s;
     }
 }
@@ -149,7 +149,7 @@ describe('CIAM', () => {
         })
     })
 
-    describe('sign-in anonym', async () => {
+    describe('sign-in anonym, happy path', async () => {
         const tokens = {
             id: tokenID,
             access: tokenAccess,
@@ -192,10 +192,6 @@ describe('CIAM', () => {
             expect(httpClient.input).toStrictEqual(`${baseURL}/auth/anonym`);
         })
 
-        test(`shall call CIAM server to ${baseURL}/auth/anonym`, () => {
-            expect(httpClient.input).toStrictEqual(`${baseURL}/auth/anonym`);
-        })
-
         test('shall make a POST request to call CIAM server', () => {
             expect(httpClient.init?.method).toStrictEqual("POST");
         })
@@ -209,7 +205,7 @@ describe('CIAM', () => {
         })
     })
 
-    describe('refresh token', async () => {
+    describe('refresh token, happy path', async () => {
         const tokensRefreshed = {
             id: tokenID,
             access: tokenAccess,
@@ -278,6 +274,65 @@ describe('CIAM', () => {
             const want = tokensRefreshed;
             Object.assign(want, {refresh: tokenRefresh});
             expect(JSON.parse(cookie.read()!)).toStrictEqual(want);
+        })
+    })
+
+    describe('sign-in user: init, happy path', async () => {
+        const mockHttp: HTTPClient = new mockHTTPClient(new mockResponse(200, undefined, tokenID));
+
+        const cookie: TokensStore = new mockTokensStore();
+
+        const ciamClient = new CIAMClient(
+            baseURL, cookie, new mockFingerprintScanner(fingerprint), mockHttp,
+        );
+
+        expect(ciamClient.isAuth()).toStrictEqual(false);
+        expect(ciamClient.isSignInInit()).toStrictEqual(false);
+
+        await ciamClient.signInInit(email)
+
+        test('shall be not authorized', () => {
+            expect(ciamClient.isAuth()).toStrictEqual(false);
+        })
+
+        test('shall indicate sign-up initialisation', () => {
+            expect(ciamClient.isSignInInit()).toStrictEqual(true);
+        })
+
+        const httpClient = mockHttp as mockHTTPClient;
+        test(`shall call CIAM server to ${baseURL}/auth/init`, () => {
+            expect(httpClient.input).toStrictEqual(`${baseURL}/auth/init`);
+        })
+
+        test('shall make a POST request to call CIAM server', () => {
+            expect(httpClient.init?.method).toStrictEqual("POST");
+        })
+
+        test('shall include email and fingerprint in the body of the request to call CIAM server', () => {
+            expect(JSON.parse(httpClient.init!.body!.toString())).toStrictEqual({
+                email: email,
+                fingerprint: fingerprint
+            });
+        })
+
+        test(`shall store the CIAM response's ID token to cookie`, () => {
+            expect(JSON.parse(cookie.read()!)).toStrictEqual({id: tokenID})
+        })
+
+        test('shall return a placeholder empty object as access header', () => {
+            expect(ciamClient.getHeaderAccess()).toStrictEqual({});
+        })
+
+        test('shall return a placeholder empty object as refresh header', () => {
+            expect(ciamClient.getHeaderRefresh()).toStrictEqual({});
+        })
+
+        test('shall return default quotas', () => {
+            expect(ciamClient.getQuotas()).toStrictEqual({
+                prompt_length_max: 100,
+                rpm: 1,
+                rpd: 1,
+            });
         })
     })
 })

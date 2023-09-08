@@ -18,13 +18,15 @@ export class mockResponse implements Response {
     readonly url: string = "";
 
     private readonly response_obj: Object | undefined;
+    private readonly response_str: string | undefined;
 
-    constructor(status_code: number, response_obj?: Object, headers?: Headers) {
+    constructor(status_code: number, response_obj?: Object, response_string?: string, headers?: Headers) {
         this.status = status_code;
         if (status_code < 300) {
             this.ok = true
         }
         this.response_obj = response_obj;
+        this.response_str = response_string;
         this.headers = headers!
     }
 
@@ -45,7 +47,7 @@ export class mockResponse implements Response {
     }
 
     text(): Promise<string> {
-        throw new Error("not implemented")
+        return Promise.resolve(this.response_str!);
     }
 
     clone(): Response {
