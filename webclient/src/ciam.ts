@@ -2,8 +2,6 @@ import {getCookie, setCookie} from "typescript-cookie";
 import {defaultHTTPClient, HTTPClient} from "./httpclient";
 import {Buffer} from "buffer";
 
-const defaultNA: string = "";
-
 type user_quotas = {
     prompt_length_max: number;
     rpm: number;
