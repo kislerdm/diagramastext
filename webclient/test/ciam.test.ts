@@ -1,7 +1,7 @@
 import {assert, describe, expect, it, test} from 'vitest'
 
 import {CIAMClient, FingerprintScanner, fromBase64, get_fingerprint, TokensStore} from './../src/ciam';
-import {mockHTTPClient, mockResponse} from "./../src/httpclient";
+import {HTTPClient, mockHTTPClient, mockResponse} from "./../src/httpclient";
 
 describe('fingerprint', () => {
     it('shall return a sha1 of a correct user-agent', () => {
@@ -82,12 +82,6 @@ class mockFingerprintScanner implements FingerprintScanner {
 }
 
 describe('CIAM', () => {
-    function mockFetchResponse(data: Object) {
-        return {
-            json: () => new Promise((resolve) => resolve(data))
-        }
-    }
-
     // JWT info
     const sub: string = "userID";
     const exp: number = Date.now() + 3e10;
@@ -212,6 +206,78 @@ describe('CIAM', () => {
 
         test(`shall store the CIAM response's tokens to cookie`, () => {
             expect(JSON.parse(cookie.read()!)).toStrictEqual(tokens)
+        })
+    })
+
+    describe('refresh token', async () => {
+        const tokensRefreshed = {
+            id: tokenID,
+            access: tokenAccess,
+        };
+        const mockHttp: HTTPClient = new mockHTTPClient(
+            new mockResponse(200, tokensRefreshed),
+        );
+
+        const tokenAccessExpired = `${jwtHeader}.${toBase64(JSON.stringify({
+            ...{...claimsStd, exp: claimsStd.exp - 10e10},
+            role: role,
+            quotas: quotas,
+        }))}`;
+
+        const cookie: TokensStore = new mockTokensStore(JSON.stringify({
+            access: tokenAccessExpired,
+            refresh: tokenRefresh,
+        }));
+
+        const ciamClient = new CIAMClient(baseURL, cookie, undefined, mockHttp);
+
+        // expect to be not authorised before refresh
+        expect(ciamClient.isAuth()).toStrictEqual(false);
+        expect(ciamClient.isExp()).toStrictEqual(true);
+
+        await ciamClient.refreshAccessToken()
+
+        test('shall be authorized', () => {
+            expect(ciamClient.isAuth()).toStrictEqual(true);
+        })
+
+        test('shall have valid access token prior to refresh', () => {
+            expect(ciamClient.isExp()).toStrictEqual(false);
+        })
+
+        test('shall return valid access header', () => {
+            expect(ciamClient.getHeaderAccess()).toStrictEqual({
+                Authorization: `Bearer ${tokenAccess}`
+            });
+        })
+
+        test('shall return valid refresh header', () => {
+            expect(ciamClient.getHeaderRefresh()).toStrictEqual({
+                Authorization: `Bearer ${tokenRefresh}`
+            });
+        })
+
+        test('shall return valid quotas', () => {
+            expect(ciamClient.getQuotas()).toStrictEqual(quotas);
+        })
+
+        const httpClient = mockHttp as mockHTTPClient;
+        test(`shall call CIAM server to ${baseURL}/auth/refresh`, () => {
+            expect(httpClient.input).toStrictEqual(`${baseURL}/auth/refresh`);
+        })
+
+        test('shall make a POST request to call CIAM server', () => {
+            expect(httpClient.init?.method).toStrictEqual("POST");
+        })
+
+        test('shall include refresh_token to the body of the request to call CIAM server', () => {
+            expect(JSON.parse(httpClient.init!.body!.toString())).toStrictEqual({refresh_token: tokenRefresh});
+        })
+
+        test(`shall store new tokens to cookie`, () => {
+            const want = tokensRefreshed;
+            Object.assign(want, {refresh: tokenRefresh});
+            expect(JSON.parse(cookie.read()!)).toStrictEqual(want);
         })
     })
 })
