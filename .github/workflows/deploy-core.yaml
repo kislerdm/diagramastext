@@ -113,7 +113,7 @@ jobs:
           make docker-push IMAGE=gcr.io/diagramastext-stage/core
 
       - name: Setup Terraform CLI
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v3.0.0
       - name: Deploy
         working-directory: "server/deployment/gcp/stage"
         run: |
@@ -153,7 +153,7 @@ jobs:
           make docker-push IMAGE=gcr.io/diagramastext-prod/core
 
       - name: Setup Terraform CLI
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v3.0.0
       - name: Deploy
         working-directory: "server/deployment/gcp/prod"
         run: |
