@@ -96,7 +96,7 @@ jobs:
           fetch-depth: 0
       - name: Authenticate with GCP
         id: auth
-        uses: 'google-github-actions/auth@v1'
+        uses: 'google-github-actions/auth@v2'
         with:
           workload_identity_provider: 'projects/619195795350/locations/global/workloadIdentityPools/github-access-pool/providers/github-oidc'
           service_account: 'terraform@diagramastext-stage.iam.gserviceaccount.com'
@@ -136,7 +136,7 @@ jobs:
           fetch-depth: 0
       - name: Authenticate with GCP
         id: auth
-        uses: 'google-github-actions/auth@v1'
+        uses: 'google-github-actions/auth@v2'
         with:
           workload_identity_provider: 'projects/677209864825/locations/global/workloadIdentityPools/github-access-pool/providers/github-oidc'
           service_account: 'terraform@diagramastext-prod.iam.gserviceaccount.com'
